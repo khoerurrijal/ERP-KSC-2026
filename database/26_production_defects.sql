@@ -24,6 +24,7 @@ SELECT
   0 AS qty_proses,
   0 AS qty_reject,
   NULL AS notes,
+  NULL AS operator_name,
   po.created_at AS created_at
 FROM purchase_items pi
 JOIN purchase_orders po ON pi.po_id = po.id
@@ -43,6 +44,7 @@ SELECT
   0 AS qty_proses,
   0 AS qty_reject,
   so.notes AS notes,
+  NULL AS operator_name,
   so.created_at AS created_at
 FROM sales_items si
 JOIN sales_orders so ON si.so_id = so.id
@@ -56,7 +58,7 @@ UNION ALL
 SELECT 
   CAST(pl.processed_date AS DATE) AS mutation_date,
   'Produksi: ' || so.invoice_number AS reference,
-  e.full_name AS actor,
+  COALESCE(c.name, so.customer_code) AS actor,
   si.product_code,
   p.name AS product_name,
   0 AS qty_in,
@@ -64,11 +66,13 @@ SELECT
   pl.qty_processed AS qty_proses,
   COALESCE(pl.qty_defect, 0) AS qty_reject,
   pl.notes AS notes,
+  e.full_name AS operator_name,
   pl.created_at AS created_at
 FROM production_logs pl
 JOIN sales_items si ON pl.job_id = si.id
 JOIN sales_orders so ON si.so_id = so.id
 JOIN products p ON si.product_code = p.product_code
+LEFT JOIN customers c ON so.customer_code = c.customer_code
 LEFT JOIN employees e ON pl.employee_id = e.id
 WHERE pl.qty_processed > 0 OR COALESCE(pl.qty_defect, 0) > 0;
 
@@ -80,6 +84,8 @@ GRANT SELECT ON public.inventory_mutations TO authenticated;
 -- (OPSIONAL) UPDATE SYNC STOCK LOGIC
 -- Jika Anda menjalankan ulang sinkronisasi manual.
 -- =====================================================================
+DROP VIEW IF EXISTS public.stock_calculation_v2;
+
 CREATE OR REPLACE VIEW public.stock_calculation_v2 AS
 SELECT 
     p.product_code,

@@ -125,7 +125,6 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                   <td className="px-6 py-4">
                     <div className="text-foreground/90 font-bold">{item.actor || '-'}</div>
                     <div className="text-xs text-foreground/60">{item.reference}</div>
-                    {item.notes && <div className="text-xs text-foreground/50 italic mt-1 break-words max-w-xs">{item.notes}</div>}
                   </td>
                   <td className="px-6 py-4 text-foreground/90">{item.product_name}</td>
                   <td className="px-6 py-4 text-right">
@@ -144,16 +143,26 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                   </td>
                   <td className="px-6 py-4 text-right">
                     {item.qty_proses > 0 ? (
-                      <span className="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full text-xs">
-                        {item.qty_proses}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full text-xs">
+                          {item.qty_proses}
+                        </span>
+                        {item.operator_name && (
+                          <span className="text-[10px] text-foreground/50">{item.operator_name}</span>
+                        )}
+                      </div>
                     ) : '-'}
                   </td>
                   <td className="px-6 py-4 text-right">
                     {item.qty_reject > 0 ? (
-                      <span className="font-bold text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full text-xs">
-                        {item.qty_reject}
-                      </span>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="font-bold text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full text-xs">
+                          {item.qty_reject}
+                        </span>
+                        {item.notes && (
+                          <span className="text-[10px] text-foreground/50 italic max-w-[100px] break-words text-right">{item.notes}</span>
+                        )}
+                      </div>
                     ) : '-'}
                   </td>
                 </tr>
