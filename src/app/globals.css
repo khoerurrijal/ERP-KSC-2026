@@ -1,0 +1,82 @@
+@import "tailwindcss";
+
+:root {
+  /* Luxury Clean Glassium Theme */
+  --background: #09090B;
+  --foreground: #FAFAFA;
+  
+  --primary: #D4AF37;
+  --primary-foreground: #09090B;
+  
+  --accent: #C084FC;
+  --accent-foreground: #FAFAFA;
+
+  --card: rgba(255, 255, 255, 0.03);
+  --card-border: rgba(255, 255, 255, 0.08);
+  
+  --radius: 1rem; /* Rounded XL */
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  
+  --color-card: var(--card);
+  --color-card-border: var(--card-border);
+  
+  --radius-xl: var(--radius);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  background-image: 
+    radial-gradient(at 0% 0%, rgba(212, 175, 55, 0.08) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, rgba(192, 132, 252, 0.08) 0px, transparent 50%);
+  background-attachment: fixed;
+}
+
+/* Glassmorphism utility classes */
+@layer utilities {
+  .glass-card {
+    @apply bg-card border border-card-border backdrop-blur-xl rounded-xl shadow-lg;
+  }
+  .glass-panel {
+    @apply bg-card border-r border-card-border backdrop-blur-xl shadow-2xl;
+  }
+  .glass-input {
+    @apply bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all;
+  }
+  .btn-primary {
+    @apply bg-primary text-primary-foreground font-semibold px-4 py-2 rounded-xl hover:bg-[#E5C158] transition-all shadow-[0_0_15px_rgba(212,175,55,0.3)] hover:shadow-[0_0_20px_rgba(212,175,55,0.5)];
+  }
+  .btn-secondary {
+    @apply bg-white/5 text-foreground border border-white/10 font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all;
+  }
+}
+
+select option {
+  background-color: #1A1A1A;
+  color: #F8F8F8;
+}
+
+/* Scrollbar custom for dark theme */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: #0A0A0A; }
+::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: #555; }
+
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type=number] {
+  -moz-appearance: textfield;
+}

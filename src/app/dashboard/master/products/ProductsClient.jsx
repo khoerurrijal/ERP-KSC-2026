@@ -1,0 +1,236 @@
+'use client'
+
+import { useState } from 'react'
+import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X } from 'lucide-react'
+import { addProduct, deleteProduct, updateProduct } from './actions'
+import CustomSelect from '@/components/CustomSelect'
+
+export default function ProductsClient({ products: initialProducts = [], error = null }) {
+  const [products, setProducts] = useState(initialProducts)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showModal, setShowModal] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  
+  // Extract unique categories for datalist
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean)))
+  
+  const [name, setName] = useState('')
+  const [category, setCategory] = useState('CUP')
+  const [workshop, setWorkshop] = useState('GLOBAL')
+  const [sellingPrice, setSellingPrice] = useState(0)
+  const [isPending, setIsPending] = useState(false)
+
+  const handleSubmit = async () => {
+    if (!name) return alert('Nama produk wajib diisi.')
+    if (!category) return alert('Kategori wajib diisi.')
+    
+    setIsPending(true)
+    let res;
+
+    if (editingId) {
+      res = await updateProduct(editingId, {
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice)
+      })
+    } else {
+      res = await addProduct({
+        product_code: 'PRD-' + Math.floor(Math.random() * 100000),
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice)
+      })
+    }
+
+    setIsPending(false)
+
+    if (res.error) return alert(res.error)
+
+    if (editingId) {
+      setProducts(products.map(p => p.id === editingId ? res.product : p))
+    } else {
+      setProducts([res.product, ...products])
+    }
+    closeModal()
+  }
+
+  const closeModal = () => {
+    setShowModal(false)
+    setEditingId(null)
+    setName('')
+    setCategory('CUP')
+    setSellingPrice(0)
+  }
+
+  const openEditModal = (product) => {
+    setEditingId(product.id)
+    setName(product.name)
+    setCategory(product.category || '')
+    setWorkshop(product.workshop_code || 'GLOBAL')
+    setSellingPrice(product.selling_price || 0)
+    setShowModal(true)
+  }
+
+  const handleDelete = async (id) => {
+    if(!confirm('Hapus produk ini?')) return;
+    const res = await deleteProduct(id)
+    if (res.error) alert(res.error)
+    else setProducts(products.filter(p => p.id !== id))
+  }
+
+  const filteredProducts = products.filter(p => 
+    (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.product_code || '').toLowerCase().includes(searchQuery.toLowerCase())
+  )
+
+  return (
+    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Box className="w-6 h-6 text-accent" />
+            Produk (Products)
+          </h1>
+          <p className="text-sm text-foreground/60 mt-1">Daftar produk jadi yang siap dijual ke Pelanggan atau Marketplace.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <div className="relative">
+            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
+            <input 
+              type="text" 
+              placeholder="Cari barang jadi..." 
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="glass-input !pl-10 h-10 w-64 text-sm"
+            />
+          </div>
+          <button onClick={() => { closeModal(); setShowModal(true); }} className="btn-primary h-10 px-4 flex items-center gap-2 text-sm">
+            <Plus className="w-4 h-4" />
+            Tambah Produk
+          </button>
+        </div>
+      </header>
+
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
+              <tr>
+                <th className="px-6 py-4 font-medium">Kode</th>
+                <th className="px-6 py-4 font-medium">Nama Produk</th>
+                <th className="px-6 py-4 font-medium">Kategori</th>
+                <th className="px-6 py-4 font-medium">Workshop</th>
+                <th className="px-6 py-4 font-medium">Harga Jual</th>
+                <th className="px-6 py-4 font-medium text-right">Aksi</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {error ? (
+                <tr>
+                  <td colSpan="7" className="px-6 py-8 text-center text-red-400">Gagal memuat data produk.</td>
+                </tr>
+              ) : filteredProducts?.length === 0 ? (
+                <tr>
+                  <td colSpan="6" className="px-6 py-12 text-center text-foreground/40">
+                    Belum ada data barang jadi. Silakan tambah data baru.
+                  </td>
+                </tr>
+              ) : filteredProducts?.map((item) => (
+                <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                  <td className="px-6 py-4 font-medium text-accent">{item.product_code}</td>
+                  <td className="px-6 py-4 text-foreground/90">{item.name}</td>
+                  <td className="px-6 py-4 text-foreground/60">{item.category || '-'}</td>
+                  <td className="px-6 py-4 text-foreground/80">{item.workshops?.name || '-'}</td>
+                  <td className="px-6 py-4 text-foreground/90 font-semibold">
+                    Rp {Number(item.selling_price || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                    <button onClick={() => openEditModal(item)} className="text-accent hover:text-accent/80 font-medium text-xs flex items-center gap-1">
+                      Edit
+                    </button>
+                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 font-medium text-xs flex items-center gap-1">
+                      <Trash2 className="w-3 h-3" /> Hapus
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Box className="w-5 h-5 text-primary" />
+                <h3 className="font-bold text-foreground">{editingId ? 'Edit Produk' : 'Tambah Produk'}</h3>
+              </div>
+              <button onClick={closeModal} className="text-foreground/50 hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Nama Produk <span className="text-red-400">*</span></label>
+                <input 
+                  type="text" 
+                  value={name} 
+                  onChange={e => setName(e.target.value)} 
+                  placeholder="Contoh: Cup 16oz Sablon"
+                  className="glass-input w-full" 
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Kategori</label>
+                  <input 
+                    list="categories" 
+                    value={category} 
+                    onChange={e => setCategory(e.target.value)} 
+                    placeholder="Pilih atau ketik baru..."
+                    className="glass-input w-full"
+                  />
+                  <datalist id="categories">
+                    {uniqueCategories.map(cat => (
+                      <option key={cat} value={cat} />
+                    ))}
+                  </datalist>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80 mb-1 block">Workshop</label>
+                  <CustomSelect 
+                    value={workshop} 
+                    onChange={e => setWorkshop(e.target.value)} 
+                    options={[
+                      { value: "GLOBAL", label: "GLOBAL" },
+                      { value: "KING", label: "KING" },
+                      { value: "GUDANG", label: "GUDANG" }
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-foreground/80">Harga Jual (Rp)</label>
+                <input 
+                  type="number" 
+                  value={sellingPrice} 
+                  onChange={e => setSellingPrice(e.target.value)} 
+                  className="glass-input w-full" 
+                />
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5">
+              <button onClick={closeModal} className="btn-secondary px-4 h-10 text-sm" disabled={isPending}>Batal</button>
+              <button onClick={handleSubmit} disabled={isPending} className="btn-primary px-4 h-10 text-sm flex items-center gap-2">
+                {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />} 
+                {isPending ? 'Menyimpan...' : 'Simpan'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
