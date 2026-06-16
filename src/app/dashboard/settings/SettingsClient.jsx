@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store } from 'lucide-react'
-import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig } from './actions'
+import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users } from 'lucide-react'
+import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles } from './actions'
 
 export default function SettingsClient({ initialSettings }) {
   const [activeTab, setActiveTab] = useState('dropdowns')
@@ -35,6 +35,23 @@ export default function SettingsClient({ initialSettings }) {
       { bank_name: 'Bank Mandiri', account_number: '098-765-4321', account_name: 'PT KING SABLON NUSANTARA' }
     ]
   })
+
+  // State for Roles & Permissions
+  const [rolePermissions, setRolePermissions] = useState(initialSettings.role_permissions || {})
+  const [userRoles, setUserRoles] = useState(initialSettings.user_roles || [])
+  
+  const MENU_LIST = [
+    { key: 'dashboard', label: 'Dashboard' },
+    { key: 'penjualan', label: 'Penjualan (SO)' },
+    { key: 'marketplace', label: 'Marketplace' },
+    { key: 'produksi', label: 'Produksi' },
+    { key: 'gudang', label: 'Gudang (Inventory & PO)' },
+    { key: 'keuangan', label: 'Keuangan (Kas, Payroll)' },
+    { key: 'master_data', label: 'Master Data' },
+    { key: 'laporan', label: 'Laporan' },
+    { key: 'pengaturan', label: 'Pengaturan' }
+  ]
+  const ROLES = ['Owner', 'Admin', 'Operator']
 
   // Handlers for Dropdowns
   const handleAddDropdownItem = (key) => {
@@ -94,6 +111,34 @@ export default function SettingsClient({ initialSettings }) {
     setStore({ ...store, banks: newBanks })
   }
 
+  // Handlers for Roles & Permissions
+  const handleTogglePermission = (role, menuKey) => {
+    const currentPerms = rolePermissions[role] || []
+    let newPerms
+    if (currentPerms.includes(menuKey)) {
+      newPerms = currentPerms.filter(k => k !== menuKey)
+    } else {
+      newPerms = [...currentPerms, menuKey]
+    }
+    setRolePermissions({ ...rolePermissions, [role]: newPerms })
+  }
+
+  const handleAddUserRole = () => {
+    setUserRoles([...userRoles, { email: '', role: 'Operator' }])
+  }
+
+  const handleUpdateUserRole = (index, field, value) => {
+    const newUR = [...userRoles]
+    newUR[index][field] = value
+    setUserRoles(newUR)
+  }
+
+  const handleRemoveUserRole = (index) => {
+    const newUR = [...userRoles]
+    newUR.splice(index, 1)
+    setUserRoles(newUR)
+  }
+
   // Handle Saves
   const handleSaveDropdowns = async () => {
     setIsSaving(true)
@@ -116,6 +161,22 @@ export default function SettingsClient({ initialSettings }) {
     setError(null)
     const res = await updateStoreConfig(store)
     if (!res.success) setError(res.error)
+    setIsSaving(false)
+  }
+
+  const handleSaveAccess = async () => {
+    setIsSaving(true)
+    setError(null)
+    
+    // validasi email user
+    const filledUsers = userRoles.filter(u => u.email.trim() !== '')
+    setUserRoles(filledUsers) // auto clean up empty ones
+
+    const res1 = await updateRolePermissions(rolePermissions)
+    const res2 = await updateUserRoles(filledUsers)
+    
+    if (!res1.success) setError(res1.error)
+    else if (!res2.success) setError(res2.error)
     setIsSaving(false)
   }
 
@@ -168,6 +229,17 @@ export default function SettingsClient({ initialSettings }) {
         >
           <Store className="w-4 h-4" />
           Toko & Invoice
+        </button>
+        <button
+          onClick={() => setActiveTab('access')}
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'access' 
+              ? 'border-primary text-primary' 
+              : 'border-transparent text-foreground/50 hover:text-foreground/80'
+          }`}
+        >
+          <ShieldCheck className="w-4 h-4" />
+          Akses & Pengguna
         </button>
       </div>
 
@@ -589,6 +661,127 @@ export default function SettingsClient({ initialSettings }) {
               {isSaving ? 'Menyimpan...' : 'Simpan Profil Toko'}
             </button>
           </div>
+        </div>
+      )}
+
+      {/* Tab Content: Access & Users */}
+      {activeTab === 'access' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          
+          {/* Matrix Role & Permission */}
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 overflow-hidden">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-primary" />
+              Matrix Hak Akses Menu
+            </h3>
+            <p className="text-sm text-foreground/60 mb-6">Centang menu yang boleh diakses oleh masing-masing Role.</p>
+            
+            <div className="overflow-x-auto custom-scrollbar">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-xs font-bold tracking-wider">
+                  <tr>
+                    <th className="px-6 py-4 rounded-tl-xl">Nama Menu</th>
+                    {ROLES.map(role => (
+                      <th key={role} className="px-6 py-4 text-center">{role}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {MENU_LIST.map((menu) => (
+                    <tr key={menu.key} className="hover:bg-white/5 transition-colors">
+                      <td className="px-6 py-4 font-medium text-foreground/90">{menu.label}</td>
+                      {ROLES.map(role => {
+                        const isChecked = (rolePermissions[role] || []).includes(menu.key)
+                        return (
+                          <td key={role} className="px-6 py-4 text-center">
+                            <label className="flex items-center justify-center cursor-pointer">
+                              <input 
+                                type="checkbox" 
+                                checked={isChecked}
+                                onChange={() => handleTogglePermission(role, menu.key)}
+                                className="w-5 h-5 rounded border-white/20 bg-black/40 text-primary focus:ring-primary focus:ring-offset-background"
+                              />
+                            </label>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* User Management */}
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-lg font-bold flex items-center gap-2">
+                <Users className="w-5 h-5 text-accent" />
+                Daftar Pengguna (User Management)
+              </h3>
+              <button 
+                onClick={handleAddUserRole}
+                className="btn-secondary text-xs px-3 h-8 flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" /> Tambah User
+              </button>
+            </div>
+            <p className="text-sm text-foreground/60 mb-6">Daftarkan username / email user beserta Role-nya di sini agar mereka bisa login dan melihat menu yang sesuai.</p>
+            
+            <div className="space-y-3">
+              {userRoles.map((ur, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-3 items-center p-3 border border-white/10 rounded-xl bg-white/5">
+                  <div className="flex-1 w-full space-y-1">
+                    <label className="text-xs text-foreground/60">Username / Email (Wajib Sama dgn Login)</label>
+                    <input
+                      type="text"
+                      placeholder="admin / admin@kingsablon.com"
+                      value={ur.email}
+                      onChange={(e) => handleUpdateUserRole(index, 'email', e.target.value.toLowerCase())}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent/50"
+                    />
+                  </div>
+                  <div className="w-full sm:w-48 space-y-1">
+                    <label className="text-xs text-foreground/60">Role Akses</label>
+                    <select
+                      value={ur.role}
+                      onChange={(e) => handleUpdateUserRole(index, 'role', e.target.value)}
+                      className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-accent/50 text-foreground [&>option]:bg-background"
+                    >
+                      {ROLES.map(r => (
+                        <option key={r} value={r}>{r}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="w-full sm:w-auto pt-5">
+                    <button 
+                      onClick={() => handleRemoveUserRole(index)}
+                      className="p-2 w-full sm:w-auto text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-transparent hover:border-red-400/20 flex items-center justify-center"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+              {userRoles.length === 0 && (
+                <div className="text-center py-8 text-foreground/40 italic text-sm">
+                  Belum ada user yang didaftarkan rolenya.<br/>User yang tidak terdaftar otomatis dianggap Operator.
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSaveAccess}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-primary text-primary-foreground px-8 py-3 rounded-xl font-bold hover:bg-primary/90 transition-all active:scale-95 shadow-[0_0_20px_rgba(var(--primary),0.3)] disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {isSaving ? 'Menyimpan...' : 'Simpan Akses & Pengguna'}
+            </button>
+          </div>
+
         </div>
       )}
     </div>
