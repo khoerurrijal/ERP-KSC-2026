@@ -105,6 +105,8 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                 <th className="px-6 py-4 font-medium">Produk</th>
                 <th className="px-6 py-4 font-medium text-right text-green-400">Masuk (IN)</th>
                 <th className="px-6 py-4 font-medium text-right text-yellow-400">Keluar (OUT)</th>
+                <th className="px-6 py-4 font-medium text-right text-blue-400">Proses</th>
+                <th className="px-6 py-4 font-medium text-right text-red-400">Reject</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -137,6 +139,20 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                     {item.qty_out > 0 ? (
                       <span className="font-bold text-yellow-400 bg-yellow-500/10 px-2.5 py-1 rounded-full text-xs">
                         -{item.qty_out}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {item.qty_proses > 0 ? (
+                      <span className="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full text-xs">
+                        {item.qty_proses}
+                      </span>
+                    ) : '-'}
+                  </td>
+                  <td className="px-6 py-4 text-right">
+                    {item.qty_reject > 0 ? (
+                      <span className="font-bold text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full text-xs">
+                        {item.qty_reject}
                       </span>
                     ) : '-'}
                   </td>
