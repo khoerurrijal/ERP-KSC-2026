@@ -13,6 +13,8 @@ export async function saveProductionProgress(payload) {
         job_id: payload.job_id,
         employee_id: payload.employee_id,
         qty_processed: payload.qty_processed,
+        qty_defect: payload.qty_defect || 0,
+        notes: payload.notes || '',
         processed_date: new Date().toISOString()
       }])
     

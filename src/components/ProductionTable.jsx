@@ -32,6 +32,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   // Form State
   const [employeeId, setEmployeeId] = useState('')
   const [qtyProcessed, setQtyProcessed] = useState('')
+  const [qtyDefect, setQtyDefect] = useState('')
+  const [notes, setNotes] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
   const [sortConfigSO, setSortConfigSO] = useState({ key: 'target_date', direction: 'asc' })
@@ -144,6 +146,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
     setIsModalOpen(false)
     setSelectedJob(null)
     setQtyProcessed('')
+    setQtyDefect('')
+    setNotes('')
   }
 
   const handleSubmitQty = async () => {
@@ -157,7 +161,9 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       const res = await saveProductionProgress({
         job_id: selectedJob.id,
         employee_id: employeeId,
-        qty_processed: parseInt(qtyProcessed)
+        qty_processed: parseInt(qtyProcessed) || 0,
+        qty_defect: parseInt(qtyDefect) || 0,
+        notes: notes
       })
 
       if (res.success) {
@@ -398,7 +404,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
               </div>
 
               <div className="space-y-2">
-                <label className="text-sm font-medium text-foreground/80">Jumlah Qty Dikerjakan Hari Ini</label>
+                <label className="text-sm font-medium text-foreground/80">Jumlah Qty Dikerjakan Hari Ini <span className="text-red-400">*</span></label>
                 <input 
                   type="number" 
                   min="1"
@@ -407,6 +413,28 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                   onChange={e => setQtyProcessed(e.target.value)} 
                   placeholder="Berapa pcs?"
                   className="glass-input w-full" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Jumlah Qty Rusak / Cacat</label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={qtyDefect} 
+                  onChange={e => setQtyDefect(e.target.value)} 
+                  placeholder="Isi jika ada barang reject"
+                  className="glass-input w-full border-red-500/30 focus:border-red-400" 
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Keterangan / Notes</label>
+                <textarea 
+                  value={notes} 
+                  onChange={e => setNotes(e.target.value)} 
+                  placeholder="Keterangan tambahan (opsional)"
+                  className="glass-input w-full min-h-[80px] resize-none" 
                 />
               </div>
             </div>

@@ -51,12 +51,12 @@ export default function InvoiceClient({ order, storeConfig }) {
       <style dangerouslySetInnerHTML={{
         __html: `
         @media print {
-          @page { size: A4 portrait; margin: 5mm; }
+          @page { size: A4 portrait; margin: 10mm; }
           .no-print, aside, nav, header { display: none !important; }
           main { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; flex: none !important; }
-          body, html { background-color: white !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+          body, html { background-color: white !important; margin: 0 !important; padding: 0 !important; width: 100% !important; zoom: 0.8; }
           * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; min-height: auto !important; overflow: visible !important; }
+          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; min-height: auto !important; overflow: visible !important; padding: 1.5rem !important; }
           .text-foreground { color: black !important; }
           .text-foreground\\/60 { color: #4a5568 !important; }
           .border-white\\/10 { border-color: #e2e8f0 !important; }

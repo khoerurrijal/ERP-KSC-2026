@@ -123,6 +123,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                   <td className="px-6 py-4">
                     <div className="text-foreground/90 font-bold">{item.actor || '-'}</div>
                     <div className="text-xs text-foreground/60">{item.reference}</div>
+                    {item.notes && <div className="text-xs text-foreground/50 italic mt-1 break-words max-w-xs">{item.notes}</div>}
                   </td>
                   <td className="px-6 py-4 text-foreground/90">{item.product_name}</td>
                   <td className="px-6 py-4 text-right">
