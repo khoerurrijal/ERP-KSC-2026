@@ -12,7 +12,7 @@ export default function PriceCalculator({ products = [] }) {
 
   const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
   const filteredProducts = products.filter(p => p.category === category)
-  const selectedProduct = products.find(p => p.id === productId)
+  const selectedProduct = products.find(p => p.id?.toString() === productId?.toString())
 
   // Harga Dasar (HPP atau base_price) -> For Sablon, the fee is added on top.
   // Wait, in real logic, does the product have selling_price? Yes.

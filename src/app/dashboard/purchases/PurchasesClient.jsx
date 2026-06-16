@@ -80,7 +80,7 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
       // Jika statusnya LUNAS, atau filternya LUNAS, kita potong berdasarkan bulan.
       // Jika statusnya BELUM LUNAS (Tempo), tampilkan semua tanpa mempedulikan bulan.
       let matchMonth = true
-      if (filterStatus === 'LUNAS' || (isLunas && filterStatus === '')) {
+      if (!searchQuery && (filterStatus === 'LUNAS' || (isLunas && filterStatus === ''))) {
         matchMonth = po.date && po.date.startsWith(selectedMonth)
       }
 

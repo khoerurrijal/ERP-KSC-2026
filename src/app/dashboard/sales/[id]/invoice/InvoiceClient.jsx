@@ -50,9 +50,11 @@ export default function InvoiceClient({ order, storeConfig }) {
       {/* Tombol Aksi - Disembunyikan saat di-print */}
       <style dangerouslySetInnerHTML={{__html: `
         @media print {
-          .no-print { display: none !important; }
-          body { background-color: white !important; }
-          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; }
+          @page { size: portrait; margin: 10mm; }
+          .no-print, aside { display: none !important; }
+          main { margin: 0 !important; padding: 0 !important; max-width: 100% !important; width: 100% !important; flex: none !important; }
+          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; min-height: 0 !important; overflow: visible !important; padding: 0 !important; }
           .text-foreground { color: black !important; }
           .text-foreground\\/60 { color: #4a5568 !important; }
           .border-white\\/10 { border-color: #e2e8f0 !important; }
@@ -65,9 +67,9 @@ export default function InvoiceClient({ order, storeConfig }) {
           <ArrowLeft className="w-4 h-4" /> Kembali ke Sales
         </button>
         <div className="flex items-center gap-3">
-          <button onClick={() => window.open(waUrl, '_blank')} className="btn-secondary bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20 h-10 px-4 text-sm flex items-center gap-2">
+          <a href={waUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20 h-10 px-4 text-sm flex items-center gap-2">
             <Phone className="w-4 h-4" /> Share WA
-          </button>
+          </a>
           <button onClick={handlePrint} className="btn-primary h-10 px-4 text-sm flex items-center gap-2">
             <Printer className="w-4 h-4" /> Print Invoice
           </button>
@@ -75,7 +77,7 @@ export default function InvoiceClient({ order, storeConfig }) {
       </div>
 
       {/* KERTAS INVOICE */}
-      <div className="glass-card bg-white text-black p-8 md:p-12 min-h-[800px] relative overflow-hidden" style={{ background: '#ffffff', color: '#1a202c' }}>
+      <div className="glass-card bg-white text-black p-8 md:p-12 min-h-[800px] relative overflow-hidden print:min-h-0 print:overflow-visible print:p-0 print:m-0" style={{ background: '#ffffff', color: '#1a202c' }}>
         
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />

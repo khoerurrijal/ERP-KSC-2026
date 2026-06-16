@@ -96,8 +96,9 @@ export default function SalesClient({ salesOrders = [] }) {
 
   const filteredAndSorted = useMemo(() => {
     let result = nonMarketplaceOrders.filter(so => {
-      const matchSearch = ((so.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-                          so.customers?.((name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      const query = String(searchQuery || '').toLowerCase()
+      const matchSearch = String(so.invoice_number || '').toLowerCase().includes(query) || 
+                          String(so.customers?.name || '').toLowerCase().includes(query)
       
       // Filter payment status
       let matchStatus = true
@@ -108,7 +109,7 @@ export default function SalesClient({ salesOrders = [] }) {
       }
 
       let matchMonth = true
-      if (filterMonth) {
+      if (filterMonth && !searchQuery) {
         const orderMonth = new Date(so.date).toISOString().substring(0, 7) // YYYY-MM
         matchMonth = orderMonth === filterMonth
       }

@@ -16,9 +16,9 @@ export default function SettingsClient({ initialSettings }) {
   const [cashflow, setCashflow] = useState({
     king_fixed_expenses: initialSettings.cashflow_config?.king_fixed_expenses || 4100000,
     tabungan_fixed_in: initialSettings.cashflow_config?.tabungan_fixed_in || 2000000,
-    profit_gudang_percent: initialSettings.cashflow_config?.profit_gudang_percent || 10,
     profit_global_percent: initialSettings.cashflow_config?.profit_global_percent || 10,
-    zakat_percent: initialSettings.cashflow_config?.zakat_percent || 3
+    zakat_percent: initialSettings.cashflow_config?.zakat_percent || 3,
+    virtual_balance: initialSettings.cashflow_config?.virtual_balance || 42289347
   })
 
   // State for Store Config
@@ -313,6 +313,24 @@ export default function SettingsClient({ initialSettings }) {
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-foreground/40">
                     <Percent className="w-4 h-4" />
                   </div>
+              <div className="h-px bg-white/10 w-full my-4" />
+
+              {/* Saldo Kas Virtual */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
+                <div>
+                  <label className="text-sm font-bold text-foreground/80">Saldo Kas Virtual (Rp)</label>
+                  <p className="text-xs text-foreground/40 mt-1">Angka penyeimbang kas yang akan tampil sebagai Kas Fisik Realtime di Laporan (Report).</p>
+                </div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">
+                    Rp
+                  </div>
+                  <input
+                    type="number"
+                    value={cashflow.virtual_balance}
+                    onChange={(e) => setCashflow({ ...cashflow, virtual_balance: Number(e.target.value) })}
+                    className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-right focus:outline-none focus:border-primary/50 text-foreground font-mono text-lg text-yellow-400"
+                  />
                 </div>
               </div>
             </div>

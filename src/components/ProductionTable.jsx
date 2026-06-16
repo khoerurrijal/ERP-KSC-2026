@@ -41,6 +41,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const filteredJobs = (productionJobs || []).filter(j => 
     (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+     (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
@@ -51,6 +52,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
      j.item_status?.toUpperCase() === 'DIKIRIM' || 
      j.item_status?.toUpperCase() === 'TERKIRIM') &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+     (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
@@ -159,8 +161,14 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       })
 
       if (res.success) {
-        alert(`Berhasil mencatat ${qtyProcessed} pcs.`)
-        handleCloseModal()
+        if (res.isFinished || (parseInt(qtyProcessed) + selectedJob.qty_processed >= selectedJob.qty_target)) {
+          alert(`Pesanan sudah jadi! (Tercatat tambahan ${qtyProcessed} pcs). Item akan dipindahkan ke tab Tracking Sales Order.`)
+          window.location.reload()
+        } else {
+          alert(`Berhasil mencatat ${qtyProcessed} pcs.`)
+          handleCloseModal()
+          window.location.reload()
+        }
       } else {
         alert('Gagal mencatat: ' + res.error)
       }

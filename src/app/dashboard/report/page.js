@@ -12,6 +12,11 @@ export default async function ReportPage({ searchParams }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })()
 
+  // Fetch virtual_balance from cashflow_config
+  const { data: configData } = await supabase.from('system_settings').select('value').eq('key', 'cashflow_config').single()
+  const cashflow_config = configData?.value || {}
+  const virtual_balance = Number(cashflow_config.virtual_balance || 42289347)
+
   // Fetch all transactions with a high limit to bypass the 1000 default
   const { data: transactions } = await supabase
     .from('transactions')
@@ -52,7 +57,7 @@ export default async function ReportPage({ searchParams }) {
     global: { masuk: 0, keluar: 0, akhir: 0 },
     tabungan: { masuk: 0, keluar: 0, akhir: 0 },
     total_buku_besar: 0,
-    total_kas_fisik: 42289347 // hardcoded physically for now unless there's a bank table
+    total_kas_fisik: virtual_balance // dynamically fetched from settings
   }
 
   // Calculate accumulated balance from history
