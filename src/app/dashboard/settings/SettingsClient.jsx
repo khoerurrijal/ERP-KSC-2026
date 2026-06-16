@@ -55,6 +55,25 @@ export default function SettingsClient({ initialSettings }) {
     setDropdowns({ ...dropdowns, [key]: list })
   }
 
+  const handleAddCategoryMapItem = (orderType) => {
+    const map = { ...(dropdowns.category_mapping || {}) }
+    if (!map[orderType]) map[orderType] = []
+    map[orderType].push('')
+    setDropdowns({ ...dropdowns, category_mapping: map })
+  }
+
+  const handleUpdateCategoryMapItem = (orderType, index, value) => {
+    const map = { ...(dropdowns.category_mapping || {}) }
+    map[orderType][index] = value
+    setDropdowns({ ...dropdowns, category_mapping: map })
+  }
+
+  const handleRemoveCategoryMapItem = (orderType, index) => {
+    const map = { ...(dropdowns.category_mapping || {}) }
+    map[orderType].splice(index, 1)
+    setDropdowns({ ...dropdowns, category_mapping: map })
+  }
+
   // Handlers for Banks
   const handleAddBank = () => {
     setStore({
@@ -156,7 +175,7 @@ export default function SettingsClient({ initialSettings }) {
       {activeTab === 'dropdowns' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {Object.keys(dropdowns).map(key => (
+            {Object.keys(dropdowns).filter(k => k !== 'category_mapping').map(key => (
               <div key={key} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-foreground/80 uppercase tracking-widest text-xs flex items-center gap-2">
@@ -194,6 +213,57 @@ export default function SettingsClient({ initialSettings }) {
                 </div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-8 border-t border-white/10 pt-8">
+            <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+              <ListPlus className="w-5 h-5 text-primary" />
+              Filter Kategori Berdasarkan Jenis Pesanan
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+              {(dropdowns.order_type || []).map(orderType => {
+                const mapList = (dropdowns.category_mapping || {})[orderType] || []
+                return (
+                  <div key={orderType} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="font-bold text-foreground/80 tracking-widest text-xs flex items-center gap-2">
+                        <Settings className="w-3 h-3 text-accent" />
+                        UNTUK: {orderType}
+                      </h3>
+                      <button 
+                        onClick={() => handleAddCategoryMapItem(orderType)}
+                        className="p-1.5 bg-accent/10 text-accent hover:bg-accent/20 rounded-lg transition-colors"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                      {mapList.map((item, idx) => (
+                        <div key={idx} className="flex gap-2">
+                          <input
+                            type="text"
+                            value={item}
+                            onChange={(e) => handleUpdateCategoryMapItem(orderType, idx, e.target.value)}
+                            className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-accent/50 focus:ring-1 focus:ring-accent/50 text-foreground"
+                            placeholder="Kategori spesifik..."
+                          />
+                          <button 
+                            onClick={() => handleRemoveCategoryMapItem(orderType, idx)}
+                            className="p-2 text-red-400 hover:bg-red-400/10 rounded-xl transition-colors border border-transparent hover:border-red-400/20"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ))}
+                      {mapList.length === 0 && (
+                        <div className="text-xs text-foreground/40 italic py-4 text-center">Belum ada filter kategori</div>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
           </div>
 
           <div className="flex justify-end pt-4">

@@ -94,7 +94,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
 
   // Derived state
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
+  const getCategoriesForItem = (orderType) => {
+    if (!orderType) return []
+    const mapping = dropdownConfig.category_mapping || {}
+    if (mapping[orderType] && mapping[orderType].length > 0) {
+      return mapping[orderType]
+    }
+    // Fallback: semua kategori
+    return [...new Set(products.map(p => p.category).filter(Boolean))]
+  }
   
   const calculateTotal = () => {
     return items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price)), 0)
@@ -117,8 +125,16 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setItems(items.map(item => {
       if (item.id === id) {
         const updated = { ...item, [field]: value }
+        if (field === 'order_type') {
+          updated.category = ''
+          updated.product_id = ''
+          updated.product_search = ''
+          updated.price = 0
+        }
         if (field === 'category') {
           updated.product_id = '' // reset product when category changes
+          updated.product_search = ''
+          updated.price = 0
         }
         // Auto-fill price and workshop_id if product changes
         if (field === 'product_search') {
@@ -295,7 +311,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         onChange={e => handleItemChange(item.id, 'order_type', e.target.value)} 
                         options={[
                           { value: "", label: "Pilih..." },
-                          ...(dropdownConfig.order_status || ["SABLON", "POLOS", "KEMASAN"]).map(v => ({ value: v, label: v }))
+                          ...(dropdownConfig.order_type || ["SABLON", "POLOS", "KEMASAN"]).map(v => ({ value: v, label: v }))
                         ]}
                       />
                     </div>
@@ -307,8 +323,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         onChange={e => handleItemChange(item.id, 'category', e.target.value)} 
                         options={[
                           { value: "", label: "Semua Kategori" },
-                          ...categories.map(c => ({ value: c, label: c }))
+                          ...getCategoriesForItem(item.order_type).map(c => ({ value: c, label: c }))
                         ]}
+                        disabled={!item.order_type}
                       />
                     </div>
 

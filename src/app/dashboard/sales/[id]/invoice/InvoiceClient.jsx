@@ -5,7 +5,7 @@ import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail } from 'lucide
 
 export default function InvoiceClient({ order, storeConfig }) {
   const router = useRouter()
-  
+
   if (!order) {
     return (
       <div className="p-8 text-center text-foreground/60">
@@ -17,7 +17,7 @@ export default function InvoiceClient({ order, storeConfig }) {
   const invoiceId = order.invoice_number
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
-  
+
   const handlePrint = () => {
     window.print()
   }
@@ -45,20 +45,22 @@ export default function InvoiceClient({ order, storeConfig }) {
   const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      
+    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 print:pb-0 print:space-y-0 print:w-full print:max-w-none print:m-0">
+
       {/* Tombol Aksi - Disembunyikan saat di-print */}
-      <style dangerouslySetInnerHTML={{__html: `
+      <style dangerouslySetInnerHTML={{
+        __html: `
         @media print {
-          @page { size: portrait; margin: 10mm; }
-          .no-print, aside { display: none !important; }
-          main { margin: 0 !important; padding: 0 !important; max-width: 100% !important; width: 100% !important; flex: none !important; }
-          body { background-color: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; min-height: 0 !important; overflow: visible !important; padding: 0 !important; }
+          @page { size: A4 portrait; margin: 5mm; }
+          .no-print, aside, nav, header { display: none !important; }
+          main { margin: 0 !important; padding: 0 !important; max-width: none !important; width: 100% !important; flex: none !important; }
+          body, html { background-color: white !important; margin: 0 !important; padding: 0 !important; width: 100% !important; }
+          * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+          .glass-card { border: none !important; box-shadow: none !important; background: white !important; color: black !important; min-height: auto !important; overflow: visible !important; }
           .text-foreground { color: black !important; }
           .text-foreground\\/60 { color: #4a5568 !important; }
           .border-white\\/10 { border-color: #e2e8f0 !important; }
-          .bg-white\\/5 { background-color: #f7fafc !important; }
+          .bg-white\\/5 { background-color: transparent !important; }
         }
       `}} />
 
@@ -77,8 +79,8 @@ export default function InvoiceClient({ order, storeConfig }) {
       </div>
 
       {/* KERTAS INVOICE */}
-      <div className="glass-card bg-white text-black p-8 md:p-12 min-h-[800px] relative overflow-hidden print:min-h-0 print:overflow-visible print:p-0 print:m-0" style={{ background: '#ffffff', color: '#1a202c' }}>
-        
+      <div className="glass-card bg-white text-black p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
+
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
 
@@ -88,7 +90,7 @@ export default function InvoiceClient({ order, storeConfig }) {
               <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-16 md:h-20 w-auto object-contain bg-transparent" />
             </div>
             <p className="text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
-            
+
             <div className="mt-4 space-y-1 text-xs text-gray-600">
               <p className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {store.address}</p>
               <p className="flex items-center gap-2"><Phone className="w-3 h-3" /> {store.phone}</p>
@@ -173,7 +175,7 @@ export default function InvoiceClient({ order, storeConfig }) {
               <span className="font-bold text-gray-900 text-lg">Total Tagihan</span>
               <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID')}</span>
             </div>
-            
+
             <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-300 space-y-2">
               <div className="flex justify-between items-center text-sm text-green-700 font-medium">
                 <span>Telah Dibayar (DP)</span>
@@ -194,7 +196,7 @@ export default function InvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-16 text-center border-t border-gray-200 pt-8">
+        <div className="mt-8 md:mt-12 text-center border-t border-gray-200 pt-6 print:mt-8 print:pt-4">
           <p className="text-gray-500 text-sm">Terima kasih atas kepercayaan Anda kepada {store.store_name}.</p>
           <p className="text-gray-400 text-xs mt-1">Invoice ini dicetak secara otomatis oleh Sistem ERP {store.store_name}.</p>
         </div>

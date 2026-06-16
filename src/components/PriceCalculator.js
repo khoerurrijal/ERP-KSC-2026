@@ -4,13 +4,23 @@ import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function PriceCalculator({ products = [] }) {
-  const [orderType, setOrderType] = useState('Sablon')
+export default function PriceCalculator({ products = [], dropdownConfig = {} }) {
+  const [orderType, setOrderType] = useState('')
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
   const [qty, setQty] = useState(1)
 
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
+  const getCategoriesForItem = (oType) => {
+    if (!oType) return []
+    const mapping = dropdownConfig.category_mapping || {}
+    if (mapping[oType] && mapping[oType].length > 0) {
+      return mapping[oType]
+    }
+    // Fallback: semua kategori
+    return [...new Set(products.map(p => p.category).filter(Boolean))]
+  }
+
+  const filteredCategories = getCategoriesForItem(orderType)
   const filteredProducts = products.filter(p => p.category === category)
   const selectedProduct = products.find(p => p.id?.toString() === productId?.toString())
 
@@ -38,10 +48,10 @@ export default function PriceCalculator({ products = [] }) {
             <label className="text-xs font-medium text-foreground/60">Jenis Pesanan</label>
             <CustomSelect 
               value={orderType} 
-              onChange={e => setOrderType(e.target.value)} 
+              onChange={e => { setOrderType(e.target.value); setCategory(''); setProductId(''); }} 
               options={[
-                { value: "Sablon", label: "Sablon" },
-                { value: "Polos", label: "Polos" }
+                { value: "", label: "- Pilih -" },
+                ...(dropdownConfig.order_type || ["SABLON", "POLOS"]).map(v => ({ value: v, label: v }))
               ]} 
             />
           </div>
@@ -53,8 +63,9 @@ export default function PriceCalculator({ products = [] }) {
               onChange={(e) => { setCategory(e.target.value); setProductId(''); }} 
               options={[
                 { value: "", label: "- Pilih -" },
-                ...categories.map(c => ({ value: c, label: c }))
+                ...filteredCategories.map(c => ({ value: c, label: c }))
               ]} 
+              disabled={!orderType}
             />
           </div>
 

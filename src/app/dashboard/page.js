@@ -21,6 +21,8 @@ export default async function DashboardPage({ searchParams }) {
 
   // Fetch products for Kalkulator
   const { data: products } = await supabase.from('products').select('*').limit(100000).order('name')
+  const { data: settings } = await supabase.from('system_settings').select('*')
+  const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
 
   // Fetch orders for metrics
   const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
@@ -97,7 +99,7 @@ export default async function DashboardPage({ searchParams }) {
         
         {/* KALKULATOR HARGA */}
         <div className="lg:col-span-1">
-          <PriceCalculator products={products || []} />
+          <PriceCalculator products={products || []} dropdownConfig={dropdownConfig} />
         </div>
 
         {/* TENGAH: Antrean & Stok */}
