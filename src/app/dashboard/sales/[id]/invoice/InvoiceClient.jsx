@@ -84,7 +84,7 @@ export default function InvoiceClient({ order, storeConfig }) {
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
 
-        <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-gray-200 pb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-gray-200 pb-8 print:flex-row">
           <div>
             <div className="mb-2">
               <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-16 md:h-20 w-auto object-contain bg-transparent" />
@@ -111,7 +111,7 @@ export default function InvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8 mb-8 flex flex-col md:flex-row justify-between items-start gap-8">
+        <div className="mt-8 mb-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row">
           <div>
             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Ditagihkan Kepada:</p>
             <h3 className="text-lg font-bold text-gray-900">{order.customers?.name || 'Customer'}</h3>
@@ -156,8 +156,8 @@ export default function InvoiceClient({ order, storeConfig }) {
           </table>
         </div>
 
-        <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-8">
-          <div className="w-full md:w-1/2 p-4 bg-gray-50 rounded-xl border border-gray-200">
+        <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row print:gap-4">
+          <div className="w-full md:w-1/2 p-4 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
             <h4 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wider">Metode Pembayaran / Transfer</h4>
             <div className="space-y-3">
               {(store.banks || []).map((bank, idx) => (
@@ -170,7 +170,7 @@ export default function InvoiceClient({ order, storeConfig }) {
             </div>
           </div>
 
-          <div className="w-full md:w-1/3 space-y-3">
+          <div className="w-full md:w-1/3 space-y-3 print:w-1/2">
             <div className="flex justify-between items-center pt-2 border-b border-gray-200 pb-3">
               <span className="font-bold text-gray-900 text-lg">Total Tagihan</span>
               <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID')}</span>
