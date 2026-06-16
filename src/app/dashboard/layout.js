@@ -25,13 +25,11 @@ export default async function DashboardLayout({ children }) {
 
   // Find user role (default Operator)
   const userEmail = user.email?.toLowerCase() || ''
-  const matchedUser = userRoles.find(u => u.email === userEmail)
-  let userRole = matchedUser ? matchedUser.role : 'Operator'
-
-  // Superadmin override (mencegah lockout)
-  if (userEmail.startsWith('admin') || userEmail.startsWith('owner')) {
-    userRole = 'Owner'
-  }
+  const matchedUser = userRoles.find(u => {
+    const inputEmail = (u.email || '').trim().toLowerCase()
+    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+  })
+  const userRole = matchedUser ? matchedUser.role : 'Operator'
 
   const allowedMenus = rolePermissions[userRole] || []
 
