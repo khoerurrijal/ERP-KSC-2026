@@ -313,6 +313,8 @@ export default function SettingsClient({ initialSettings }) {
                   <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-foreground/40">
                     <Percent className="w-4 h-4" />
                   </div>
+                </div>
+              </div>
               <div className="h-px bg-white/10 w-full my-4" />
 
               {/* Saldo Kas Virtual */}
