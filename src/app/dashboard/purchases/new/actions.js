@@ -41,6 +41,8 @@ export async function createPurchaseOrder(payload) {
       po_id: po.id,
       product_code: item.product_id,
       qty: item.qty,
+      unit: item.unit || 'PCS',
+      unit_multiplier: item.unit_multiplier || 1,
       unit_price: item.unit_cost,
       total_price: Number(item.qty) * Number(item.unit_cost)
     }))
@@ -58,10 +60,11 @@ export async function createPurchaseOrder(payload) {
 
     // 5. Update Inventory (Increment Stock)
     for (const item of payload.items) {
+      const addedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
       const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_id).single()
       if (prod) {
         await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) + Number(item.qty) })
+          .update({ stock_qty: Number(prod.stock_qty || 0) + addedQty })
           .eq('product_code', item.product_id)
       }
     }
@@ -86,10 +89,11 @@ export async function updatePurchaseOrder(id, payload) {
     
     if (oldItems && oldItems.length > 0) {
       for (const oldItem of oldItems) {
+        const removedQty = Number(oldItem.qty) * Number(oldItem.unit_multiplier || 1)
         const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', oldItem.product_code).single()
         if (prod) {
           await supabase.from('products')
-            .update({ stock_qty: Number(prod.stock_qty || 0) - Number(oldItem.qty) })
+            .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
             .eq('product_code', oldItem.product_code)
         }
       }
@@ -119,6 +123,8 @@ export async function updatePurchaseOrder(id, payload) {
       po_id: id,
       product_code: item.product_id,
       qty: item.qty,
+      unit: item.unit || 'PCS',
+      unit_multiplier: item.unit_multiplier || 1,
       unit_price: item.unit_cost,
       total_price: Number(item.qty) * Number(item.unit_cost)
     }))
@@ -128,10 +134,11 @@ export async function updatePurchaseOrder(id, payload) {
 
     // 5. Update Inventory (Increment Stock with new qty)
     for (const item of payload.items) {
+      const addedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
       const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_id).single()
       if (prod) {
         await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) + Number(item.qty) })
+          .update({ stock_qty: Number(prod.stock_qty || 0) + addedQty })
           .eq('product_code', item.product_id)
       }
     }
@@ -156,10 +163,11 @@ export async function deletePurchaseOrder(id) {
     
     if (oldItems && oldItems.length > 0) {
       for (const oldItem of oldItems) {
+        const removedQty = Number(oldItem.qty) * Number(oldItem.unit_multiplier || 1)
         const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', oldItem.product_code).single()
         if (prod) {
           await supabase.from('products')
-            .update({ stock_qty: Number(prod.stock_qty || 0) - Number(oldItem.qty) })
+            .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
             .eq('product_code', oldItem.product_code)
         }
       }

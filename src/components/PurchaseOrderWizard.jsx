@@ -24,7 +24,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
 
   // Tab 2: Detail Pembelian
   const [items, setItems] = useState(initialData?.items && initialData.items.length > 0 ? initialData.items : [
-    { id: Date.now(), workshop_id: '', category: '', product_id: '', qty: 1, unit: 'Pcs', unit_cost: 0 }
+    { id: Date.now(), workshop_id: '', category: '', product_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }
   ])
 
   // Tab 3: Pembayaran
@@ -82,7 +82,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   }
 
   const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'Pcs', unit_cost: 0 }])
+    setItems([...items, { id: Date.now(), workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }])
   }
 
   const handleRemoveItem = (id) => {
@@ -111,9 +111,22 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
           if (selectedProduct) {
             updated.product_id = selectedProduct.product_code
             updated.unit_cost = selectedProduct.base_price || 0
+            updated.unit = 'PCS'
+            updated.unit_multiplier = 1
           } else {
             updated.product_id = ''
             updated.unit_cost = 0
+            updated.unit = 'PCS'
+            updated.unit_multiplier = 1
+          }
+        } else if (field === 'unit') {
+          updated.unit = value
+          const selectedProduct = products.find(p => p.name === updated.product_search)
+          if (selectedProduct && selectedProduct.product_units) {
+             const pu = selectedProduct.product_units.find(u => u.unit_name === value)
+             updated.unit_multiplier = pu ? pu.multiplier : 1
+          } else {
+             updated.unit_multiplier = 1
           }
         }
         return updated
@@ -319,7 +332,15 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                       <CustomSelect 
                         value={item.unit} 
                         onChange={e => handleItemChange(item.id, 'unit', e.target.value)} 
-                        options={(dropdownConfig.unit || ["Pcs", "Pack", "Roll"]).map(v => ({ value: v, label: v }))}
+                        options={(() => {
+                          const p = products.find(prod => prod.name === item.product_search)
+                          const base = [{ value: 'PCS', label: 'PCS' }]
+                          if (p && p.product_units && p.product_units.length > 0) {
+                            return [...base, ...p.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
+                          }
+                          return base
+                        })()}
+                        disabled={!item.product_search}
                       />
                     </div>
 

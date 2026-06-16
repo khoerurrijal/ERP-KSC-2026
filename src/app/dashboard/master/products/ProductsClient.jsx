@@ -18,6 +18,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
   const [category, setCategory] = useState('CUP')
   const [workshop, setWorkshop] = useState('GLOBAL')
   const [sellingPrice, setSellingPrice] = useState(0)
+  const [units, setUnits] = useState([]) // Array of { unit_name, multiplier }
   const [isPending, setIsPending] = useState(false)
 
   const handleSubmit = async () => {
@@ -29,12 +30,12 @@ export default function ProductsClient({ products: initialProducts = [], error =
 
     if (editingId) {
       res = await updateProduct(editingId, {
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice)
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), units
       })
     } else {
       res = await addProduct({
         product_code: 'PRD-' + Math.floor(Math.random() * 100000),
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice)
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), units
       })
     }
 
@@ -56,6 +57,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     setName('')
     setCategory('CUP')
     setSellingPrice(0)
+    setUnits([])
   }
 
   const openEditModal = (product) => {
@@ -64,6 +66,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     setCategory(product.category || '')
     setWorkshop(product.workshop_code || 'GLOBAL')
     setSellingPrice(product.selling_price || 0)
+    setUnits(product.product_units || [])
     setShowModal(true)
   }
 
@@ -211,13 +214,63 @@ export default function ProductsClient({ products: initialProducts = [], error =
               </div>
 
               <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Harga Jual (Rp)</label>
+                <label className="text-xs font-medium text-foreground/80">Harga Jual per PCS (Rp)</label>
                 <input 
                   type="number" 
                   value={sellingPrice} 
                   onChange={e => setSellingPrice(e.target.value)} 
                   className="glass-input w-full" 
                 />
+              </div>
+
+              <div className="pt-4 border-t border-white/10">
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-xs font-medium text-foreground/80">Satuan Konversi (Beli/Jual)</label>
+                  <button 
+                    onClick={() => setUnits([...units, { unit_name: 'DUS', multiplier: 1000 }])}
+                    className="text-xs text-accent hover:text-accent/80 flex items-center gap-1"
+                  >
+                    <Plus className="w-3 h-3" /> Tambah Satuan
+                  </button>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input type="text" value="PCS" disabled className="glass-input w-24 bg-white/5 opacity-50 text-center" />
+                    <span className="text-xs text-foreground/50">=</span>
+                    <input type="number" value="1" disabled className="glass-input flex-1 bg-white/5 opacity-50" />
+                    <span className="text-xs text-foreground/50">pcs</span>
+                    <div className="w-8"></div>
+                  </div>
+                  {units.map((u, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input 
+                        type="text" 
+                        value={u.unit_name} 
+                        onChange={e => {
+                          const newUnits = [...units];
+                          newUnits[i].unit_name = e.target.value.toUpperCase();
+                          setUnits(newUnits);
+                        }}
+                        className="glass-input w-24 text-center uppercase" 
+                      />
+                      <span className="text-xs text-foreground/50">=</span>
+                      <input 
+                        type="number" 
+                        value={u.multiplier} 
+                        onChange={e => {
+                          const newUnits = [...units];
+                          newUnits[i].multiplier = Number(e.target.value);
+                          setUnits(newUnits);
+                        }}
+                        className="glass-input flex-1" 
+                      />
+                      <span className="text-xs text-foreground/50">pcs</span>
+                      <button onClick={() => setUnits(units.filter((_, idx) => idx !== i))} className="w-8 h-8 flex items-center justify-center text-red-400 hover:bg-red-400/10 rounded-lg">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

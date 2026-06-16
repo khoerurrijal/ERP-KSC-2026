@@ -72,10 +72,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         product_search: products.find(p => p.product_code === i.product_code)?.name || '',
         workshop_id: workshops.find(w => w.code === products.find(p => p.product_code === i.product_code)?.workshop_code)?.id || '',
         qty: i.qty || 1,
-        unit: 'Pcs',
+        unit: i.unit || 'PCS',
+        unit_multiplier: i.unit_multiplier || 1,
         price: i.unit_price || 0
       }))
-    : [{ id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'Pcs', price: 0 }]
+    : [{ id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
   )
 
   // Tab 3: Pembayaran
@@ -112,7 +113,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const remaining = grandTotal - dpAmount
 
   const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'Pcs', price: 0 }])
+    setItems([...items, { id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
   }
 
   const handleRemoveItem = (id) => {
@@ -144,10 +145,23 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
             updated.product_id = selectedProduct.product_code
             updated.price = selectedProduct.selling_price || 0
             updated.workshop_id = selectedProduct.workshop_id || ''
+            updated.unit = 'PCS'
+            updated.unit_multiplier = 1
           } else {
             updated.product_id = ''
             updated.price = 0
             updated.workshop_id = ''
+            updated.unit = 'PCS'
+            updated.unit_multiplier = 1
+          }
+        } else if (field === 'unit') {
+          updated.unit = value
+          const selectedProduct = products.find(p => p.name === updated.product_search)
+          if (selectedProduct && selectedProduct.product_units) {
+             const pu = selectedProduct.product_units.find(u => u.unit_name === value)
+             updated.unit_multiplier = pu ? pu.multiplier : 1
+          } else {
+             updated.unit_multiplier = 1
           }
         }
         return updated
@@ -354,7 +368,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                       <CustomSelect 
                         value={item.unit} 
                         onChange={e => handleItemChange(item.id, 'unit', e.target.value)} 
-                        options={(dropdownConfig.unit || ["Pcs", "Pack", "Dus", "Roll"]).map(v => ({ value: v, label: v }))}
+                        options={(() => {
+                          const p = products.find(prod => prod.name === item.product_search)
+                          const base = [{ value: 'PCS', label: 'PCS' }]
+                          if (item.order_type !== 'SABLON' && item.order_type !== 'Sablon' && p && p.product_units && p.product_units.length > 0) {
+                            return [...base, ...p.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
+                          }
+                          return base
+                        })()}
+                        disabled={item.order_type === 'SABLON' || item.order_type === 'Sablon' || !item.product_search}
                       />
                     </div>
 

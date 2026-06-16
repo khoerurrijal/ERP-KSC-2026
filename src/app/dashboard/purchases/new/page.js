@@ -8,7 +8,7 @@ export default async function NewPurchaseOrderPage() {
 
   // Fetch real data
   const { data: suppliers } = await supabase.from('suppliers').select('*')
-  const { data: products } = await supabase.from('products').select('*')
+  const { data: products } = await supabase.from('products').select('*, product_units(id, unit_name, multiplier)')
   const { data: workshops } = await supabase.from('workshops').select('*')
   const { data: settings } = await supabase.from('system_settings').select('*')
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}

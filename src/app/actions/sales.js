@@ -134,6 +134,8 @@ export async function createSalesOrder(payload) {
         product_code: item.product_id,
         mockup_url: item.mockup_url,
         qty: Number(item.qty),
+        unit: item.unit || 'PCS',
+        unit_multiplier: item.unit_multiplier || 1,
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
@@ -147,10 +149,11 @@ export async function createSalesOrder(payload) {
 
     // DECREMENT STOCK for each item
     for (const item of soItems) {
+      const removedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
       const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_code).single()
       if (prod) {
         await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) - Number(item.qty) })
+          .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
           .eq('product_code', item.product_code)
       }
     }
@@ -359,6 +362,8 @@ export async function updateSalesOrder(soId, payload) {
         product_code: item.product_id,
         mockup_url: item.mockup_url,
         qty: Number(item.qty),
+        unit: item.unit || 'PCS',
+        unit_multiplier: item.unit_multiplier || 1,
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
