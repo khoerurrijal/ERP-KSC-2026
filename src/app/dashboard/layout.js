@@ -26,7 +26,13 @@ export default async function DashboardLayout({ children }) {
   // Find user role (default Operator)
   const userEmail = user.email?.toLowerCase() || ''
   const matchedUser = userRoles.find(u => u.email === userEmail)
-  const userRole = matchedUser ? matchedUser.role : 'Operator'
+  let userRole = matchedUser ? matchedUser.role : 'Operator'
+
+  // Fallback super admin protection to prevent lock-out
+  // Jika user belum terdaftar, tapi login pakai admin/owner, paksa jadi Owner
+  if (!matchedUser && (userEmail.startsWith('admin') || userEmail.startsWith('owner'))) {
+    userRole = 'Owner'
+  }
 
   const allowedMenus = rolePermissions[userRole] || []
 
