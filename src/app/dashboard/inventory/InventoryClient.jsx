@@ -44,7 +44,7 @@ export default function InventoryClient({ products: initialProducts = [] }) {
       alert(res.error)
     } else {
       setProducts(products.map(p => 
-        p.product_code === opnameProduct.product_code ? { ...p, stock_qty: Number(newStock) } : p
+        p.product_code === opnameProduct.product_code ? { ...p, physical_stock: Number(newStock) } : p
       ))
       setShowOpnameModal(false)
       setOpnameProduct(null)
@@ -54,7 +54,7 @@ export default function InventoryClient({ products: initialProducts = [] }) {
 
   const openOpnameModal = (product) => {
     setOpnameProduct(product)
-    setNewStock(product.stock_qty || 0)
+    setNewStock(product.physical_stock || 0)
     setShowOpnameModal(true)
   }
 
@@ -165,7 +165,8 @@ export default function InventoryClient({ products: initialProducts = [] }) {
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('name')}>Nama Produk {renderSortIcon('name')}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('category')}>Kategori {renderSortIcon('category')}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop')}>Workshop {renderSortIcon('workshop')}</th>
-                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('stock_qty')}>Stok Fisik {renderSortIcon('stock_qty')}</th>
+                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('stock_qty')}>Stok Tersedia {renderSortIcon('stock_qty')}</th>
+                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('physical_stock')}>Stok Fisik {renderSortIcon('physical_stock')}</th>
                   <th className="px-4 py-3 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
@@ -176,8 +177,13 @@ export default function InventoryClient({ products: initialProducts = [] }) {
                     <td className="px-4 py-3 text-foreground/60">{p.category}</td>
                     <td className="px-4 py-3 text-foreground/60">{p.workshops?.name}</td>
                     <td className="px-4 py-3 text-right">
-                      <span className={`font-bold ${p.stock_qty > 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
+                      <span className={`font-bold ${p.stock_qty > 5000 ? 'text-blue-400' : 'text-blue-200'}`}>
                         {p.stock_qty || 0} {p.unit || 'pcs'}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <span className={`font-bold ${p.physical_stock > 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
+                        {p.physical_stock || 0} {p.unit || 'pcs'}
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">

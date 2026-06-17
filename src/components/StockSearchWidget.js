@@ -14,7 +14,7 @@ export default function StockSearchWidget({ products = [] }) {
     <div className="glass-card flex flex-col mt-6 border-t-4 border-green-500 h-full">
       <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col gap-3">
         <h2 className="font-bold text-foreground flex items-center gap-2">
-          <PackageSearch className="w-5 h-5 text-green-400" /> Cek Sisa Stok
+          <PackageSearch className="w-5 h-5 text-green-400" /> Cek Stok Tersedia
         </h2>
         <input 
           type="text" 

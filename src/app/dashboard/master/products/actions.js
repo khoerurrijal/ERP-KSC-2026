@@ -79,7 +79,7 @@ export async function updateStock(product_code, new_stock) {
   
   const { error } = await supabase
     .from('products')
-    .update({ stock_qty: new_stock })
+    .update({ physical_stock: new_stock })
     .eq('product_code', product_code)
 
   if (error) return { error: error.message }
