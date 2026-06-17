@@ -16,38 +16,40 @@ export default function PriceListClient({ products, matrix }) {
   products.forEach(p => {
     if (!p.price_polos || p.price_polos <= 0) return // Skip invalid
 
-    let cat = p.category || 'LAINNYA'
+    let cat = p.category ? p.category.toUpperCase() : 'LAINNYA'
     let upperName = p.name.toUpperCase()
+    let isTutup = upperName.includes('TUTUP')
 
-    // Logika Penggabungan Tutup ke dalam Kotak Cup-nya
-    if (cat === 'ADDON') {
-      if (upperName.includes('TUTUP CUP INJECT')) cat = 'INJECTION'
-      else if (upperName.includes('TUTUP CUP PET')) cat = 'PET'
-      else if (upperName.includes('TUTUP GOCUP')) cat = 'GOCUP'
-      else if (upperName.includes('TUTUP CUP PP')) cat = 'STARINDO'
-      else cat = 'ADDONS' // Sisa addons (sedotan, sealer, jasa) masuk ke Addons
-    } else if (cat === 'CUP INJECT') {
-      cat = 'INJECTION'
-    } else if (cat === 'CUP PET') {
-      cat = 'PET'
-    } else if (cat === 'CUP PP') {
-      cat = 'STARINDO'
-    } else if (cat === 'CUP GOCUP') {
-      cat = 'GOCUP'
+    // Logika Penggabungan Tutup ke dalam Kotak Cup-nya secara universal (apapun kategorinya)
+    if (isTutup || cat.includes('ADDON')) {
+      if (upperName.includes('INJECT')) cat = 'INJECTION'
+      else if (upperName.includes('PET')) cat = 'PET'
+      else if (upperName.includes('GOCUP')) cat = 'GOCUP'
+      else if (upperName.includes('PP') || upperName.includes('STARINDO')) cat = 'STARINDO'
+      else if (!isTutup) cat = 'ADDONS' 
+    } 
+    
+    // Normalisasi nama kategori utama
+    if (cat.includes('INJECT') && !cat.includes('INJECTION')) cat = 'INJECTION'
+    else if (cat === 'CUP PET') cat = 'PET'
+    else if (cat === 'CUP PP') cat = 'STARINDO'
+    else if (cat === 'CUP GOCUP') cat = 'GOCUP'
+
+    // Kategori TINTA
+    if (cat.includes('TINTA') || upperName.includes('TINTA')) {
+      cat = 'TINTA'
     }
 
     // Filter berdasarkan Main Tab
     // KING CUP: Cup & Addons
-    // KING PLASTIK BOX: Box Dus, Plastik, Botol
-    const isBoxPlastik = cat.includes('BOX DUS') || cat.includes('PLASTIK') || cat.includes('BOTOL')
+    // KING PLASTIK BOX: Box Dus, Plastik, Botol, Tinta
+    const isBoxPlastik = cat.includes('BOX DUS') || cat.includes('PLASTIK') || cat.includes('BOTOL') || cat.includes('TINTA')
     
     if (mainTab === 'KING CUP' && isBoxPlastik) return
     if (mainTab === 'KING PLASTIK BOX' && !isBoxPlastik) return
 
     if (!groupedProducts[cat]) groupedProducts[cat] = []
     
-    // Sort logic: Cup first, then Tutup
-    const isTutup = upperName.includes('TUTUP')
     groupedProducts[cat].push({ ...p, isTutup })
   })
 
