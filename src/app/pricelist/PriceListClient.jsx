@@ -3,46 +3,75 @@
 import { useState } from 'react'
 
 export default function PriceListClient({ products, matrix }) {
-  const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
 
-  // Kategori unik
-  const categories = ['ALL', ...new Set(products.map(p => p.category).filter(Boolean))]
+  // Normalisasi Kategori yang mirip dengan di PDF
+  const categoryOrder = [
+    'INJECTION', 'PET', 'STARINDO', 'GOCUP', 'HOK', 'PAPERCUP', 'PAPERBOWL', 'LID SEALER', 'TUTUP CUP', 'SEDOTAN'
+  ]
 
-  const filteredProducts = products.filter(p => {
-    const matchesSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase()) || p.product_code.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesCategory = activeCategory === 'ALL' || p.category === activeCategory
-    // Tampilkan hanya yang punya harga polos atau sablon masuk akal
-    const hasPrice = p.price_polos > 0
-    return matchesSearch && matchesCategory && hasPrice
+  const groupedProducts = {}
+  products.forEach(p => {
+    if (!p.price_polos || p.price_polos <= 0) return // Skip invalid
+    const cat = p.category || 'LAINNYA'
+    if (!groupedProducts[cat]) groupedProducts[cat] = []
+    groupedProducts[cat].push(p)
   })
+
+  const sortedCategories = Object.keys(groupedProducts).sort((a, b) => {
+    const idxA = categoryOrder.findIndex(c => a.toUpperCase().includes(c))
+    const idxB = categoryOrder.findIndex(c => b.toUpperCase().includes(c))
+    return (idxA !== -1 ? idxA : 99) - (idxB !== -1 ? idxB : 99)
+  })
+
+  // Jika activeCategory !== ALL, filter categories
+  const displayCategories = activeCategory === 'ALL' 
+    ? sortedCategories 
+    : sortedCategories.filter(c => c === activeCategory)
 
   // Format ke Rupiah
   const formatRp = (num) => {
-    return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num)
+    if (!num) return '-'
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num)
+  }
+
+  // Get image for category (placeholder logic for user to upload later)
+  const getCategoryImage = (catName) => {
+    const name = catName.toUpperCase()
+    if (name.includes('INJECTION')) return '/images/cups/injection.png'
+    if (name.includes('PET')) return '/images/cups/pet.png'
+    if (name.includes('STARINDO')) return '/images/cups/starindo.png'
+    if (name.includes('GOCUP')) return '/images/cups/gocup.png'
+    if (name.includes('PAPERBOWL')) return '/images/cups/paperbowl.png'
+    if (name.includes('PAPERCUP')) return '/images/cups/papercup.png'
+    if (name.includes('LID')) return '/images/cups/lid.png'
+    if (name.includes('SEDOTAN')) return '/images/cups/sedotan.png'
+    return '/images/cups/default.png'
   }
 
   return (
-    <div className="space-y-6">
-      {/* Controls */}
-      <div className="flex flex-col md:flex-row gap-4 items-center justify-between p-4 bg-background/50 border border-border backdrop-blur-xl rounded-2xl shadow-sm">
-        <input
-          type="text"
-          placeholder="Cari produk (contoh: Cup 16 Oz)"
-          className="w-full md:w-96 px-4 py-2 bg-background border border-border rounded-xl focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-        
-        <div className="flex gap-2 overflow-x-auto w-full md:w-auto pb-2 md:pb-0 scrollbar-hide">
-          {categories.map(cat => (
+    <div className="space-y-12">
+      {/* Category Tabs (Sticky) */}
+      <div className="sticky top-0 z-50 pt-4 pb-4 bg-background/90 backdrop-blur-xl border-b border-border shadow-sm -mx-4 px-4 md:mx-0 md:px-0">
+        <div className="flex gap-2 overflow-x-auto scrollbar-hide py-1">
+          <button
+            onClick={() => setActiveCategory('ALL')}
+            className={`px-5 py-2.5 whitespace-nowrap rounded-full text-sm font-bold transition-all ${
+              activeCategory === 'ALL' 
+                ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.4)]' 
+                : 'bg-card hover:bg-muted border border-border text-foreground/80'
+            }`}
+          >
+            Semua Kategori
+          </button>
+          {sortedCategories.map(cat => (
             <button
               key={cat}
               onClick={() => setActiveCategory(cat)}
-              className={`px-4 py-2 whitespace-nowrap rounded-xl text-sm font-medium transition-all ${
+              className={`px-5 py-2.5 whitespace-nowrap rounded-full text-sm font-bold transition-all ${
                 activeCategory === cat 
-                  ? 'bg-primary text-primary-foreground shadow-[0_0_15px_rgba(var(--primary),0.3)]' 
-                  : 'bg-background hover:bg-muted border border-border text-foreground/80'
+                  ? 'bg-primary text-primary-foreground shadow-[0_0_20px_rgba(var(--primary),0.4)]' 
+                  : 'bg-card hover:bg-muted border border-border text-foreground/80'
               }`}
             >
               {cat}
@@ -51,44 +80,81 @@ export default function PriceListClient({ products, matrix }) {
         </div>
       </div>
 
-      {/* Grid view instead of boring table */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProducts.map((product) => {
-          const catMatrix = matrix[product.category] || {}
-          const jasaSablon = catMatrix.min_1000 || 250 // fallback to 250 if not found
-          const hargaPolos1000 = product.price_polos * 1000
-          const hargaSablon1000 = (product.price_polos + jasaSablon) * 1000
+      {/* Categories Rendering */}
+      {displayCategories.map(cat => {
+        const catProducts = groupedProducts[cat]
+        const catMatrix = matrix[cat] || {}
+        const imgUrl = getCategoryImage(cat)
 
-          return (
-            <div key={product.product_code} className="group p-6 bg-background/50 border border-border backdrop-blur-sm rounded-2xl shadow-sm hover:shadow-[0_8px_30px_rgba(0,0,0,0.4)] transition-all hover:-translate-y-1 overflow-hidden relative">
-              {/* Decoration line */}
-              <div className="absolute top-0 left-0 w-1 h-full bg-gradient-to-b from-primary to-accent opacity-0 group-hover:opacity-100 transition-opacity" />
+        return (
+          <div key={cat} className="scroll-mt-32 relative animate-in fade-in slide-in-from-bottom-8 duration-700">
+            <div className="flex flex-col lg:flex-row gap-8 bg-card backdrop-blur-xl border border-card-border rounded-3xl p-6 md:p-8 shadow-sm hover:shadow-md transition-shadow overflow-hidden">
               
-              <div className="text-xs text-foreground/50 mb-1 font-mono">{product.product_code}</div>
-              <h3 className="text-lg font-bold text-foreground mb-4 leading-tight">{product.name}</h3>
-              
-              <div className="space-y-3">
-                <div className="flex justify-between items-center p-3 bg-card border border-border rounded-xl">
-                  <span className="text-sm text-foreground/70">Harga Polos<br/><span className="text-[10px] text-foreground/40">/ 1.000 Pcs</span></span>
-                  <span className="font-bold text-lg text-foreground">{formatRp(hargaPolos1000)}</span>
+              {/* Left Side: Visual / Title */}
+              <div className="lg:w-1/3 flex flex-col justify-center items-center lg:items-start text-center lg:text-left relative z-10">
+                <div className="w-full max-w-[280px] aspect-square relative mb-6">
+                  {/* Decorative Glow */}
+                  <div className="absolute inset-0 bg-primary/20 blur-[50px] rounded-full" />
+                  {/* The Image (User will upload PNGs here) */}
+                  <img 
+                    src={imgUrl} 
+                    alt={cat} 
+                    className="w-full h-full object-contain relative z-10 drop-shadow-2xl"
+                    onError={(e) => {
+                      e.target.onerror = null; 
+                      e.target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 400 400' fill='none'%3E%3Crect width='400' height='400' fill='%238D6E63' fill-opacity='0.1'/%3E%3Ctext x='50%25' y='50%25' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='24' fill='%233E2723' opacity='0.5'%3E[Upload PNG: %0A" + imgUrl.split('/').pop() + "]%3C/text%3E%3C/svg%3E";
+                    }}
+                  />
                 </div>
-                
-                <div className="flex justify-between items-center p-3 bg-primary/5 border border-primary/20 rounded-xl relative overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-accent/10 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  <span className="text-sm font-medium text-primary relative z-10">Harga Sablon<br/><span className="text-[10px] text-primary/60">/ 1.000 Pcs</span></span>
-                  <span className="font-black text-xl text-primary relative z-10 drop-shadow-md">{formatRp(hargaSablon1000)}</span>
-                </div>
+                <h2 className="text-3xl font-black text-foreground mb-2">{cat}</h2>
+                <p className="text-sm text-foreground/60">Harga tercantum sudah termasuk Sablon 1 Warna Reguler (Kecuali item polos).</p>
               </div>
-            </div>
-          )
-        })}
-      </div>
 
-      {filteredProducts.length === 0 && (
-        <div className="text-center py-20 text-foreground/50 border border-dashed border-border rounded-3xl">
-          Tidak ada produk yang ditemukan.
-        </div>
-      )}
+              {/* Right Side: Table */}
+              <div className="lg:w-2/3 w-full overflow-x-auto pb-4 relative z-10">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b-2 border-border/50">
+                      <th className="py-4 px-4 font-bold text-foreground bg-foreground/5 rounded-tl-xl">Produk / Ukuran</th>
+                      <th className="py-4 px-4 font-bold text-center text-primary bg-primary/5">500 Pcs</th>
+                      <th className="py-4 px-4 font-bold text-center text-primary bg-primary/5">1.000 Pcs</th>
+                      <th className="py-4 px-4 font-bold text-center text-primary bg-primary/5 rounded-tr-xl">5.000 Pcs</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/30">
+                    {catProducts.map(product => {
+                      // Calculate Prices (Per Pcs)
+                      const p = product.price_polos
+                      const p500 = p + (catMatrix.min_500 || 0)
+                      const p1000 = p + (catMatrix.min_1000 || 0)
+                      const p5000 = p + (catMatrix.min_5000 || 0)
+
+                      return (
+                        <tr key={product.product_code} className="hover:bg-foreground/5 transition-colors group">
+                          <td className="py-4 px-4 font-semibold text-foreground/90">
+                            {product.name}
+                            <div className="text-[10px] text-foreground/40 font-mono mt-1 opacity-0 group-hover:opacity-100 transition-opacity">{product.product_code}</div>
+                          </td>
+                          <td className="py-4 px-4 text-center font-medium text-foreground/80">
+                            {catMatrix.min_500 ? formatRp(p500) : '-'}
+                          </td>
+                          <td className="py-4 px-4 text-center font-bold text-primary text-lg">
+                            {catMatrix.min_1000 ? formatRp(p1000) : formatRp(p)}
+                          </td>
+                          <td className="py-4 px-4 text-center font-medium text-foreground/80">
+                            {catMatrix.min_5000 ? formatRp(p5000) : '-'}
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+              
+            </div>
+          </div>
+        )
+      })}
     </div>
   )
 }
