@@ -161,7 +161,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
                     onChange={(e) => handleAddonChange(addon.id, 'productId', e.target.value)} 
                     options={[
                       { value: "", label: "- Pilih Add-on -" },
-                      ...products.filter(p => ['ADDON', 'TUTUP CUP INJECT', 'TUTUP CUP PET', 'TUTUP CUP PP', 'TUTUP GOCUP', 'TUTUP PAPERCUP', 'SEDOTAN', 'SEALER'].includes(p.category)).map(p => ({ value: p.id, label: p.name }))
+                      ...products.map(p => ({ value: p.id, label: `${p.name} (Stok: ${p.stock_qty || 0})` }))
                     ]} 
                   />
                 </div>
