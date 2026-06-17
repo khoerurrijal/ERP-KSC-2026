@@ -13,6 +13,7 @@ export default async function PriceListPage() {
   const { data: products } = await supabase
     .from('products')
     .select('product_code, name, category, workshop_code, base_price, price_polos')
+    .eq('is_active', true)
     .order('name')
 
   // Ambil matrix sablon

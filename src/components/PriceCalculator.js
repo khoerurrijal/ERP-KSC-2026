@@ -159,6 +159,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
                   <CustomSelect 
                     value={addon.productId} 
                     onChange={(e) => handleAddonChange(addon.id, 'productId', e.target.value)} 
+                    searchable={true}
                     options={[
                       { value: "", label: "- Pilih Add-on -" },
                       ...products.map(p => ({ value: p.id, label: `${p.name} (Stok: ${p.stock_qty || 0})` }))
