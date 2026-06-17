@@ -18,7 +18,6 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  // Tab 1: Info Umum
   const [orderDate, setOrderDate] = useState(initialData?.date || new Date().toISOString().split('T')[0])
   const [customerId, setCustomerId] = useState(initialData?.customer_code || '')
   const [isMarketplace, setIsMarketplace] = useState(initialData?.marketplace_receipt ? true : false)
@@ -39,7 +38,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
 
   const handleNextTab1 = () => {
-    const custExists = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
+    const custExists = localCustomers.find(c => c.customer_code === customerId)
     if (!custExists && customerId.trim() !== '') {
       setNewCustomerName(customerId)
       setShowAddCustomer(true)
@@ -57,8 +56,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       type: newCustomerType
     }
     setLocalCustomers([...localCustomers, newCust])
-    setCustomerId(newCust.name)
+    setCustomerId(newCust.customer_code)
     setShowAddCustomer(false)
+    setNewCustomerName('')
     setCurrentTab(2)
   }
 
@@ -209,7 +209,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     
     try {
       
-      const selectedCustomer = localCustomers.find(c => c.name === customerId)
+      const selectedCustomer = localCustomers.find(c => c.customer_code === customerId)
       if (!selectedCustomer) {
         setLoading(false)
         return setError("Pelanggan tidak ditemukan. Silakan tambahkan di menu Master Data terlebih dahulu.")
@@ -298,7 +298,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     }}
                     options={[
                       { value: "", label: "Pilih Pelanggan..." },
-                      ...localCustomers.map(c => ({ value: c.name, label: `${c.name} - ${c.customer_code} (${c.type})` }))
+                      ...localCustomers.map(c => ({ value: c.customer_code, label: `${c.name} - ${c.customer_code} (${c.type})` }))
                     ]}
                     searchable={true}
                   />

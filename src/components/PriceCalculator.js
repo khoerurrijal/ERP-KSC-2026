@@ -62,7 +62,9 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
               onChange={e => { setOrderType(e.target.value); setCategory(''); setProductId(''); }} 
               options={[
                 { value: "", label: "- Pilih -" },
-                ...(dropdownConfig.order_type || ["SABLON", "POLOS"]).map(v => ({ value: v, label: v }))
+                ...(dropdownConfig.order_type || ["SABLON", "POLOS"]).includes("ADDON") 
+                  ? (dropdownConfig.order_type || ["SABLON", "POLOS"]).map(v => ({ value: v, label: v }))
+                  : [...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"].map(v => ({ value: v, label: v }))
               ]} 
             />
           </div>
@@ -96,8 +98,8 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
             <label className="text-xs font-medium text-foreground/60">Kuantitas (Qty)</label>
             <input 
               type="number" 
-              value={qty} 
-              onChange={(e) => setQty(Number(e.target.value))}
+              value={qty === 0 ? '' : qty} 
+              onChange={(e) => setQty(e.target.value === '' ? 0 : Number(e.target.value))}
               className="glass-input w-full text-sm"
               min="1"
             />
