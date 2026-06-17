@@ -3,10 +3,11 @@ import SalesOrderWizard from '@/components/SalesOrderWizard'
 import { redirect } from 'next/navigation'
 
 export default async function EditSalesOrderPage({ params }) {
+  const resolvedParams = await params
   const supabase = await createClient()
 
   // 1. Fetch Sales Order
-  const { data: so, error: soErr } = await supabase.from('sales_orders').select('*').eq('id', params.id).single()
+  const { data: so, error: soErr } = await supabase.from('sales_orders').select('*').eq('id', resolvedParams.id).single()
   
   if (soErr || !so) {
     redirect('/dashboard/sales')
@@ -18,7 +19,7 @@ export default async function EditSalesOrderPage({ params }) {
   }
 
   // 2. Fetch Items
-  const { data: items } = await supabase.from('sales_items').select('*').eq('so_id', params.id)
+  const { data: items } = await supabase.from('sales_items').select('*').eq('so_id', resolvedParams.id)
   so.items = items || []
 
   // 3. Fetch dependencies for Wizard

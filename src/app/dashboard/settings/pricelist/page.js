@@ -5,6 +5,8 @@ export const metadata = {
   title: 'Pengaturan Pricelist | King Sablon',
 }
 
+export const dynamic = 'force-dynamic'
+
 export default async function PricelistSettingsPage() {
   const supabase = await createClient()
 
