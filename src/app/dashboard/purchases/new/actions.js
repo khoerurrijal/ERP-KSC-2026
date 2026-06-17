@@ -71,8 +71,6 @@ export async function createPurchaseOrder(payload) {
       }
     }
 
-    }
-
     // 6. Recalculate Dynamic Pricing for all affected products
     const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
     for (const prodCode of uniqueProducts) {
@@ -153,8 +151,6 @@ export async function updatePurchaseOrder(id, payload) {
           .update({ stock_qty: Number(prod.stock_qty || 0) + addedQty })
           .eq('product_code', item.product_id)
       }
-    }
-
     }
 
     // 6. Recalculate Dynamic Pricing for all affected products
