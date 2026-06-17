@@ -26,6 +26,8 @@ export default function PriceListClient({ products, matrix }) {
       else if (upperName.includes('PET')) cat = 'PET'
       else if (upperName.includes('GOCUP')) cat = 'GOCUP'
       else if (upperName.includes('PP') || upperName.includes('STARINDO')) cat = 'STARINDO'
+      else if (upperName.includes('PAPERBOWL') || upperName.includes('PAPER BOWL')) cat = 'PAPERBOWL'
+      else if (upperName.includes('PAPERCUP') || upperName.includes('PAPER CUP')) cat = 'PAPERCUP'
       else if (!isTutup) cat = 'ADDONS' 
     } 
     
