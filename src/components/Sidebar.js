@@ -20,7 +20,7 @@ const MENU_GROUPS = [
       { name: 'Sales Order', path: '/dashboard/sales', icon: FileText, key: 'penjualan' },
       { name: 'Marketplace', path: '/dashboard/marketplace', icon: ShoppingBag, key: 'marketplace' },
       { name: 'Produksi', path: '/dashboard/production', icon: Factory, key: 'produksi' },
-      { name: 'Public Pricelist', path: '/pricelist', icon: FileText, key: 'pricelist' },
+      { name: 'Public Pricelist', path: '/pricelist', icon: FileText, key: 'dashboard' },
     ]
   },
   {
