@@ -15,11 +15,15 @@
   --card-border: rgba(255, 255, 255, 0.08);
   
   --radius: 1rem; /* Rounded XL */
+
+  --scroll-track: #0A0A0A;
+  --scroll-thumb: #333;
+  --scroll-thumb-hover: #555;
 }
 
 .light {
   /* Premium Coffee Theme */
-  --background: #FDF8F5; /* Latte / Cream */
+  --background: #F5E6D3; /* Cream / Milky Coffee */
   --foreground: #3E2723; /* Espresso Dark Brown */
   
   --primary: #1B4332; /* Deep Forest Green */
@@ -28,8 +32,12 @@
   --accent: #8D6E63; /* Mocha Brown */
   --accent-foreground: #FFFFFF;
 
-  --card: rgba(139, 69, 19, 0.04);
-  --card-border: rgba(139, 69, 19, 0.1);
+  --card: rgba(101, 67, 33, 0.12); /* Brown Glassmorphism */
+  --card-border: rgba(101, 67, 33, 0.25);
+  
+  --scroll-track: #E6D5C3;
+  --scroll-thumb: #A07855;
+  --scroll-thumb-hover: #8B5A2B;
 }
 
 @theme inline {
@@ -89,9 +97,9 @@ select option {
 
 /* Scrollbar custom for dark theme */
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-track { background: #0A0A0A; }
-::-webkit-scrollbar-thumb { background: #333; border-radius: 5px; }
-::-webkit-scrollbar-thumb:hover { background: #555; }
+::-webkit-scrollbar-track { background: var(--scroll-track); }
+::-webkit-scrollbar-thumb { background: var(--scroll-thumb); border-radius: 5px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-thumb-hover); }
 
 /* Hide number input spinners */
 input[type=number]::-webkit-inner-spin-button,
