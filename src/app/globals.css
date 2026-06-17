@@ -22,8 +22,8 @@
 }
 
 .light {
-  /* Premium Coffee Theme */
-  --background: #F5E6D3; /* Cream / Milky Coffee */
+  /* Premium Coffee Theme - Refined */
+  --background: #FCF9F2; /* Sangat terang, hint cream */
   --foreground: #3E2723; /* Espresso Dark Brown */
   
   --primary: #1B4332; /* Deep Forest Green */
@@ -32,12 +32,12 @@
   --accent: #8D6E63; /* Mocha Brown */
   --accent-foreground: #FFFFFF;
 
-  --card: rgba(101, 67, 33, 0.12); /* Brown Glassmorphism */
-  --card-border: rgba(101, 67, 33, 0.25);
+  --card: rgba(255, 255, 255, 0.75); /* Frosted white glass, more opaque */
+  --card-border: rgba(139, 69, 19, 0.15); /* Subtle brown border */
   
-  --scroll-track: #E6D5C3;
-  --scroll-thumb: #A07855;
-  --scroll-thumb-hover: #8B5A2B;
+  --scroll-track: #F2E8DC;
+  --scroll-thumb: #CBB5A1;
+  --scroll-thumb-hover: #9E7D63;
 }
 
 @theme inline {
