@@ -31,12 +31,12 @@ export default function ProductsClient({ products: initialProducts = [], error =
 
     if (editingId) {
       res = await updateProduct(editingId, {
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), is_active: isActive, units
+        name, category, workshop_code: workshop, price_polos: Number(sellingPrice), is_active: isActive, units
       })
     } else {
       res = await addProduct({
         product_code: 'PRD-' + Math.floor(Math.random() * 100000),
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), is_active: isActive, units
+        name, category, workshop_code: workshop, price_polos: Number(sellingPrice), is_active: isActive, units
       })
     }
 
@@ -67,7 +67,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     setName(product.name)
     setCategory(product.category || '')
     setWorkshop(product.workshop_code || 'GLOBAL')
-    setSellingPrice(product.selling_price || 0)
+    setSellingPrice(product.price_polos || 0)
     setIsActive(product.is_active !== false) // Default true if undefined
     setUnits(product.product_units || [])
     setShowModal(true)
@@ -145,7 +145,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
                   <td className="px-6 py-4 text-foreground/60">{item.category || '-'}</td>
                   <td className="px-6 py-4 text-foreground/80">{item.workshops?.name || '-'}</td>
                   <td className="px-6 py-4 text-foreground/90 font-semibold">
-                    Rp {Number(item.selling_price || 0).toLocaleString('id-ID')}
+                    Rp {Number(item.price_polos || 0).toLocaleString('id-ID')}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {item.is_active !== false ? (
