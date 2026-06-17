@@ -18,6 +18,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
   const [category, setCategory] = useState('CUP')
   const [workshop, setWorkshop] = useState('GLOBAL')
   const [sellingPrice, setSellingPrice] = useState(0)
+  const [isActive, setIsActive] = useState(true)
   const [units, setUnits] = useState([]) // Array of { unit_name, multiplier }
   const [isPending, setIsPending] = useState(false)
 
@@ -30,12 +31,12 @@ export default function ProductsClient({ products: initialProducts = [], error =
 
     if (editingId) {
       res = await updateProduct(editingId, {
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), units
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), is_active: isActive, units
       })
     } else {
       res = await addProduct({
         product_code: 'PRD-' + Math.floor(Math.random() * 100000),
-        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), units
+        name, category, workshop_code: workshop, selling_price: Number(sellingPrice), is_active: isActive, units
       })
     }
 
@@ -57,6 +58,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     setName('')
     setCategory('CUP')
     setSellingPrice(0)
+    setIsActive(true)
     setUnits([])
   }
 
@@ -66,6 +68,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     setCategory(product.category || '')
     setWorkshop(product.workshop_code || 'GLOBAL')
     setSellingPrice(product.selling_price || 0)
+    setIsActive(product.is_active !== false) // Default true if undefined
     setUnits(product.product_units || [])
     setShowModal(true)
   }
@@ -120,6 +123,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
                 <th className="px-6 py-4 font-medium">Kategori</th>
                 <th className="px-6 py-4 font-medium">Workshop</th>
                 <th className="px-6 py-4 font-medium">Harga Jual</th>
+                <th className="px-6 py-4 font-medium text-center">Status</th>
                 <th className="px-6 py-4 font-medium text-right">Aksi</th>
               </tr>
             </thead>
@@ -142,6 +146,13 @@ export default function ProductsClient({ products: initialProducts = [], error =
                   <td className="px-6 py-4 text-foreground/80">{item.workshops?.name || '-'}</td>
                   <td className="px-6 py-4 text-foreground/90 font-semibold">
                     Rp {Number(item.selling_price || 0).toLocaleString('id-ID')}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    {item.is_active !== false ? (
+                      <span className="px-2 py-1 text-[10px] font-bold bg-green-500/20 text-green-400 rounded-full border border-green-500/20">Aktif</span>
+                    ) : (
+                      <span className="px-2 py-1 text-[10px] font-bold bg-red-500/20 text-red-400 rounded-full border border-red-500/20">Non-Aktif</span>
+                    )}
                   </td>
                   <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
                     <button onClick={() => openEditModal(item)} className="text-accent hover:text-accent/80 font-medium text-xs flex items-center gap-1">
@@ -213,14 +224,29 @@ export default function ProductsClient({ products: initialProducts = [], error =
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-xs font-medium text-foreground/80">Harga Jual per PCS (Rp)</label>
-                <input 
-                  type="number" 
-                  value={sellingPrice} 
-                  onChange={e => setSellingPrice(e.target.value)} 
-                  className="glass-input w-full" 
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Harga Jual per PCS (Rp)</label>
+                  <input 
+                    type="number" 
+                    value={sellingPrice} 
+                    onChange={e => setSellingPrice(e.target.value)} 
+                    className="glass-input w-full" 
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80 mb-1 block">Status Produk</label>
+                  <label className="flex items-center gap-2 cursor-pointer pt-1">
+                    <input 
+                      type="checkbox" 
+                      checked={isActive} 
+                      onChange={e => setIsActive(e.target.checked)}
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-white/10 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-white/10 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-500 relative"></div>
+                    <span className="text-sm font-medium text-foreground/80">{isActive ? 'Aktif' : 'Non-Aktif'}</span>
+                  </label>
+                </div>
               </div>
 
               <div className="pt-4 border-t border-white/10">
