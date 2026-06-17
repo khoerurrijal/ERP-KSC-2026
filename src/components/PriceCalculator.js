@@ -10,6 +10,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
   const [productId, setProductId] = useState('')
   const [unit, setUnit] = useState('PCS')
   const [qty, setQty] = useState(1)
+  const [addons, setAddons] = useState([]) // [{ id: Date.now(), productId: '', qty: 1 }]
 
   const getCategoriesForItem = (oType) => {
     if (!oType) return []
@@ -51,8 +52,29 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
     if (pu) unitMultiplier = pu.multiplier
   }
 
+  // Calculate Addons Total
+  let addonsTotal = 0
+  addons.forEach(addon => {
+    if (addon.productId) {
+      const p = products.find(prod => prod.id?.toString() === addon.productId?.toString())
+      if (p) {
+        addonsTotal += (p.price_polos || 0) * (addon.qty || 0)
+      }
+    }
+  })
+
   const finalPricePerPcs = isSablon ? ((basePrice + currentSablonFee) * unitMultiplier) : (basePrice * unitMultiplier)
-  const totalPrice = finalPricePerPcs * qty
+  const totalPrice = (finalPricePerPcs * qty) + addonsTotal
+
+  const handleAddAddon = () => {
+    setAddons([...addons, { id: Date.now(), productId: '', qty: 1 }])
+  }
+  const handleRemoveAddon = (id) => {
+    setAddons(addons.filter(a => a.id !== id))
+  }
+  const handleAddonChange = (id, field, val) => {
+    setAddons(addons.map(a => a.id === id ? { ...a, [field]: val } : a))
+  }
 
   return (
     <div className="glass-card flex flex-col h-full border-t-4 border-primary">
@@ -126,6 +148,44 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
               min="1"
             />
           </div>
+        </div>
+
+        {addons.length > 0 && (
+          <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+            <h3 className="text-xs font-bold text-foreground/80">Item Tambahan (Add-on)</h3>
+            {addons.map((addon, idx) => (
+              <div key={addon.id} className="flex items-center gap-2">
+                <div className="flex-1">
+                  <CustomSelect 
+                    value={addon.productId} 
+                    onChange={(e) => handleAddonChange(addon.id, 'productId', e.target.value)} 
+                    options={[
+                      { value: "", label: "- Pilih Add-on -" },
+                      ...products.filter(p => ['ADDON', 'TUTUP CUP INJECT', 'TUTUP CUP PET', 'TUTUP CUP PP', 'TUTUP GOCUP', 'TUTUP PAPERCUP', 'SEDOTAN', 'SEALER'].includes(p.category)).map(p => ({ value: p.id, label: p.name }))
+                    ]} 
+                  />
+                </div>
+                <div className="w-20">
+                  <input 
+                    type="number" 
+                    value={addon.qty === 0 ? '' : addon.qty} 
+                    onChange={(e) => handleAddonChange(addon.id, 'qty', e.target.value === '' ? 0 : Number(e.target.value))}
+                    className="glass-input w-full text-sm px-2"
+                    placeholder="Qty"
+                  />
+                </div>
+                <button onClick={() => handleRemoveAddon(addon.id)} className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></svg>
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-4">
+           <button onClick={handleAddAddon} className="text-xs text-primary font-semibold hover:underline flex items-center gap-1 border border-primary/30 border-dashed rounded-lg px-3 py-1.5 hover:bg-primary/10">
+             + Tambah Add-on
+           </button>
         </div>
 
         <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
