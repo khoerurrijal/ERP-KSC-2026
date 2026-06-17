@@ -16,12 +16,21 @@ export const metadata = {
   description: "Internal ERP System for King Sablon Nusantara",
 };
 
+import { ThemeProvider } from "@/components/ThemeProvider";
+
 export default function RootLayout({ children }) {
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}>
-        <NextTopLoader color="#a855f7" showSpinner={false} height={3} />
-        {children}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="dark"
+          enableSystem={false}
+          disableTransitionOnChange
+        >
+          <NextTopLoader color="#a855f7" showSpinner={false} height={3} />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

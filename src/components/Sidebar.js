@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag } from 'lucide-react'
+import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, Sun, Moon } from 'lucide-react'
+import { useTheme } from 'next-themes'
 
 const MENU_GROUPS = [
   {
@@ -109,7 +110,8 @@ export default function Sidebar({ allowedMenus = [], userRole = '' }) {
             <span className="text-sm font-bold text-primary">{userRole}</span>
           </div>
         )}
-        <form action="/auth/signout" method="post">
+        <ThemeToggle />
+        <form action="/auth/signout" method="post" className="mt-2">
           <button type="submit" className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-400/10 transition-all font-medium justify-center">
             <LogOut className="w-5 h-5" />
             <span>Sign Out</span>
@@ -117,6 +119,29 @@ export default function Sidebar({ allowedMenus = [], userRole = '' }) {
         </form>
       </div>
     </aside>
+  )
+}
+
+function ThemeToggle() {
+  const { theme, setTheme } = useTheme()
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  if (!mounted) return null
+
+  const isDark = theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)
+
+  return (
+    <button 
+      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+      className="flex items-center gap-3 px-4 py-3 w-full rounded-xl hover:bg-white/5 transition-all font-medium text-foreground/80 hover:text-foreground mb-2"
+    >
+      {isDark ? <Sun className="w-5 h-5 text-yellow-500" /> : <Moon className="w-5 h-5 text-slate-800" />}
+      <span>{isDark ? 'Light Mode' : 'Dark Mode'}</span>
+    </button>
   )
 }
 
