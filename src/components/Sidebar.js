@@ -54,6 +54,7 @@ const MENU_GROUPS = [
     subItems: [
       { name: 'Laporan', path: '/dashboard/report', icon: FileText, key: 'laporan' },
       { name: 'Pengaturan', path: '/dashboard/settings', icon: Settings, key: 'pengaturan' },
+      { name: 'Public Price List', path: '/pricelist', icon: FileText, key: 'dashboard' },
     ]
   }
 ]

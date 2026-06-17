@@ -7,7 +7,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 
-export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {} }) {
+export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, jasaSablon = 250 }) {
   const router = useRouter()
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
@@ -143,7 +143,14 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           const selectedProduct = products.find(p => p.name === value)
           if (selectedProduct) {
             updated.product_id = selectedProduct.product_code
-            updated.price = selectedProduct.selling_price || 0
+            
+            // Default ke price_polos
+            let basePrice = selectedProduct.price_polos || 0
+            if (updated.order_type === 'SABLON') {
+              basePrice += jasaSablon
+            }
+            updated.price = basePrice
+            
             updated.workshop_id = selectedProduct.workshop_id || ''
             updated.unit = 'PCS'
             updated.unit_multiplier = 1

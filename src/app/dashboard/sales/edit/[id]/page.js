@@ -30,6 +30,8 @@ export default async function EditSalesOrderPage({ params }) {
   ])
 
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
+  const jasaSablonStr = settings?.find(s => s.key === 'jasa_sablon_price')?.value || "250"
+  const jasaSablon = parseFloat(jasaSablonStr)
 
   return (
     <SalesOrderWizard 
@@ -38,6 +40,7 @@ export default async function EditSalesOrderPage({ params }) {
       workshops={workshops || []} 
       initialData={so}
       dropdownConfig={dropdownConfig}
+      jasaSablon={jasaSablon}
     />
   )
 }

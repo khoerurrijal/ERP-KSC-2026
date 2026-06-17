@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function PriceCalculator({ products = [], dropdownConfig = {} }) {
+export default function PriceCalculator({ products = [], dropdownConfig = {}, jasaSablon = 250 }) {
   const [orderType, setOrderType] = useState('')
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
@@ -24,15 +24,12 @@ export default function PriceCalculator({ products = [], dropdownConfig = {} }) 
   const filteredProducts = products.filter(p => p.category === category)
   const selectedProduct = products.find(p => p.id?.toString() === productId?.toString())
 
-  // Harga Dasar (HPP atau base_price) -> For Sablon, the fee is added on top.
-  // Wait, in real logic, does the product have selling_price? Yes.
-  // The user said it just calculates real-time. If it's like Sales Order, we take the selling price.
-  const basePrice = selectedProduct?.selling_price || 0
+  // Harga Dasar (price_polos) -> For Sablon, we add jasaSablon
+  const basePrice = selectedProduct?.price_polos || 0
   
-  // Custom logic if Sablon adds fee? The user hasn't specified exact Sablon tier rules in DB yet, 
-  // but let's assume `basePrice` already includes it or we just show basePrice * Qty for now 
-  // since they said "mirip form sales order". 
-  const finalPricePerPcs = basePrice
+  // Custom logic for Sablon fee
+  const isSablon = orderType === 'SABLON'
+  const finalPricePerPcs = isSablon ? (basePrice + jasaSablon) : basePrice
   const totalPrice = finalPricePerPcs * qty
 
   return (
