@@ -165,11 +165,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         }
         
         // RECALCULATE PRICE IF RELEVANT FIELDS CHANGE
-        if (['qty', 'product_search', 'order_type', 'category'].includes(field)) {
+        if (['qty', 'product_search', 'order_type', 'category', 'unit'].includes(field)) {
           const selectedProduct = products.find(p => p.name === updated.product_search)
           if (selectedProduct) {
             let basePrice = selectedProduct.price_polos || 0
-            if (updated.order_type === 'SABLON') {
+            if (updated.order_type === 'SABLON' || updated.order_type === 'Sablon') {
                let currentSablonFee = 0
                const qty = updated.qty || 1
                const cat = updated.category
@@ -188,7 +188,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                }
                basePrice += currentSablonFee
             }
-            updated.price = basePrice
+            updated.price = basePrice * updated.unit_multiplier
           }
         }
         
@@ -353,7 +353,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         onChange={e => handleItemChange(item.id, 'order_type', e.target.value)} 
                         options={[
                           { value: "", label: "- Pilih -" },
-                          ...(dropdownConfig.order_type?.includes('ADDON') ? dropdownConfig.order_type : [...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"]).map(v => ({ value: v, label: v }))
+                          ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"])).map(v => ({ value: v, label: v }))
                         ]} 
                       />
                     </div>

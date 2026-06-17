@@ -8,6 +8,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
   const [orderType, setOrderType] = useState('')
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
+  const [unit, setUnit] = useState('PCS')
   const [qty, setQty] = useState(1)
 
   const getCategoriesForItem = (oType) => {
@@ -43,7 +44,14 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
     else currentSablonFee = tierMatrix.min_1000 || 250 // fallback
   }
 
-  const finalPricePerPcs = isSablon ? (basePrice + currentSablonFee) : basePrice
+  // Get Unit Multiplier
+  let unitMultiplier = 1
+  if (unit !== 'PCS' && selectedProduct && selectedProduct.product_units) {
+    const pu = selectedProduct.product_units.find(u => u.unit_name === unit)
+    if (pu) unitMultiplier = pu.multiplier
+  }
+
+  const finalPricePerPcs = isSablon ? ((basePrice + currentSablonFee) * unitMultiplier) : (basePrice * unitMultiplier)
   const totalPrice = finalPricePerPcs * qty
 
   return (
@@ -62,9 +70,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
               onChange={e => { setOrderType(e.target.value); setCategory(''); setProductId(''); }} 
               options={[
                 { value: "", label: "- Pilih -" },
-                ...(dropdownConfig.order_type || ["SABLON", "POLOS"]).includes("ADDON") 
-                  ? (dropdownConfig.order_type || ["SABLON", "POLOS"]).map(v => ({ value: v, label: v }))
-                  : [...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"].map(v => ({ value: v, label: v }))
+                ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"])).map(v => ({ value: v, label: v }))
               ]} 
             />
           </div>
@@ -86,7 +92,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
             <label className="text-xs font-medium text-foreground/60">Produk</label>
             <CustomSelect 
               value={productId} 
-              onChange={(e) => setProductId(e.target.value)} 
+              onChange={(e) => { setProductId(e.target.value); setUnit('PCS'); }} 
               options={[
                 { value: "", label: "- Pilih -" },
                 ...filteredProducts.map(p => ({ value: p.id, label: p.name }))
@@ -94,7 +100,23 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
             />
           </div>
 
-          <div className="space-y-1 col-span-2">
+          <div className="space-y-1 col-span-2 md:col-span-1">
+            <label className="text-xs font-medium text-foreground/60">Satuan</label>
+            <CustomSelect 
+              value={unit} 
+              onChange={(e) => setUnit(e.target.value)} 
+              options={(() => {
+                const base = [{ value: 'PCS', label: 'PCS' }]
+                if (!isSablon && selectedProduct && selectedProduct.product_units && selectedProduct.product_units.length > 0) {
+                  return [...base, ...selectedProduct.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
+                }
+                return base
+              })()}
+              disabled={isSablon || !productId}
+            />
+          </div>
+
+          <div className="space-y-1 col-span-2 md:col-span-1">
             <label className="text-xs font-medium text-foreground/60">Kuantitas (Qty)</label>
             <input 
               type="number" 
