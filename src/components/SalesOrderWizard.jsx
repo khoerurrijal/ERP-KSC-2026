@@ -353,7 +353,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         onChange={e => handleItemChange(item.id, 'order_type', e.target.value)} 
                         options={[
                           { value: "", label: "- Pilih -" },
-                          ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"])).map(v => ({ value: v, label: v === "ADDON" ? "ADDON / LAINNYA" : v }))
+                          ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])])).map(v => ({ value: v, label: v }))
                         ]} 
                       />
                     </div>
