@@ -29,7 +29,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
   const basePrice = selectedProduct?.price_polos || 0
   
   // Custom logic for Sablon fee
-  const isSablon = orderType === 'SABLON'
+  const isSablon = orderType?.toUpperCase() === 'SABLON'
   
   let currentSablonFee = 0
   if (isSablon && category && matrix[category]) {
@@ -70,7 +70,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
               onChange={e => { setOrderType(e.target.value); setCategory(''); setProductId(''); }} 
               options={[
                 { value: "", label: "- Pilih -" },
-                ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"])).map(v => ({ value: v, label: v }))
+                ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"])).map(v => ({ value: v, label: v === "ADDON" ? "ADDON / LAINNYA" : v }))
               ]} 
             />
           </div>
