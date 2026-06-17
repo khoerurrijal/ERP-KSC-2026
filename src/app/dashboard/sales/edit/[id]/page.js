@@ -30,8 +30,14 @@ export default async function EditSalesOrderPage({ params }) {
   ])
 
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
-  const jasaSablonStr = settings?.find(s => s.key === 'jasa_sablon_price')?.value || "250"
-  const jasaSablon = parseFloat(jasaSablonStr)
+  
+  const { data: matrixData } = await supabase.from('sablon_matrix').select('*')
+  const matrix = {}
+  if (matrixData) {
+    matrixData.forEach(row => {
+      matrix[row.category] = row
+    })
+  }
 
   return (
     <SalesOrderWizard 
@@ -40,7 +46,7 @@ export default async function EditSalesOrderPage({ params }) {
       workshops={workshops || []} 
       initialData={so}
       dropdownConfig={dropdownConfig}
-      jasaSablon={jasaSablon}
+      matrix={matrix}
     />
   )
 }

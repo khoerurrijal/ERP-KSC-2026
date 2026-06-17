@@ -7,19 +7,24 @@ export async function savePricelistConfig(config) {
   const supabase = await createClient()
 
   try {
-    // 1. Simpan config ke system_settings
+    // 1. Simpan config margin ke system_settings
     const { error: setErr } = await supabase
       .from('system_settings')
       .upsert({
         key: 'pricelist_config',
-        value: config,
+        value: { profitMargin: config.profitMargin },
         updated_at: new Date().toISOString()
       })
     
     if (setErr) throw setErr
 
-    // 2. Ambil semua produk untuk diupdate selling_price-nya
-    // selling_price = base_price + (base_price * profitMargin / 100)
+    // 2. Simpan Matrix Sablon
+    const matrixPromises = Object.values(config.matrix).map(row => 
+      supabase.from('sablon_matrix').upsert(row, { onConflict: 'category' })
+    )
+    await Promise.all(matrixPromises)
+
+    // 3. Update price_polos produk
     const { data: products, error: getErr } = await supabase
       .from('products')
       .select('id, base_price')
@@ -29,14 +34,12 @@ export async function savePricelistConfig(config) {
     if (products && products.length > 0) {
       const margin = Number(config.profitMargin) || 0
       
-      // Karena keterbatasan Supabase JS bulk update tanpa ID yang sama, 
-      // kita harus update satu per satu atau menggunakan RPC.
-      // Untuk amannya (karena jumlah produk mungkin belum terlalu besar), kita loop:
       for (const prod of products) {
-        const newSellingPrice = Math.round(prod.base_price * (1 + (margin / 100)))
+        if (!prod.base_price) continue
+        const newPrice = Math.round(prod.base_price * (1 + (margin / 100)))
         await supabase
           .from('products')
-          .update({ selling_price: newSellingPrice })
+          .update({ price_polos: newPrice })
           .eq('id', prod.id)
       }
     }

@@ -15,14 +15,17 @@ export default async function PriceListPage() {
     .select('product_code, name, category, workshop_code, base_price, price_polos')
     .order('name')
 
-  // Ambil jasa sablon dari pengaturan (default 250 per pcs / 250000 per 1000)
-  const { data: settingsData } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'jasa_sablon_price')
-    .single()
+  // Ambil matrix sablon
+  const { data: matrixData } = await supabase
+    .from('sablon_matrix')
+    .select('*')
 
-  const jasaSablonPerPcs = settingsData?.value ? parseFloat(settingsData.value) : 250
+  const matrix = {}
+  if (matrixData) {
+    matrixData.forEach(row => {
+      matrix[row.category] = row
+    })
+  }
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
@@ -36,7 +39,7 @@ export default async function PriceListPage() {
       </div>
 
       <div className="max-w-6xl mx-auto px-4 relative z-10">
-        <PriceListClient products={products || []} jasaSablon={jasaSablonPerPcs} />
+        <PriceListClient products={products || []} matrix={matrix} />
       </div>
     </div>
   )

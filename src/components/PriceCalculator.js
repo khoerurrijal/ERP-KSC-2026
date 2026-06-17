@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function PriceCalculator({ products = [], dropdownConfig = {}, jasaSablon = 250 }) {
+export default function PriceCalculator({ products = [], dropdownConfig = {}, matrix = {} }) {
   const [orderType, setOrderType] = useState('')
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
@@ -29,7 +29,21 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ja
   
   // Custom logic for Sablon fee
   const isSablon = orderType === 'SABLON'
-  const finalPricePerPcs = isSablon ? (basePrice + jasaSablon) : basePrice
+  
+  let currentSablonFee = 0
+  if (isSablon && category && matrix[category]) {
+    const tierMatrix = matrix[category]
+    if (qty >= 10000 && tierMatrix.min_10000 > 0) currentSablonFee = tierMatrix.min_10000
+    else if (qty >= 5000 && tierMatrix.min_5000 > 0) currentSablonFee = tierMatrix.min_5000
+    else if (qty >= 1000 && tierMatrix.min_1000 > 0) currentSablonFee = tierMatrix.min_1000
+    else if (qty >= 500 && tierMatrix.min_500 > 0) currentSablonFee = tierMatrix.min_500
+    else if (qty >= 100 && tierMatrix.min_100 > 0) currentSablonFee = tierMatrix.min_100
+    else if (qty >= 10 && tierMatrix.min_10 > 0) currentSablonFee = tierMatrix.min_10
+    else if (tierMatrix.min_1 > 0) currentSablonFee = tierMatrix.min_1
+    else currentSablonFee = tierMatrix.min_1000 || 250 // fallback
+  }
+
+  const finalPricePerPcs = isSablon ? (basePrice + currentSablonFee) : basePrice
   const totalPrice = finalPricePerPcs * qty
 
   return (

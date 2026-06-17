@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 
-export default function PriceListClient({ products, jasaSablon }) {
+export default function PriceListClient({ products, matrix }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [activeCategory, setActiveCategory] = useState('ALL')
 
@@ -54,6 +54,8 @@ export default function PriceListClient({ products, jasaSablon }) {
       {/* Grid view instead of boring table */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredProducts.map((product) => {
+          const catMatrix = matrix[product.category] || {}
+          const jasaSablon = catMatrix.min_1000 || 250 // fallback to 250 if not found
           const hargaPolos1000 = product.price_polos * 1000
           const hargaSablon1000 = (product.price_polos + jasaSablon) * 1000
 

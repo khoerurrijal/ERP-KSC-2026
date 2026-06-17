@@ -7,7 +7,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 
-export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, jasaSablon = 250 }) {
+export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, matrix = {} }) {
   const router = useRouter()
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
@@ -143,14 +143,6 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           const selectedProduct = products.find(p => p.name === value)
           if (selectedProduct) {
             updated.product_id = selectedProduct.product_code
-            
-            // Default ke price_polos
-            let basePrice = selectedProduct.price_polos || 0
-            if (updated.order_type === 'SABLON') {
-              basePrice += jasaSablon
-            }
-            updated.price = basePrice
-            
             updated.workshop_id = selectedProduct.workshop_id || ''
             updated.unit = 'PCS'
             updated.unit_multiplier = 1
@@ -171,6 +163,35 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
              updated.unit_multiplier = 1
           }
         }
+        
+        // RECALCULATE PRICE IF RELEVANT FIELDS CHANGE
+        if (['qty', 'product_search', 'order_type', 'category'].includes(field)) {
+          const selectedProduct = products.find(p => p.name === updated.product_search)
+          if (selectedProduct) {
+            let basePrice = selectedProduct.price_polos || 0
+            if (updated.order_type === 'SABLON') {
+               let currentSablonFee = 0
+               const qty = updated.qty || 1
+               const cat = updated.category
+               if (cat && matrix[cat]) {
+                 const tierMatrix = matrix[cat]
+                 if (qty >= 10000 && tierMatrix.min_10000 > 0) currentSablonFee = tierMatrix.min_10000
+                 else if (qty >= 5000 && tierMatrix.min_5000 > 0) currentSablonFee = tierMatrix.min_5000
+                 else if (qty >= 1000 && tierMatrix.min_1000 > 0) currentSablonFee = tierMatrix.min_1000
+                 else if (qty >= 500 && tierMatrix.min_500 > 0) currentSablonFee = tierMatrix.min_500
+                 else if (qty >= 100 && tierMatrix.min_100 > 0) currentSablonFee = tierMatrix.min_100
+                 else if (qty >= 10 && tierMatrix.min_10 > 0) currentSablonFee = tierMatrix.min_10
+                 else if (tierMatrix.min_1 > 0) currentSablonFee = tierMatrix.min_1
+                 else currentSablonFee = tierMatrix.min_1000 || 250
+               } else {
+                 currentSablonFee = 250 // fallback
+               }
+               basePrice += currentSablonFee
+            }
+            updated.price = basePrice
+          }
+        }
+        
         return updated
       }
       return item
@@ -325,15 +346,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {/* Urutan 1: Jenis Pesanan */}
-                    <div className="space-y-1">
-                      <label className="text-xs text-foreground/60 block">Jenis Order</label>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-medium text-foreground/60 mb-1 block">Jenis Pesanan</label>
                       <CustomSelect 
                         value={item.order_type} 
                         onChange={e => handleItemChange(item.id, 'order_type', e.target.value)} 
                         options={[
-                          { value: "", label: "Pilih..." },
-                          ...(dropdownConfig.order_type || ["SABLON", "POLOS", "KEMASAN"]).map(v => ({ value: v, label: v }))
-                        ]}
+                          { value: "", label: "- Pilih -" },
+                          ...(dropdownConfig.order_type?.includes('ADDON') ? dropdownConfig.order_type : [...(dropdownConfig.order_type || ["SABLON", "POLOS"]), "ADDON"]).map(v => ({ value: v, label: v }))
+                        ]} 
                       />
                     </div>
                     

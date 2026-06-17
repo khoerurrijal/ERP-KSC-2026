@@ -9,15 +9,11 @@ export default function PricelistClient({ initialConfig }) {
   const [isPending, startTransition] = useTransition()
   
   // Matrix pricing for Jasa Sablon per pcs based on tier
-  const [sablonFee, setSablonFee] = useState(initialConfig?.sablonFee || {
-    CUP: { '500': 450, '1000': 350, '5000': 300, '10000': 250 },
-    PLASTIK: { '500': 350, '1000': 250, '5000': 200, '10000': 150 },
-    PAPERBOWL: { '500': 550, '1000': 450, '5000': 400, '10000': 350 },
-  })
+  const [matrix, setMatrix] = useState(initialConfig?.matrix || {})
 
   const handleSave = () => {
     startTransition(async () => {
-      const config = { profitMargin, sablonFee }
+      const config = { profitMargin, matrix }
       const res = await savePricelistConfig(config)
       if (res.success) {
         alert('Pengaturan Pricelist berhasil disimpan! Harga jual seluruh produk otomatis disinkronkan.')
@@ -28,7 +24,7 @@ export default function PricelistClient({ initialConfig }) {
   }
 
   const handleFeeChange = (category, tier, value) => {
-    setSablonFee(prev => ({
+    setMatrix(prev => ({
       ...prev,
       [category]: {
         ...prev[category],
@@ -98,26 +94,29 @@ export default function PricelistClient({ initialConfig }) {
               <thead className="bg-white/5 border-b border-white/10 text-foreground/60 text-xs uppercase">
                 <tr>
                   <th className="px-4 py-3 font-medium">Kategori</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 1 pcs</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 10 pcs</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 100 pcs</th>
                   <th className="px-4 py-3 font-medium text-center">&ge; 500 pcs</th>
-                  <th className="px-4 py-3 font-medium text-center">&ge; 1.000 pcs</th>
-                  <th className="px-4 py-3 font-medium text-center">&ge; 5.000 pcs</th>
-                  <th className="px-4 py-3 font-medium text-center">&ge; 10.000 pcs</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 1K pcs</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 5K pcs</th>
+                  <th className="px-4 py-3 font-medium text-center">&ge; 10K pcs</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 
-                {Object.keys(sablonFee).map((category) => (
+                {Object.keys(matrix).map((category) => (
                   <tr key={category} className="hover:bg-white/5">
-                    <td className="px-4 py-4 font-bold text-primary">{category === 'CUP' ? 'CUP / INJEK' : category}</td>
-                    {['500', '1000', '5000', '10000'].map(tier => (
-                      <td key={tier} className="px-2 py-2">
+                    <td className="px-4 py-4 font-bold text-primary whitespace-nowrap">{category}</td>
+                    {['min_1', 'min_10', 'min_100', 'min_500', 'min_1000', 'min_5000', 'min_10000'].map(tier => (
+                      <td key={tier} className="px-1 py-2">
                         <div className="relative">
-                          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-foreground/40 font-bold">Rp</span>
+                          <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-foreground/40 font-bold">Rp</span>
                           <input 
                             type="number"
-                            value={sablonFee[category][tier]}
+                            value={matrix[category][tier] || 0}
                             onChange={(e) => handleFeeChange(category, tier, e.target.value)}
-                            className="glass-input w-full pl-8 pr-2 h-9 text-xs font-bold text-foreground"
+                            className="glass-input w-full pl-6 pr-1 h-9 text-xs font-bold text-foreground text-right"
                           />
                         </div>
                       </td>

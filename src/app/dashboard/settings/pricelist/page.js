@@ -8,45 +8,51 @@ export const metadata = {
 export default async function PricelistSettingsPage() {
   const supabase = await createClient()
 
-  // Ambil pengaturan
+  // Ambil pengaturan profit margin
   const { data: configRow } = await supabase
     .from('system_settings')
     .select('value')
     .eq('key', 'pricelist_config')
     .single()
 
+  // Ambil sablon matrix
+  const { data: matrixData } = await supabase
+    .from('sablon_matrix')
+    .select('*')
+    .order('category', { ascending: true })
+
   // Ambil kategori unik dari products
   const { data: products } = await supabase.from('products').select('category')
   const uniqueCategories = [...new Set((products || []).map(p => p.category).filter(Boolean))]
 
-  const defaultSablonFee = {}
-  uniqueCategories.forEach(cat => {
-    defaultSablonFee[cat] = { '500': 450, '1000': 350, '5000': 300, '10000': 250 }
-  })
-
-  const defaultConfig = {
-    profitMargin: 15,
-    sablonFee: defaultSablonFee
+  const defaultRow = { min_1: 0, min_10: 0, min_100: 0, min_500: 0, min_1000: 0, min_5000: 0, min_10000: 0, status: 'AKTIF' }
+  const matrix = {}
+  
+  // Populate dari database
+  if (matrixData) {
+    matrixData.forEach(row => {
+      matrix[row.category] = row
+    })
   }
 
-  const initialConfig = configRow?.value || defaultConfig
-
-  // Memastikan kategori baru di products juga muncul di sablonFee
-  const mergedSablonFee = { ...initialConfig.sablonFee }
+  // Tambahkan kategori yang belum ada
   uniqueCategories.forEach(cat => {
-    if (!mergedSablonFee[cat]) {
-      mergedSablonFee[cat] = { '500': 450, '1000': 350, '5000': 300, '10000': 250 }
+    if (!matrix[cat]) {
+      matrix[cat] = { category: cat, ...defaultRow }
     }
   })
-  
+
   // Hapus kategori yang sudah tidak ada di products
-  Object.keys(mergedSablonFee).forEach(cat => {
+  Object.keys(matrix).forEach(cat => {
     if (!uniqueCategories.includes(cat)) {
-      delete mergedSablonFee[cat]
+      delete matrix[cat]
     }
   })
-  
-  initialConfig.sablonFee = mergedSablonFee
+
+  const initialConfig = {
+    profitMargin: configRow?.value?.profitMargin || 15,
+    matrix: matrix
+  }
 
   return <PricelistClient initialConfig={initialConfig} categories={uniqueCategories} />
 }

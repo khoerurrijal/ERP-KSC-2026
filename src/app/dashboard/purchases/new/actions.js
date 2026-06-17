@@ -5,6 +5,8 @@ import { revalidatePath } from 'next/cache'
 
 export async function createPurchaseOrder(payload) {
   try {
+    // Dynamically import to avoid circular dependencies if any
+    const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
 
     // 1. Generate PO Number
@@ -69,9 +71,18 @@ export async function createPurchaseOrder(payload) {
       }
     }
 
+    }
+
+    // 6. Recalculate Dynamic Pricing for all affected products
+    const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
+    for (const prodCode of uniqueProducts) {
+      await recalculateProductPrices(prodCode)
+    }
+
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/purchases')
     revalidatePath('/dashboard')
+    revalidatePath('/pricelist')
 
     return { success: true, po_number: po.po_number }
   } catch (error) {
@@ -82,6 +93,7 @@ export async function createPurchaseOrder(payload) {
 
 export async function updatePurchaseOrder(id, payload) {
   try {
+    const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
 
     // 1. Fetch old items to revert stock
@@ -143,9 +155,18 @@ export async function updatePurchaseOrder(id, payload) {
       }
     }
 
+    }
+
+    // 6. Recalculate Dynamic Pricing for all affected products
+    const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
+    for (const prodCode of uniqueProducts) {
+      await recalculateProductPrices(prodCode)
+    }
+
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/purchases')
     revalidatePath('/dashboard')
+    revalidatePath('/pricelist')
 
     return { success: true }
   } catch (error) {
@@ -156,6 +177,7 @@ export async function updatePurchaseOrder(id, payload) {
 
 export async function deletePurchaseOrder(id) {
   try {
+    const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
 
     // 1. Fetch old items to revert stock
@@ -176,6 +198,19 @@ export async function deletePurchaseOrder(id) {
     // 2. Delete PO (Items will cascade if ON DELETE CASCADE, but we already reverted stock)
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id)
     if (error) throw new Error(error.message)
+
+    // 3. Recalculate Dynamic Pricing for affected products
+    if (oldItems && oldItems.length > 0) {
+      const uniqueProducts = [...new Set(oldItems.map(i => i.product_code))]
+      for (const prodCode of uniqueProducts) {
+        await recalculateProductPrices(prodCode)
+      }
+    }
+
+    revalidatePath('/dashboard/inventory')
+    revalidatePath('/dashboard/purchases')
+    revalidatePath('/dashboard')
+    revalidatePath('/pricelist')
 
     return { success: true }
   } catch (error) {
