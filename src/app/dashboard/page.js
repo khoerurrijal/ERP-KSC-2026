@@ -26,6 +26,14 @@ export default async function DashboardPage({ searchParams }) {
   const jasaSablonStr = settings?.find(s => s.key === 'jasa_sablon_price')?.value || "250"
   const jasaSablon = parseFloat(jasaSablonStr)
 
+  const { data: matrixData } = await supabase.from('sablon_matrix').select('*')
+  const matrix = {}
+  if (matrixData) {
+    matrixData.forEach(row => {
+      matrix[row.category] = row
+    })
+  }
+
   // Fetch orders for metrics
   const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
   const { data: marketplaceOrders } = await supabase.from('sales_orders').select('*, customers!inner(type)').limit(100000).in('customers.type', ['Marketplace', 'Shopee', 'Tokopedia', 'TikTok'])
@@ -101,7 +109,7 @@ export default async function DashboardPage({ searchParams }) {
         
         {/* KALKULATOR HARGA */}
         <div className="lg:col-span-1">
-          <PriceCalculator products={products || []} dropdownConfig={dropdownConfig} jasaSablon={jasaSablon} />
+          <PriceCalculator products={products || []} dropdownConfig={dropdownConfig} jasaSablon={jasaSablon} matrix={matrix} />
         </div>
 
         {/* TENGAH: Antrean & Stok */}
