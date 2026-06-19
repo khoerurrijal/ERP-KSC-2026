@@ -229,8 +229,8 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
                       <button 
                         onClick={() => {
                           const url = `${window.location.origin}/track/${item.id}`;
-                          navigator.clipboard.writeText(`Lacak progres pesanan Anda secara live di sini:\n${url}`);
-                          alert('Tautan pelacakan disalin!');
+                          navigator.clipboard.writeText(url);
+                          alert('Tautan pelacakan berhasil disalin!');
                         }}
                         className="text-green-400 hover:text-green-300 font-medium text-xs flex items-center gap-1"
                         title="Salin Tautan Pelacakan"
