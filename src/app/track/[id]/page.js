@@ -16,12 +16,12 @@ export default async function PublicTrackingPage({ params }) {
       sales_items (
         id,
         product_code,
-        product_name,
         qty,
         unit_price,
         total_price,
         status,
-        unit_multiplier
+        unit_multiplier,
+        products (name)
       )
     `)
     .eq('id', id)

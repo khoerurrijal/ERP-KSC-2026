@@ -211,7 +211,14 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
                 </tr>
               ) : filteredAndSorted.map((item) => {
                 return (
-                  <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                  <tr 
+                    key={item.id} 
+                    className="hover:bg-white/5 transition-colors cursor-pointer group"
+                    onClick={(e) => {
+                      if (e.target.closest('button') || e.target.closest('a')) return
+                      window.open(`/track/${item.id}`, '_blank')
+                    }}
+                  >
                     <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                     <td className="px-6 py-4 text-foreground/90 font-medium">{item.customers?.name}</td>
                     <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.grand_total || item.total_amount || 0).toLocaleString('id-ID')}</td>
@@ -226,14 +233,7 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
                           <Edit3 className="w-3 h-3" /> Edit Item
                         </Link>
                       )}
-                      <Link 
-                        href={`/track/${item.id}`}
-                        target="_blank"
-                        className="text-green-400 hover:text-green-300 font-medium text-xs flex items-center gap-1"
-                        title="Buka Layar Pelacakan"
-                      >
-                        <ExternalLink className="w-3 h-3" /> Tracking
-                      </Link>
+
                       <button onClick={() => handleEditClick(item)} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1">
                         <Edit className="w-3 h-3" /> Update
                       </button>
