@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban } from 'lucide-react'
+import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2 } from 'lucide-react'
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
@@ -293,13 +293,13 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5">
-                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64 cursor-pointer hover:text-white" onClick={() => handleSort('name')}>📦 Produk {renderSortIcon('name')}</th>
+                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64 cursor-pointer hover:text-white" onClick={() => handleSort('name')}><div className="flex items-center gap-2"><Package className="w-4 h-4"/> Produk {renderSortIcon('name')}</div></th>
                   <th className="p-4 font-semibold text-foreground/60 text-center cursor-pointer hover:text-white" onClick={() => handleSort('fisik')}>Fisik (Gudang) {renderSortIcon('fisik')}</th>
-                  <th className="p-4 font-semibold text-blue-400 text-center cursor-pointer hover:text-blue-300" onClick={() => handleSort('qty_booking')}>🛒 Baru Masuk {renderSortIcon('qty_booking')}</th>
-                  <th className="p-4 font-semibold text-yellow-400 text-center cursor-pointer hover:text-yellow-300" onClick={() => handleSort('qty_proses')}>⚙️ Proses {renderSortIcon('qty_proses')}</th>
-                  <th className="p-4 font-semibold text-orange-400 text-center cursor-pointer hover:text-orange-300" onClick={() => handleSort('qty_siap')}>🎁 Sudah Jadi {renderSortIcon('qty_siap')}</th>
-                  <th className="p-4 font-semibold text-purple-400 text-center cursor-pointer hover:text-purple-300" onClick={() => handleSort('qty_selesai')}>🚀 Dikirim {renderSortIcon('qty_selesai')}</th>
-                  <th className="p-4 font-semibold text-green-400 text-center cursor-pointer hover:text-green-300" onClick={() => handleSort('tersedia')}>🟢 Tersedia (Bebas) {renderSortIcon('tersedia')}</th>
+                  <th className="p-4 font-semibold text-blue-400 text-center cursor-pointer hover:text-blue-300" onClick={() => handleSort('qty_booking')}><div className="flex items-center justify-center gap-1"><ShoppingCart className="w-4 h-4"/> Baru Masuk {renderSortIcon('qty_booking')}</div></th>
+                  <th className="p-4 font-semibold text-yellow-400 text-center cursor-pointer hover:text-yellow-300" onClick={() => handleSort('qty_proses')}><div className="flex items-center justify-center gap-1"><Settings className="w-4 h-4"/> Proses {renderSortIcon('qty_proses')}</div></th>
+                  <th className="p-4 font-semibold text-orange-400 text-center cursor-pointer hover:text-orange-300" onClick={() => handleSort('qty_siap')}><div className="flex items-center justify-center gap-1"><Gift className="w-4 h-4"/> Sudah Jadi {renderSortIcon('qty_siap')}</div></th>
+                  <th className="p-4 font-semibold text-purple-400 text-center cursor-pointer hover:text-purple-300" onClick={() => handleSort('qty_selesai')}><div className="flex items-center justify-center gap-1"><Truck className="w-4 h-4"/> Dikirim {renderSortIcon('qty_selesai')}</div></th>
+                  <th className="p-4 font-semibold text-green-400 text-center cursor-pointer hover:text-green-300" onClick={() => handleSort('tersedia')}><div className="flex items-center justify-center gap-1"><CheckCircle2 className="w-4 h-4"/> Tersedia (Bebas) {renderSortIcon('tersedia')}</div></th>
                 </tr>
               </thead>
               <tbody>

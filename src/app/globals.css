@@ -67,26 +67,35 @@ body {
 /* Glassmorphism utility classes */
 @layer utilities {
   .glass-card {
-    @apply bg-card border border-card-border backdrop-blur-xl rounded-xl shadow-lg;
+    @apply bg-card border border-card-border backdrop-blur-[24px] rounded-[1.25rem] shadow-2xl;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
   .glass-panel {
-    @apply bg-card border-r border-card-border backdrop-blur-xl shadow-2xl;
+    @apply bg-card border-r border-card-border backdrop-blur-[24px] shadow-2xl;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
   }
   .glass-input {
-    @apply bg-white/5 border border-white/10 rounded-xl px-4 py-2 text-foreground focus:outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/50 transition-all;
+    @apply bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-foreground shadow-inner focus:outline-none focus:border-primary/70 focus:ring-1 focus:ring-primary/70 transition-all;
+    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
   }
   .btn-primary {
-    @apply font-semibold px-4 py-2 rounded-xl transition-all;
-    background-color: var(--primary);
+    @apply font-semibold px-4 py-2 rounded-xl transition-all border border-transparent;
+    background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 70%, black) 100%);
     color: var(--primary-foreground);
-    box-shadow: 0 0 15px color-mix(in srgb, var(--primary) 30%, transparent);
+    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
   }
   .btn-primary:hover {
-    background-color: color-mix(in srgb, var(--primary) 85%, white);
-    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 50%, transparent);
+    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 85%, white) 0%, color-mix(in srgb, var(--primary) 80%, black) 100%);
+    box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 40%, transparent), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
+    transform: translateY(-1px);
   }
   .btn-secondary {
-    @apply bg-white/5 text-foreground border border-white/10 font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all;
+    @apply bg-white/5 text-foreground border border-white/10 font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all backdrop-blur-md;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+  }
+  .btn-secondary:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
   }
 }
 

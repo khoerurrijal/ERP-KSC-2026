@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { Coffee, Box } from 'lucide-react'
 
 export default function PriceListClient({ products, matrix }) {
   const [mainTab, setMainTab] = useState('KING CUP')
@@ -109,7 +110,7 @@ export default function PriceListClient({ products, matrix }) {
                 : 'text-foreground/70 hover:bg-foreground/5'
             }`}
           >
-            ☕ KING CUP
+            <div className="flex items-center gap-2 justify-center"><Coffee className="w-4 h-4"/> KING CUP</div>
           </button>
           <button
             onClick={() => { setMainTab('KING PLASTIK BOX'); setActiveCategory('ALL') }}
@@ -119,7 +120,7 @@ export default function PriceListClient({ products, matrix }) {
                 : 'text-foreground/70 hover:bg-foreground/5'
             }`}
           >
-            📦 KING PLASTIK BOX
+            <div className="flex items-center gap-2 justify-center"><Box className="w-4 h-4"/> KING PLASTIK BOX</div>
           </button>
         </div>
       </div>
