@@ -93,6 +93,37 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
     return result
   }, [products, searchQuery, filterCategory, filterWorkshop, sortConfig])
 
+  const filteredPipelineData = useMemo(() => {
+    let result = pipelineData.filter(pipe => {
+      const matchSearch = ((pipe.product_name || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
+                          ((pipe.category || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      
+      const matchCat = filterCategory ? pipe.category === filterCategory : true
+      
+      return matchSearch && matchCat
+    })
+
+    result.sort((a, b) => {
+      let valA = a[sortConfig.key] || a.product_name
+      let valB = b[sortConfig.key] || b.product_name
+      
+      // Override sorting for pipeline numeric columns
+      if (['fisik', 'qty_booking', 'qty_proses', 'qty_siap', 'qty_selesai', 'tersedia'].includes(sortConfig.key)) {
+         valA = Number(a[sortConfig.key] || 0)
+         valB = Number(b[sortConfig.key] || 0)
+      } else if (sortConfig.key === 'name') {
+         valA = a.product_name
+         valB = b.product_name
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return result
+  }, [pipelineData, searchQuery, filterCategory, sortConfig])
+
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -221,28 +252,58 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
 
       {activeTab === 'pipeline' && (
         <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-white/10 bg-white/5">
-            <h2 className="font-bold text-foreground flex items-center gap-2">
-              <Kanban className="w-5 h-5 text-primary" />
-              Pipeline Pergerakan Stok per Produk
-            </h2>
-            <p className="text-xs text-foreground/60 mt-1">Pantau kemacetan (bottleneck) dan kesehatan aliran stok harian Anda.</p>
+          <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div>
+              <h2 className="font-bold text-foreground flex items-center gap-2">
+                <Kanban className="w-5 h-5 text-primary" />
+                Pipeline Pergerakan Stok per Produk
+              </h2>
+              <p className="text-xs text-foreground/60 mt-1">Pantau kemacetan (bottleneck) dan kesehatan aliran stok harian Anda.</p>
+            </div>
+            <div className="flex gap-2 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <input 
+                  type="text" 
+                  placeholder="Cari produk..." 
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="glass-input pl-4 h-9 w-full text-sm"
+                />
+              </div>
+              <button onClick={() => setShowFilters(!showFilters)} className={`btn-secondary h-9 px-3 flex items-center gap-2 text-sm ${showFilters ? 'bg-white/10' : ''}`}>
+                <Filter className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+
+          {showFilters && (
+            <div className="p-4 border-b border-white/10 bg-white/5 animate-in fade-in slide-in-from-top-2">
+              <CustomSelect 
+                value={filterCategory} 
+                onChange={e => setFilterCategory(e.target.value)} 
+                options={[
+                  { value: "", label: "- Semua Kategori -" },
+                  ...categories.map(c => ({ value: c, label: c }))
+                ]}
+              />
+            </div>
+          )}
+
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5">
-                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64">📦 Produk</th>
-                  <th className="p-4 font-semibold text-foreground/60 text-center">Fisik (Gudang)</th>
-                  <th className="p-4 font-semibold text-blue-400 text-center">🛒 Baru Masuk</th>
-                  <th className="p-4 font-semibold text-yellow-400 text-center">⚙️ Proses</th>
-                  <th className="p-4 font-semibold text-orange-400 text-center">🎁 Sudah Jadi</th>
-                  <th className="p-4 font-semibold text-purple-400 text-center">🚀 Dikirim</th>
-                  <th className="p-4 font-semibold text-green-400 text-center">🟢 Tersedia (Bebas)</th>
+                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64 cursor-pointer hover:text-white" onClick={() => handleSort('name')}>📦 Produk {renderSortIcon('name')}</th>
+                  <th className="p-4 font-semibold text-foreground/60 text-center cursor-pointer hover:text-white" onClick={() => handleSort('fisik')}>Fisik (Gudang) {renderSortIcon('fisik')}</th>
+                  <th className="p-4 font-semibold text-blue-400 text-center cursor-pointer hover:text-blue-300" onClick={() => handleSort('qty_booking')}>🛒 Baru Masuk {renderSortIcon('qty_booking')}</th>
+                  <th className="p-4 font-semibold text-yellow-400 text-center cursor-pointer hover:text-yellow-300" onClick={() => handleSort('qty_proses')}>⚙️ Proses {renderSortIcon('qty_proses')}</th>
+                  <th className="p-4 font-semibold text-orange-400 text-center cursor-pointer hover:text-orange-300" onClick={() => handleSort('qty_siap')}>🎁 Sudah Jadi {renderSortIcon('qty_siap')}</th>
+                  <th className="p-4 font-semibold text-purple-400 text-center cursor-pointer hover:text-purple-300" onClick={() => handleSort('qty_selesai')}>🚀 Dikirim {renderSortIcon('qty_selesai')}</th>
+                  <th className="p-4 font-semibold text-green-400 text-center cursor-pointer hover:text-green-300" onClick={() => handleSort('tersedia')}>🟢 Tersedia (Bebas) {renderSortIcon('tersedia')}</th>
                 </tr>
               </thead>
               <tbody>
-                {pipelineData.map(pipe => (
+                {filteredPipelineData.map(pipe => (
                   <tr key={pipe.product_code} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                     <td className="p-4 sticky left-0 bg-background/95 backdrop-blur-sm group-hover:bg-white/5 transition-colors">
                       <p className="font-semibold text-foreground text-sm truncate w-64">{pipe.product_name}</p>
@@ -278,8 +339,8 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
                     </td>
                   </tr>
                 ))}
-                {pipelineData.length === 0 && (
-                  <tr><td colSpan="7" className="text-center p-8 text-foreground/50">Belum ada data agregasi pipeline stok.</td></tr>
+                {filteredPipelineData.length === 0 && (
+                  <tr><td colSpan="7" className="text-center p-8 text-foreground/50">Tidak ada data produk yang ditemukan.</td></tr>
                 )}
               </tbody>
             </table>

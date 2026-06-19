@@ -1,5 +1,4 @@
 import { createClient } from '@/utils/supabase/server'
-import { notFound } from 'next/navigation'
 import TrackClient from './TrackClient'
 
 export const dynamic = 'force-dynamic'
@@ -28,8 +27,19 @@ export default async function PublicTrackingPage({ params }) {
     .eq('id', id)
     .single()
 
-  if (!order) {
-    notFound()
+  if (error || !order) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4 text-red-500">Pesanan Tidak Ditemukan</h1>
+          <p className="text-gray-400 mb-2">ID: {id}</p>
+          <p className="text-gray-500 text-sm">{error?.message || 'Data kosong'}</p>
+          <pre className="text-left bg-white/10 p-4 rounded-xl mt-4 text-xs overflow-auto">
+            {JSON.stringify(error, null, 2)}
+          </pre>
+        </div>
+      </div>
+    )
   }
 
   // Find production logs for this order
