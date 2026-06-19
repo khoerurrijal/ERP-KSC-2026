@@ -292,8 +292,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
                 <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('description')}>Keterangan {renderSortIcon('description')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('reference')}>Referensi {renderSortIcon('reference')}</th>
+                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('description')}>Keterangan / Pelanggan {renderSortIcon('description')}</th>
                 <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop_code')}>Workshop {renderSortIcon('workshop_code')}</th>
                 <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_method')}>Metode {renderSortIcon('payment_method')}</th>
                 <th className="px-6 py-4 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('amount_out')}>Kas Keluar {renderSortIcon('amount_out')}</th>
@@ -311,12 +310,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                   <td className="px-6 py-4 font-medium text-foreground/90">
                     {trx.description && trx.description !== '-' 
                       ? trx.description 
-                      : (trx.sales_orders ? `Pesanan: ${trx.sales_orders.customers?.name || 'Unknown'} (${trx.sales_orders.invoice_number})` : (trx.reference || '-'))}
-                  </td>
-                  <td className="px-6 py-4">
-                    <span className="px-2 py-1 rounded text-[10px] font-bold border border-white/10 bg-white/5 text-foreground/60">
-                      {trx.reference || '-'}
-                    </span>
+                      : (trx.sales_orders ? trx.sales_orders.customers?.name || 'Unknown Pelanggan' : 'Sistem ERP')}
                   </td>
                   <td className="px-6 py-4 text-foreground/80">{trx.workshop_code || '-'}</td>
                   <td className="px-6 py-4 text-foreground/80">{trx.payment_method || '-'}</td>

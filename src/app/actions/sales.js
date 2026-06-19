@@ -345,7 +345,9 @@ export async function updateSalesOrder(soId, payload) {
 
       itemBeliGlobal += itemRoyalty
 
-      preparedItems.push({
+      const isExisting = String(item.id).length > 20;
+
+      const preparedItem = {
         so_id: soId,
         order_type: item.order_type,
         product_code: item.product_id,
@@ -358,7 +360,13 @@ export async function updateSalesOrder(soId, payload) {
         hpp_price: dynamicHPP,
         beli_gudang: itemBeliGudang,
         beli_global: itemBeliGlobal
-      })
+      }
+
+      if (isExisting) {
+        preparedItem.id = item.id;
+      }
+
+      preparedItems.push(preparedItem)
     }
 
     const finalBeliGlobal = totalBeliGlobal + virtualRoyaltyGlobal
@@ -379,11 +387,18 @@ export async function updateSalesOrder(soId, payload) {
 
     if (soError) throw new Error('Gagal update pesanan: ' + soError.message)
 
-    // Delete existing items
-    await supabase.from('sales_items').delete().eq('so_id', soId)
+    // Handle items safely without wiping production logs
+    const existingItemIds = preparedItems.filter(i => i.id).map(i => i.id);
 
-    // Re-insert new items
-    const { error: itemsError } = await supabase.from('sales_items').insert(preparedItems)
+    // Delete items that were removed in the UI
+    if (existingItemIds.length > 0) {
+      await supabase.from('sales_items').delete().eq('so_id', soId).not('id', 'in', `(${existingItemIds.join(',')})`);
+    } else {
+      await supabase.from('sales_items').delete().eq('so_id', soId);
+    }
+
+    // Upsert the remaining items (inserts new ones, updates existing ones by id)
+    const { error: itemsError } = await supabase.from('sales_items').upsert(preparedItems)
     if (itemsError) throw new Error('Gagal update item pesanan.')
 
     revalidatePath('/dashboard/sales')

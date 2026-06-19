@@ -1,12 +1,13 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History } from 'lucide-react'
+import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban } from 'lucide-react'
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function InventoryClient({ products: initialProducts = [] }) {
+export default function InventoryClient({ products: initialProducts = [], pipelineData = [] }) {
+  const [activeTab, setActiveTab] = useState('tabel')
   const [products, setProducts] = useState(initialProducts)
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
@@ -112,6 +113,16 @@ export default function InventoryClient({ products: initialProducts = [] }) {
         </div>
       </header>
 
+      <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-4 overflow-x-auto hide-scrollbar">
+        <button onClick={() => setActiveTab('tabel')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${activeTab === 'tabel' ? 'bg-primary text-background' : 'bg-white/5 text-foreground/60 hover:text-foreground hover:bg-white/10'}`}>
+          <PackageSearch className="w-4 h-4" /> Tabel Stok
+        </button>
+        <button onClick={() => setActiveTab('pipeline')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${activeTab === 'pipeline' ? 'bg-primary text-background' : 'bg-white/5 text-foreground/60 hover:text-foreground hover:bg-white/10'}`}>
+          <Kanban className="w-4 h-4" /> Live Tracking (Pipeline)
+        </button>
+      </div>
+
+      {activeTab === 'tabel' && (
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         
         <div className="md:col-span-4 glass-card overflow-hidden flex flex-col">
@@ -206,13 +217,83 @@ export default function InventoryClient({ products: initialProducts = [] }) {
           </div>
         </div>
       </div>
+      )}
+
+      {activeTab === 'pipeline' && (
+        <div className="glass-card overflow-hidden">
+          <div className="p-4 border-b border-white/10 bg-white/5">
+            <h2 className="font-bold text-foreground flex items-center gap-2">
+              <Kanban className="w-5 h-5 text-primary" />
+              Pipeline Pergerakan Stok per Produk
+            </h2>
+            <p className="text-xs text-foreground/60 mt-1">Pantau kemacetan (bottleneck) dan kesehatan aliran stok harian Anda.</p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
+              <thead>
+                <tr className="border-b border-white/10 bg-white/5">
+                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64">📦 Produk</th>
+                  <th className="p-4 font-semibold text-foreground/60 text-center">Fisik (Gudang)</th>
+                  <th className="p-4 font-semibold text-blue-400 text-center">🛒 Baru Masuk</th>
+                  <th className="p-4 font-semibold text-yellow-400 text-center">⚙️ Proses</th>
+                  <th className="p-4 font-semibold text-orange-400 text-center">🎁 Sudah Jadi</th>
+                  <th className="p-4 font-semibold text-purple-400 text-center">🚀 Dikirim</th>
+                  <th className="p-4 font-semibold text-green-400 text-center">🟢 Tersedia (Bebas)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipelineData.map(pipe => (
+                  <tr key={pipe.product_code} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
+                    <td className="p-4 sticky left-0 bg-background/95 backdrop-blur-sm group-hover:bg-white/5 transition-colors">
+                      <p className="font-semibold text-foreground text-sm truncate w-64">{pipe.product_name}</p>
+                      <p className="text-xs text-foreground/50">{pipe.category}</p>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className="font-bold text-base">{Number(pipe.fisik).toLocaleString('id-ID')}</span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_booking > 0 ? 'bg-blue-500/20 text-blue-400' : 'text-foreground/20'}`}>
+                        {Number(pipe.qty_booking).toLocaleString('id-ID')}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_proses > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'text-foreground/20'}`}>
+                        {Number(pipe.qty_proses).toLocaleString('id-ID')}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_siap > 0 ? 'bg-orange-500/20 text-orange-400' : 'text-foreground/20'}`}>
+                        {Number(pipe.qty_siap).toLocaleString('id-ID')}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_selesai > 0 ? 'bg-purple-500/20 text-purple-400' : 'text-foreground/20'}`}>
+                        {Number(pipe.qty_selesai).toLocaleString('id-ID')}
+                      </span>
+                    </td>
+                    <td className="p-4 text-center">
+                      <span className={`px-3 py-1 rounded-full font-bold ${pipe.tersedia > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                        {Number(pipe.tersedia).toLocaleString('id-ID')}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {pipelineData.length === 0 && (
+                  <tr><td colSpan="7" className="text-center p-8 text-foreground/50">Belum ada data agregasi pipeline stok.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {showOpnameModal && opnameProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
               <h3 className="font-bold text-foreground">Stok Opname</h3>
               <button onClick={() => setShowOpnameModal(false)} className="text-foreground/50 hover:text-foreground">
-                <Filter className="w-4 h-4 hidden" /> {/* Dummy icon reference, X would be better but we don't have it imported, let's just use text */}
+                <Filter className="w-4 h-4 hidden" />
                 Batal
               </button>
             </div>

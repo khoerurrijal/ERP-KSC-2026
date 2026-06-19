@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3 } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Share2 } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { addSalesPayment } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
@@ -226,6 +226,17 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
                           <Edit3 className="w-3 h-3" /> Edit Item
                         </Link>
                       )}
+                      <button 
+                        onClick={() => {
+                          const url = `${window.location.origin}/track/${item.id}`;
+                          navigator.clipboard.writeText(`Lacak progres pesanan Anda secara live di sini:\n${url}`);
+                          alert('Tautan pelacakan disalin!');
+                        }}
+                        className="text-green-400 hover:text-green-300 font-medium text-xs flex items-center gap-1"
+                        title="Salin Tautan Pelacakan"
+                      >
+                        <Share2 className="w-3 h-3" /> Share
+                      </button>
                       <button onClick={() => handleEditClick(item)} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1">
                         <Edit className="w-3 h-3" /> Update
                       </button>

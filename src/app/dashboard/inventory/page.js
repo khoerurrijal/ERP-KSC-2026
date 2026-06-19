@@ -17,5 +17,11 @@ export default async function InventoryPage() {
     .limit(100000)
     .order('name')
 
-  return <InventoryClient products={products || []} />
+  // Fetch pipeline data for active products
+  const { data: pipelineData } = await supabase
+    .from('product_pipeline_view')
+    .select('*')
+    .limit(100000)
+
+  return <InventoryClient products={products || []} pipelineData={pipelineData || []} />
 }

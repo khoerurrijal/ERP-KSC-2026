@@ -118,8 +118,7 @@ export async function updatePurchaseOrder(id, payload) {
        // Just fetch old items for pricing recalculation later
     }
 
-    // 2. Delete old items
-    await supabase.from('purchase_items').delete().eq('po_id', id)
+    // 2. We will handle deletion carefully later
 
     // 3. Update Purchase Order
     let finalSupplierCode = payload.supplierId;
@@ -165,18 +164,34 @@ export async function updatePurchaseOrder(id, payload) {
 
     if (poError) throw new Error(poError.message)
 
-    // 4. Insert New Purchase Items
-    const itemsToInsert = payload.items.map(item => ({
-      po_id: id,
-      product_code: item.product_id,
-      qty: item.qty,
-      unit: item.unit || 'PCS',
-      unit_multiplier: item.unit_multiplier || 1,
-      unit_price: item.unit_cost,
-      total_price: Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)
-    }))
+    // 4. Upsert Purchase Items
+    const itemsToInsert = payload.items.map(item => {
+      const isExisting = String(item.id).length > 20;
+      const data = {
+        po_id: id,
+        product_code: item.product_id,
+        qty: item.qty,
+        unit: item.unit || 'PCS',
+        unit_multiplier: item.unit_multiplier || 1,
+        unit_price: item.unit_cost,
+        total_price: Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)
+      }
+      if (isExisting) {
+        data.id = item.id;
+      }
+      return data;
+    })
 
-    const { error: itemsError } = await supabase.from('purchase_items').insert(itemsToInsert)
+    const existingItemIds = itemsToInsert.filter(i => i.id).map(i => i.id);
+
+    // Delete items that were removed in the UI
+    if (existingItemIds.length > 0) {
+      await supabase.from('purchase_items').delete().eq('po_id', id).not('id', 'in', `(${existingItemIds.join(',')})`);
+    } else {
+      await supabase.from('purchase_items').delete().eq('po_id', id);
+    }
+
+    const { error: itemsError } = await supabase.from('purchase_items').upsert(itemsToInsert)
     if (itemsError) throw new Error(itemsError.message)
 
     // 5. Inventory is updated automatically by DB Trigger on purchase_items

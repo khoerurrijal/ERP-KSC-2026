@@ -101,7 +101,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
                 <th className="px-6 py-4 font-medium">Waktu Transaksi</th>
-                <th className="px-6 py-4 font-medium">Referensi (Supplier / Customer)</th>
+                <th className="px-6 py-4 font-medium">Pelanggan / Supplier</th>
                 <th className="px-6 py-4 font-medium">Produk</th>
                 <th className="px-6 py-4 font-medium text-right text-green-400">Masuk (IN)</th>
                 <th className="px-6 py-4 font-medium text-right text-yellow-400">Keluar (OUT)</th>
@@ -123,8 +123,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                     <div className="text-xs text-foreground/50">{new Date(item.created_at).toLocaleTimeString('id-ID')}</div>
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-foreground/90 font-bold">{item.actor || '-'}</div>
-                    <div className="text-xs text-foreground/60">{item.reference}</div>
+                    <div className="text-foreground/90 font-bold">{item.actor || 'Sistem ERP'}</div>
                   </td>
                   <td className="px-6 py-4 text-foreground/90">{item.product_name}</td>
                   <td className="px-6 py-4 text-right">
