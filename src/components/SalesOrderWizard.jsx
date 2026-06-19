@@ -102,7 +102,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       return mapping[orderType]
     }
     // Fallback: semua kategori
-    return [...new Set(products.map(p => p.category).filter(Boolean))]
+    return [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
   }
   
   const calculateTotal = () => {
@@ -379,7 +379,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         onChange={e => handleItemChange(item.id, 'product_search', e.target.value)} 
                         options={[
                           { value: "", label: "Ketik/Pilih Produk..." },
-                          ...products.filter(p => p.category === item.category).map(p => ({ value: p.name, label: p.name }))
+                          ...products.filter(p => p.category === item.category && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: p.name }))
                         ]}
                         searchable={true}
                         disabled={!item.category}
@@ -528,9 +528,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   value={newCustomerType} 
                   onChange={e => setNewCustomerType(e.target.value)} 
                   options={[
-                    { value: "Umum", label: "Umum" },
-                    { value: "Member", label: "Member" },
-                    { value: "Grosir", label: "Grosir" }
+                    ...(dropdownConfig.customer_type || ["Umum", "Member", "Grosir"]).map(t => ({ value: t, label: t }))
                   ]}
                 />
               </div>

@@ -25,7 +25,7 @@ export default async function EditSalesOrderPage({ params }) {
   // 3. Fetch dependencies for Wizard
   const [{ data: customers }, { data: products }, { data: workshops }, { data: settings }] = await Promise.all([
     supabase.from('customers').select('*').order('name'),
-    supabase.from('products').select('*').order('name'),
+    supabase.from('products').select('*, product_units(id, unit_name, multiplier)').order('name'),
     supabase.from('workshops').select('*'),
     supabase.from('system_settings').select('*')
   ])

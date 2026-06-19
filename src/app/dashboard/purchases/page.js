@@ -54,5 +54,8 @@ export default async function PurchasesPage({ searchParams }) {
     }
   })
 
-  return <PurchasesClient purchaseOrders={allPOs} summary={summary} selectedMonth={selectedMonth} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <PurchasesClient purchaseOrders={allPOs} summary={summary} selectedMonth={selectedMonth} dropdownConfig={dropdownConfig} />
 }

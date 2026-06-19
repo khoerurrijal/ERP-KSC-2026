@@ -18,6 +18,33 @@ export async function createPurchaseOrder(payload) {
       return { success: false, error: 'Supplier belum diisi.' }
     }
 
+    const { data: existingSupplier } = await supabase
+      .from('suppliers')
+      .select('supplier_code')
+      .eq('supplier_name', finalSupplierCode)
+      .single()
+
+    if (existingSupplier) {
+      finalSupplierCode = existingSupplier.supplier_code
+    } else {
+      const newCode = `SUPP-${Math.floor(Math.random() * 10000)}`
+      const { data: newSupplier, error: newSuppError } = await supabase
+        .from('suppliers')
+        .insert({
+          supplier_code: newCode,
+          supplier_name: finalSupplierCode,
+          contact_person: '',
+          phone: '',
+          address: ''
+        })
+        .select('supplier_code')
+        .single()
+        
+      if (!newSuppError && newSupplier) {
+        finalSupplierCode = newSupplier.supplier_code
+      }
+    }
+
     // 3. Insert Purchase Order
     const { data: po, error: poError } = await supabase
       .from('purchase_orders')
@@ -46,7 +73,7 @@ export async function createPurchaseOrder(payload) {
       unit: item.unit || 'PCS',
       unit_multiplier: item.unit_multiplier || 1,
       unit_price: item.unit_cost,
-      total_price: Number(item.qty) * Number(item.unit_cost)
+      total_price: Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)
     }))
 
     const { error: itemsError } = await supabase
@@ -60,16 +87,7 @@ export async function createPurchaseOrder(payload) {
       return { success: false, error: itemsError.message }
     }
 
-    // 5. Update Inventory (Increment Stock)
-    for (const item of payload.items) {
-      const addedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
-      const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_id).single()
-      if (prod) {
-        await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) + addedQty })
-          .eq('product_code', item.product_id)
-      }
-    }
+    // 5. Inventory is updated automatically by DB Trigger on purchase_items
 
     // 6. Recalculate Dynamic Pricing for all affected products
     const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
@@ -93,20 +111,11 @@ export async function updatePurchaseOrder(id, payload) {
   try {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
-
-    // 1. Fetch old items to revert stock
+    // 1. Stock reverting is automatically handled by DB Trigger on purchase_items BEFORE DELETE
     const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
     
     if (oldItems && oldItems.length > 0) {
-      for (const oldItem of oldItems) {
-        const removedQty = Number(oldItem.qty) * Number(oldItem.unit_multiplier || 1)
-        const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', oldItem.product_code).single()
-        if (prod) {
-          await supabase.from('products')
-            .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
-            .eq('product_code', oldItem.product_code)
-        }
-      }
+       // Just fetch old items for pricing recalculation later
     }
 
     // 2. Delete old items
@@ -114,6 +123,34 @@ export async function updatePurchaseOrder(id, payload) {
 
     // 3. Update Purchase Order
     let finalSupplierCode = payload.supplierId;
+    if (finalSupplierCode) {
+      const { data: existingSupplier } = await supabase
+        .from('suppliers')
+        .select('supplier_code')
+        .eq('supplier_name', finalSupplierCode)
+        .single()
+
+      if (existingSupplier) {
+        finalSupplierCode = existingSupplier.supplier_code
+      } else {
+        const newCode = `SUPP-${Math.floor(Math.random() * 10000)}`
+        const { data: newSupplier, error: newSuppError } = await supabase
+          .from('suppliers')
+          .insert({
+            supplier_code: newCode,
+            supplier_name: finalSupplierCode,
+            contact_person: '',
+            phone: '',
+            address: ''
+          })
+          .select('supplier_code')
+          .single()
+          
+        if (!newSuppError && newSupplier) {
+          finalSupplierCode = newSupplier.supplier_code
+        }
+      }
+    }
     const { error: poError } = await supabase
       .from('purchase_orders')
       .update({
@@ -136,22 +173,13 @@ export async function updatePurchaseOrder(id, payload) {
       unit: item.unit || 'PCS',
       unit_multiplier: item.unit_multiplier || 1,
       unit_price: item.unit_cost,
-      total_price: Number(item.qty) * Number(item.unit_cost)
+      total_price: Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)
     }))
 
     const { error: itemsError } = await supabase.from('purchase_items').insert(itemsToInsert)
     if (itemsError) throw new Error(itemsError.message)
 
-    // 5. Update Inventory (Increment Stock with new qty)
-    for (const item of payload.items) {
-      const addedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
-      const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_id).single()
-      if (prod) {
-        await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) + addedQty })
-          .eq('product_code', item.product_id)
-      }
-    }
+    // 5. Inventory is updated automatically by DB Trigger on purchase_items
 
     // 6. Recalculate Dynamic Pricing for all affected products
     const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
@@ -176,20 +204,8 @@ export async function deletePurchaseOrder(id) {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
 
-    // 1. Fetch old items to revert stock
+    // 1. Stock reverting is automatically handled by DB Trigger on purchase_items ON DELETE
     const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
-    
-    if (oldItems && oldItems.length > 0) {
-      for (const oldItem of oldItems) {
-        const removedQty = Number(oldItem.qty) * Number(oldItem.unit_multiplier || 1)
-        const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', oldItem.product_code).single()
-        if (prod) {
-          await supabase.from('products')
-            .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
-            .eq('product_code', oldItem.product_code)
-        }
-      }
-    }
 
     // 2. Delete PO (Items will cascade if ON DELETE CASCADE, but we already reverted stock)
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id)

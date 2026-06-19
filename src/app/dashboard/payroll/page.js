@@ -31,5 +31,8 @@ export default async function PayrollPage() {
     `)
     .eq('is_active', true)
 
-  return <PayrollClient employees={employees || []} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <PayrollClient employees={employees || []} dropdownConfig={dropdownConfig} />
 }

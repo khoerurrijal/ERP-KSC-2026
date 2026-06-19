@@ -10,7 +10,7 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-export default function SalesClient({ salesOrders = [] }) {
+export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
@@ -297,11 +297,10 @@ export default function SalesClient({ salesOrders = [] }) {
                       <CustomSelect 
                         value={newPaymentMethod} 
                         onChange={e => setNewPaymentMethod(e.target.value)} 
-                        options={[
-                          { value: "BCA", label: "BCA" },
-                          { value: "MANDIRI", label: "MANDIRI" },
-                          { value: "CASH", label: "CASH" }
-                        ]}
+                        options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                          value: method,
+                          label: method
+                        }))}
                       />
                     </div>
                   </div>

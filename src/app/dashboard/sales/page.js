@@ -21,5 +21,8 @@ export default async function SalesPage() {
 
   const salesOrders = rawOrders || [];
 
-  return <SalesClient salesOrders={salesOrders} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <SalesClient salesOrders={salesOrders} dropdownConfig={dropdownConfig} />
 }

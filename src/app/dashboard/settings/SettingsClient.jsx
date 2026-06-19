@@ -9,8 +9,18 @@ export default function SettingsClient({ initialSettings }) {
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
   
-  // State for Dropdowns
-  const [dropdowns, setDropdowns] = useState(initialSettings.dropdown_config || {})
+  // Ensure default keys exist in dropdown_config
+  const defaultDropdowns = {
+    payment_method: ["BCA", "MANDIRI", "CASH"],
+    payment_status_po: ["TEMPO", "LUNAS"],
+    transaction_reference: ["PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "HPP GUDANG", "BAYAR HPP GUDANG", "LAIN-LAIN"],
+    customer_type: ["Umum", "Member", "Grosir"],
+    order_type: ["SABLON", "POLOS"],
+    kas_account: ["KING", "GLOBAL", "GUDANG", "TABUNGAN"],
+    category_mapping: {}
+  }
+  const mergedDropdowns = { ...defaultDropdowns, ...(initialSettings.dropdown_config || {}) }
+  const [dropdowns, setDropdowns] = useState(mergedDropdowns)
   
   // State for Cashflow
   const [cashflow, setCashflow] = useState({

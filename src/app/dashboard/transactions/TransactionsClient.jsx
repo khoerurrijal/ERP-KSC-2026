@@ -7,7 +7,7 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-export default function TransactionsClient({ transactions = [] }) {
+export default function TransactionsClient({ transactions = [], dropdownConfig = {} }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -367,12 +367,10 @@ export default function TransactionsClient({ transactions = [] }) {
                   <CustomSelect 
                     value={formWorkshop} 
                     onChange={e => setFormWorkshop(e.target.value)} 
-                    options={[
-                      { value: "KING", label: "KING" },
-                      { value: "GLOBAL", label: "GLOBAL" },
-                      { value: "GUDANG", label: "GUDANG" },
-                      { value: "TABUNGAN", label: "TABUNGAN" }
-                    ]}
+                    options={(dropdownConfig.kas_account || ["KING", "GLOBAL", "GUDANG", "TABUNGAN"]).map(acc => ({
+                      value: acc,
+                      label: acc
+                    }))}
                   />
                 </div>
               </div>
@@ -383,11 +381,10 @@ export default function TransactionsClient({ transactions = [] }) {
                   <CustomSelect 
                     value={formPaymentMethod} 
                     onChange={e => setFormPaymentMethod(e.target.value)} 
-                    options={[
-                      { value: "BCA", label: "BCA" },
-                      { value: "Mandiri", label: "Mandiri" },
-                      { value: "Cash", label: "Cash" }
-                    ]}
+                    options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                      value: method,
+                      label: method
+                    }))}
                   />
                 </div>
 
@@ -397,15 +394,10 @@ export default function TransactionsClient({ transactions = [] }) {
                     <CustomSelect 
                       value={formRef} 
                       onChange={e => setFormRef(e.target.value)} 
-                      options={[
-                        { value: "PENJUALAN", label: "Penjualan SO" },
-                        { value: "PENGIRIMAN", label: "Biaya Pengiriman" },
-                        { value: "LISTRIK WIFI", label: "Listrik & Wifi" },
-                        { value: "GAJI KARYAWAN", label: "Gaji / Kasbon" },
-                        { value: "MAINTENANCE", label: "Maintenance Mesin" },
-                        { value: "NOTA", label: "Pembelian Nota/ATK" },
-                        { value: "LAIN-LAIN", label: "Lain-lain" }
-                      ]}
+                      options={(dropdownConfig.transaction_reference || ["PENJUALAN", "PENGIRIMAN", "LISTRIK WIFI", "GAJI KARYAWAN", "MAINTENANCE", "NOTA", "LAIN-LAIN"]).map(ref => ({
+                        value: ref,
+                        label: ref
+                      }))}
                     />
                   </div>
                 ) : (

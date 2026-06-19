@@ -32,9 +32,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
 
   const getCategoriesForWorkshop = (wsId) => {
-    if (!wsId) return [];
-    const wsCode = workshops.find(w => w.id === wsId)?.code;
-    return [...new Set(products.filter(p => p.workshop_code === wsCode).map(p => p.category).filter(Boolean))]
+    return Array.from(new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))).sort();
   }
 
   const handleSupplierChange = (e) => {
@@ -65,7 +63,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   }
 
   const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_cost)), 0)
+    return items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)), 0)
   }
 
   const grandTotal = calculateTotal()
@@ -315,7 +313,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                         onChange={e => handleItemChange(item.id, 'product_search', e.target.value)} 
                         options={[
                           { value: "", label: "Ketik/Pilih Produk..." },
-                          ...products.filter(p => p.workshop_code === workshops.find(w => w.id === item.workshop_id)?.code && p.category === item.category).map(p => ({ value: p.name, label: p.name }))
+                          ...products.filter(p => p.workshop_code === workshops.find(w => w.id === item.workshop_id)?.code && p.category === item.category && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: p.name }))
                         ]}
                         searchable={true}
                         disabled={!item.category}
@@ -334,9 +332,10 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                         onChange={e => handleItemChange(item.id, 'unit', e.target.value)} 
                         options={(() => {
                           const p = products.find(prod => prod.name === item.product_search)
-                          const base = [{ value: 'PCS', label: 'PCS' }]
+                          let base = [{ value: 'PCS', label: 'PCS' }]
                           if (p && p.product_units && p.product_units.length > 0) {
-                            return [...base, ...p.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
+                            const extraUnits = p.product_units.filter(u => u.unit_name !== 'PCS').map(u => ({ value: u.unit_name, label: u.unit_name }))
+                            return [...base, ...extraUnits]
                           }
                           return base
                         })()}
@@ -352,7 +351,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                   
                   <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-sm">
                     <span className="text-foreground/60">Subtotal Modal:</span>
-                    <span className="font-bold text-red-400 text-base">Rp {(Number(item.qty) * Number(item.unit_cost)).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-red-400 text-base">Rp {(Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)).toLocaleString('id-ID')}</span>
                   </div>
                 </div>
               ))}

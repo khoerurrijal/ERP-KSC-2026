@@ -5,7 +5,7 @@ import { Plus, CheckCircle2, Wallet, X, Loader2, Trash2 } from 'lucide-react'
 import { createLoan, deleteLoan } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function LoansClient({ employees = [], initialLoans = [], error }) {
+export default function LoansClient({ employees = [], initialLoans = [], error = null, dropdownConfig = {} }) {
   const [loans, setLoans] = useState(initialLoans)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -169,11 +169,10 @@ export default function LoansClient({ employees = [], initialLoans = [], error }
                   <CustomSelect 
                     value={formData.payment_method} 
                     onChange={e => setFormData({...formData, payment_method: e.target.value})} 
-                    options={[
-                      { value: "Cash", label: "Cash" },
-                      { value: "BCA", label: "BCA" },
-                      { value: "Mandiri", label: "Mandiri" }
-                    ]}
+                    options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                      value: method,
+                      label: method
+                    }))}
                   />
                 </div>
               </div>

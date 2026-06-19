@@ -7,7 +7,7 @@ import { processMarketplaceSettlement } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-export default function MarketplaceClient({ marketplaceOrders = [] }) {
+export default function MarketplaceClient({ marketplaceOrders = [], dropdownConfig = {} }) {
   const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') // 'ALL' | 'BELUM_LUNAS' | 'LUNAS'
   
   const filteredOrders = useMemo(() => {
@@ -240,11 +240,10 @@ export default function MarketplaceClient({ marketplaceOrders = [] }) {
                   <CustomSelect 
                     value={settlementMethod} 
                     onChange={e => setSettlementMethod(e.target.value)} 
-                    options={[
-                      { value: "BCA", label: "BCA" },
-                      { value: "Mandiri", label: "Mandiri" },
-                      { value: "Cash", label: "Cash" }
-                    ]}
+                    options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                      value: method,
+                      label: method
+                    }))}
                   />
                 </div>
               </div>

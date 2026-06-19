@@ -137,5 +137,8 @@ export default async function ReportPage({ searchParams }) {
   summary.total_buku_besar = summary.gudang.akhir + summary.global.akhir + summary.tabungan.akhir + summary.king.saldo_bersih
   summary.physicalBalances = physicalBalances
 
-  return <ReportClient transactions={validTransactions} summary={summary} />
+  const { data: dropdownSettings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = dropdownSettings?.value || {}
+
+  return <ReportClient transactions={validTransactions} summary={summary} dropdownConfig={dropdownConfig} />
 }

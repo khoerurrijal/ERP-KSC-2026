@@ -22,5 +22,8 @@ export default async function MarketplacePage() {
 
   const marketplaceOrders = validOrders;
 
-  return <MarketplaceClient marketplaceOrders={marketplaceOrders} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <MarketplaceClient marketplaceOrders={marketplaceOrders} dropdownConfig={dropdownConfig} />
 }

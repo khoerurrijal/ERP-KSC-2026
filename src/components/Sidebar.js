@@ -122,6 +122,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '' }) {
   )
 }
 
+
 function ThemeToggle() {
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)

@@ -19,5 +19,8 @@ export default async function LoansPage() {
     .select('*, employees(full_name)')
     .order('created_at', { ascending: false })
 
-  return <LoansClient employees={employees || []} initialLoans={loans || []} error={error} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <LoansClient employees={employees || []} initialLoans={loans || []} error={error} dropdownConfig={dropdownConfig} />
 }

@@ -5,7 +5,7 @@ import { Calendar, CheckCircle2, Loader2, Calculator, Receipt } from 'lucide-rea
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { calculatePayroll, savePayroll } from './actions'
 
-export default function PayrollClient({ employees = [] }) {
+export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [loading, setLoading] = useState(false)
@@ -305,11 +305,10 @@ export default function PayrollClient({ employees = [] }) {
                   <CustomSelect 
                     value={savePaymentMethod} 
                     onChange={e => setSavePaymentMethod(e.target.value)} 
-                    options={[
-                      { value: "BCA", label: "BCA" },
-                      { value: "Mandiri", label: "Mandiri" },
-                      { value: "Cash", label: "Cash" }
-                    ]}
+                    options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                      value: method,
+                      label: method
+                    }))}
                   />
                 </div>
                 <div className="space-y-2">

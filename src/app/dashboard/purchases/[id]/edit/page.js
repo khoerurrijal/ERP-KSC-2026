@@ -38,7 +38,8 @@ export default async function EditPurchaseOrderPage({ params }) {
       product_id: item.product_code,
       product_search: product?.name || '',
       qty: item.qty,
-      unit: product?.unit || 'Pcs',
+      unit: item.unit || product?.unit || 'PCS',
+      unit_multiplier: item.unit_multiplier || 1,
       unit_cost: item.unit_price
     }
   })

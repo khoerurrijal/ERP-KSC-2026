@@ -8,5 +8,8 @@ export default async function TransactionsPage() {
     .select('*, sales_orders(invoice_number, customers(name))')
     .order('date', { ascending: false })
 
-  return <TransactionsClient transactions={transactions || []} />
+  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settings?.value || {}
+
+  return <TransactionsClient transactions={transactions || []} dropdownConfig={dropdownConfig} />
 }

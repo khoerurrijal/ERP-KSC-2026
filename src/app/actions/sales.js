@@ -60,16 +60,16 @@ export async function createSalesOrder(payload) {
       const isSealer = category.includes('sealer');
 
       if (isPlastik && item.order_type === 'Sablon') {
-        virtualRoyaltyGlobal += (20 * Number(item.qty));
+        virtualRoyaltyGlobal += (20 * Number(item.qty) * Number(item.unit_multiplier || 1));
       } else if (isSealer) {
-        virtualRoyaltyGlobal += (20000 * Number(item.qty));
+        virtualRoyaltyGlobal += (20000 * Number(item.qty) * Number(item.unit_multiplier || 1));
       }
 
       const { data: product } = await supabase.from('products').select('workshop_code, base_price').eq('product_code', item.product_id).single();
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
       
       if (product) {
-        const itemHppTotal = dynamicHPP * item.qty;
+        const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1);
         if (product.workshop_code === 'GUDANG') {
           totalHppGudang += itemHppTotal * (1 + (profitGudangPct / 100));
         }
@@ -113,12 +113,12 @@ export async function createSalesOrder(payload) {
 
       let itemRoyalty = 0;
       if (isPlastik && item.order_type === 'Sablon') {
-        itemRoyalty = (20 * Number(item.qty));
+        itemRoyalty = (20 * Number(item.qty) * Number(item.unit_multiplier || 1));
       } else if (isSealer) {
-        itemRoyalty = (20000 * Number(item.qty));
+        itemRoyalty = (20000 * Number(item.qty) * Number(item.unit_multiplier || 1));
       }
 
-      const itemHppTotal = dynamicHPP * Number(item.qty);
+      const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1);
       let itemBeliGudang = 0;
       let itemBeliGlobal = 0;
 
@@ -146,17 +146,6 @@ export async function createSalesOrder(payload) {
 
     const { error: itemsError } = await supabase.from('sales_items').insert(soItems)
     if (itemsError) throw new Error('Gagal menyimpan item pesanan.')
-
-    // DECREMENT STOCK for each item
-    for (const item of soItems) {
-      const removedQty = Number(item.qty) * Number(item.unit_multiplier || 1)
-      const { data: prod } = await supabase.from('products').select('stock_qty').eq('product_code', item.product_code).single()
-      if (prod) {
-        await supabase.from('products')
-          .update({ stock_qty: Number(prod.stock_qty || 0) - removedQty })
-          .eq('product_code', item.product_code)
-      }
-    }
 
     // 3. Transactions Splitting Logic (If any payment is made)
     // We record the incoming cash to KING
@@ -331,16 +320,16 @@ export async function updateSalesOrder(soId, payload) {
 
       let itemRoyalty = 0
       if (isPlastik && item.order_type === 'Sablon') {
-        itemRoyalty = (20 * Number(item.qty))
+        itemRoyalty = (20 * Number(item.qty) * Number(item.unit_multiplier || 1))
       } else if (isSealer) {
-        itemRoyalty = (20000 * Number(item.qty))
+        itemRoyalty = (20000 * Number(item.qty) * Number(item.unit_multiplier || 1))
       }
       virtualRoyaltyGlobal += itemRoyalty
 
       const { data: product } = await supabase.from('products').select('workshop_code, base_price').eq('product_code', item.product_id).single()
       
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0)
-      const itemHppTotal = dynamicHPP * Number(item.qty)
+      const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1)
       
       let itemBeliGudang = 0;
       let itemBeliGlobal = 0;

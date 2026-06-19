@@ -5,7 +5,7 @@ import { TrendingDown, TrendingUp, Wallet, AlertOctagon, Tag, Building2, FileTex
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function ReportClient({ transactions = [], summary = {} }) {
+export default function ReportClient({ transactions = [], summary = {}, dropdownConfig = {} }) {
   const [filterRef, setFilterRef] = useState('')
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false)
   
@@ -244,14 +244,10 @@ export default function ReportClient({ transactions = [], summary = {} }) {
             icon={Tag}
             options={[
               { value: "", label: "Semua Kategori" },
-              { value: "PENJUALAN", label: "PENJUALAN" },
-              { value: "PEMBELIAN", label: "PEMBELIAN (PO)" },
-              { value: "GAJI KARYAWAN", label: "GAJI KARYAWAN" },
-              { value: "LISTRIK WIFI", label: "LISTRIK WIFI" },
-              { value: "MAINTENANCE", label: "MAINTENANCE" },
-              { value: "HPP GUDANG", label: "HPP GUDANG" },
-              { value: "BAYAR HPP GUDANG", label: "BAYAR HPP GUDANG" },
-              { value: "LAIN-LAIN", label: "LAIN-LAIN" }
+              ...(dropdownConfig.transaction_reference || ["PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "HPP GUDANG", "BAYAR HPP GUDANG", "LAIN-LAIN"]).map(ref => ({
+                value: ref,
+                label: ref
+              }))
             ]}
           />
         </div>

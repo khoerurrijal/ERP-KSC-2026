@@ -77,10 +77,23 @@ export async function updateProduct(id, payload) {
 export async function updateStock(product_code, new_stock) {
   const supabase = await createClient()
   
-  const { error } = await supabase
-    .from('products')
-    .update({ physical_stock: new_stock })
-    .eq('product_code', product_code)
+  // Ambil stok saat ini
+  const { data: prod } = await supabase.from('products').select('physical_stock').eq('product_code', product_code).single()
+  if (!prod) return { error: 'Produk tidak ditemukan.' }
+
+  const current_stock = Number(prod.physical_stock || 0)
+  const difference = Number(new_stock) - current_stock
+
+  if (difference === 0) return { success: true }
+
+  // Insert mutasi OPNAME, trigger DB akan mengupdate physical_stock & stock_qty otomatis
+  const { error } = await supabase.from('stock_mutations').insert({
+    product_code: product_code,
+    mutation_type: 'OPNAME',
+    qty_tersedia_change: difference,
+    qty_fisik_change: difference,
+    notes: `Penyesuaian Stok Opname (Dari ${current_stock} menjadi ${new_stock})`
+  })
 
   if (error) return { error: error.message }
   

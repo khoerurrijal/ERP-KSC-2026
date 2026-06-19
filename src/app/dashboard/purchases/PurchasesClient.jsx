@@ -8,7 +8,7 @@ import { deletePurchaseOrder, payPurchaseOrder } from './new/actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function PurchasesClient({ purchaseOrders = [], summary = {}, selectedMonth = '' }) {
+export default function PurchasesClient({ purchaseOrders = [], summary = {}, selectedMonth = '', dropdownConfig = {} }) {
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('BELUM LUNAS')
@@ -232,11 +232,10 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
               <CustomSelect 
                 value={payMethod} 
                 onChange={e => setPayMethod(e.target.value)} 
-                options={[
-                  { value: "BCA", label: "BCA" },
-                  { value: "Mandiri", label: "Mandiri" },
-                  { value: "Cash", label: "Cash" }
-                ]}
+                options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({
+                  value: method,
+                  label: method
+                }))}
               />
             </div>
 
