@@ -95,6 +95,9 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
 
   const filteredPipelineData = useMemo(() => {
     let result = pipelineData.filter(pipe => {
+      const isActive = products.some(p => p.product_code === pipe.product_code)
+      if (!isActive) return false
+
       const matchSearch = ((pipe.product_name || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
                           ((pipe.category || '').toLowerCase().includes(searchQuery.toLowerCase()))
       
@@ -130,7 +133,7 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Boxes className="w-6 h-6 text-green-400" />
-            Inventory & Kalkulator
+            Inventory
           </h1>
           <p className="text-sm text-foreground/60 mt-1">Pantau stok gudang dan riwayat barang masuk/keluar.</p>
         </div>
