@@ -8,7 +8,7 @@ export default async function PublicTrackingPage({ params }) {
   const supabase = await createClient()
 
   // Find sales order by ID
-  const { data: order } = await supabase
+  const { data: order, error } = await supabase
     .from('sales_orders')
     .select(`
       *,
