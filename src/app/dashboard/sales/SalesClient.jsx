@@ -399,6 +399,17 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                   const currentStatus = (item.status || 'BARU MASUK').toUpperCase();
                   const isUpdating = updatingItem === item.id;
                   
+                  let itemStatuses = productionStatuses;
+                  if (item.order_type?.toUpperCase() === 'POLOS') {
+                    itemStatuses = [
+                      productionStatuses[1] || 'BARU MASUK',
+                      productionStatuses[5] || 'SIAP KIRIM',
+                      productionStatuses[6] || 'DIKIRIM',
+                      productionStatuses[7] || 'SUDAH DIAMBIL',
+                      productionStatuses[8] || 'SELESAI'
+                    ].filter(Boolean);
+                  }
+                  
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-3">
@@ -433,7 +444,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                                 currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 
                                 'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
                           >
-                            {productionStatuses.map(statusOption => (
+                            {itemStatuses.map(statusOption => (
                               <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
                                 {statusOption}
                               </option>
