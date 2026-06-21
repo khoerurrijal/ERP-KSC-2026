@@ -58,10 +58,48 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+  position: relative;
+  overflow-x: hidden;
+}
+
+/* Aurora & Logo Background Setup */
+body::before, body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* The Aurora Animated Gradients */
+body::before {
   background-image: 
-    radial-gradient(at 0% 0%, color-mix(in srgb, var(--primary) 8%, transparent) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, color-mix(in srgb, var(--accent) 8%, transparent) 0px, transparent 50%);
-  background-attachment: fixed;
+    radial-gradient(circle at 15% 50%, rgba(212, 175, 55, 0.15), transparent 40%),
+    radial-gradient(circle at 85% 30%, rgba(192, 192, 192, 0.1), transparent 40%),
+    radial-gradient(circle at 50% 80%, rgba(212, 175, 55, 0.08), transparent 50%),
+    radial-gradient(circle at 80% 90%, rgba(255, 215, 0, 0.12), transparent 40%);
+  background-size: 200% 200%;
+  animation: aurora-shift 20s ease-in-out infinite alternate;
+  filter: blur(40px);
+  opacity: 1;
+}
+
+/* The Faint Logo Watermark */
+body::after {
+  background-image: url('/logo.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 60% auto;
+  opacity: 0.05; /* Faint watermark */
+  mix-blend-mode: luminosity; /* Blends well with dark mode */
+}
+
+@keyframes aurora-shift {
+  0% { background-position: 0% 0%; }
+  33% { background-position: 100% 50%; }
+  66% { background-position: 50% 100%; }
+  100% { background-position: 0% 100%; }
 }
 
 /* Glassmorphism utility classes */
