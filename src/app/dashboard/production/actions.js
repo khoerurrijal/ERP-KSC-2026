@@ -39,7 +39,7 @@ export async function handleAutoStatusUpdate(itemId) {
   const supabase = await createClient()
 
   // Ambil data item dan invoice
-  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status)').eq('id', itemId).single()
+  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status, marketplace_receipt)').eq('id', itemId).single()
   if (!item) return;
 
   const so = item.sales_orders;
@@ -47,6 +47,8 @@ export async function handleAutoStatusUpdate(itemId) {
 
   const isLunas = so.payment_status === 'LUNAS';
   const isPaid = so.payment_status === 'LUNAS' || so.payment_status === 'DP';
+  const isMarketplace = so.marketplace_receipt && so.marketplace_receipt.trim() !== '';
+  const canProceed = isPaid || isMarketplace;
 
   // Hitung qty processed
   const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', itemId)
@@ -73,8 +75,8 @@ export async function handleAutoStatusUpdate(itemId) {
   const targetQty = item.qty * (item.unit_multiplier || 1);
 
   if (item.order_type?.toUpperCase() === 'POLOS') {
-    // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas
-    if (!isPaid) {
+    // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas atau dari Marketplace
+    if (!canProceed) {
       newStatus = ST_BARU_MASUK;
     } else {
       if (newStatus !== ST_DIKIRIM && newStatus !== ST_SUDAH_DIAMBIL && newStatus !== ST_SELESAI) {
@@ -100,7 +102,7 @@ export async function handleAutoStatusUpdate(itemId) {
       const isOldDataFinished = hasNoLogs && [ST_SUDAH_JADI, ST_SIAP_KIRIM, ST_DIKIRIM, ST_SUDAH_DIAMBIL, ST_SELESAI].includes(oldStatus);
       
       if (!isOldDataFinished) {
-        if (!isPaid) {
+        if (!canProceed) {
           newStatus = ST_BARU_MASUK;
         } else {
           newStatus = ST_SIAP_PROSES;
