@@ -87,12 +87,12 @@ body::before {
 
 /* The Faint Logo Watermark */
 body::after {
-  background-image: url('/logo.png');
+  background-image: url('/logo_bg.png');
   background-position: center;
   background-repeat: no-repeat;
   background-size: 60% auto;
-  opacity: 0.05; /* Faint watermark */
-  mix-blend-mode: luminosity; /* Blends well with dark mode */
+  opacity: 0.15; /* Increased slightly for better visibility since it has black bg */
+  mix-blend-mode: screen; /* Changed to screen to hide black background of the logo */
 }
 
 @keyframes aurora-shift {
