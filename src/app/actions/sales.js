@@ -451,8 +451,8 @@ export async function updateSalesItemStatus(itemId, newStatus) {
         await supabase.from('transactions').delete().eq('so_id', itemData.so_id)
       }
     }
-    
     revalidatePath('/dashboard/sales')
+    revalidatePath('/dashboard/production')
     revalidatePath('/track')
     return { success: true }
   } catch (error) {
