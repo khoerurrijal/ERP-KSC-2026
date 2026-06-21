@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 
 export async function processMarketplaceSettlement(settlementData, paymentMethod, settlementDate) {
   const supabase = await createClient()
@@ -126,8 +127,20 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
       })
     }
 
+    // Trigger auto status update for all items in the settled orders
+    // Because marketplace orders might be stuck at DIKIRIM and need to move to SELESAI once LUNAS
+    const { data: allSettledItems } = await supabase.from('sales_items').select('id').in('so_id', orderIds);
+    if (allSettledItems) {
+      for (const item of allSettledItems) {
+        await handleAutoStatusUpdate(item.id);
+      }
+    }
+
     revalidatePath('/dashboard/marketplace')
     revalidatePath('/dashboard/transactions')
+    revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
     return { success: true }
   } catch (err) {
     console.error(err)

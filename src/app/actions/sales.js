@@ -423,6 +423,13 @@ export async function updateSalesOrder(soId, payload) {
     const { error: itemsError } = await supabase.from('sales_items').upsert(preparedItems)
     if (itemsError) throw new Error('Gagal update item pesanan: ' + itemsError.message)
 
+    const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', soId);
+    if (soItemsForStatus) {
+      for (const item of soItemsForStatus) {
+        await handleAutoStatusUpdate(item.id);
+      }
+    }
+
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/transactions')
     
