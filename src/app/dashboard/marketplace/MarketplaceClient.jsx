@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShoppingBag, TrendingUp, Wallet, Save, X } from 'lucide-react'
-import { processMarketplaceSettlement } from './actions'
+import { processMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
@@ -23,6 +23,10 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
 
   // State for inline pencairan inputs
   const [inputPencairan, setInputPencairan] = useState({})
+  
+  // State for inline receipt inputs
+  const [inputReceipts, setInputReceipts] = useState({})
+  const [savingReceiptId, setSavingReceiptId] = useState(null)
 
   // Dynamic Summary Stats
   const activeOrders = useMemo(() => marketplaceOrders.filter(o => o.payment_status !== 'LUNAS'), [marketplaceOrders])
@@ -40,6 +44,30 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       ...prev,
       [id]: value
     }))
+  }
+
+  const handleReceiptChange = (id, value) => {
+    setInputReceipts(prev => ({
+      ...prev,
+      [id]: value
+    }))
+  }
+
+  const handleReceiptBlur = async (id, originalValue) => {
+    const newValue = inputReceipts[id]
+    if (newValue === undefined || newValue === originalValue) return // no change
+    
+    setSavingReceiptId(id)
+    try {
+      const res = await updateMarketplaceReceipt(id, newValue)
+      if (!res.success) {
+        alert('Gagal menyimpan No Pesanan: ' + res.error)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingReceiptId(null)
+    }
   }
 
   // Calculate summary based on currently inputted valid amounts for BELUM_LUNAS items
@@ -150,7 +178,20 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               ) : filteredOrders.map(item => (
                 <tr key={item.id} className={`hover:bg-white/5 ${inputPencairan[item.id] > 0 ? 'bg-primary/5' : ''}`}>
                   <td className="px-4 py-3 text-foreground/80">{new Date(item.date).toLocaleDateString('id-ID')}</td>
-                  <td className="px-4 py-3 font-medium text-xs">{item.marketplace_receipt || item.invoice_number || '-'}</td>
+                  <td className="px-4 py-3 font-medium text-xs">
+                    <div className="relative flex items-center">
+                      <input 
+                        type="text" 
+                        placeholder={item.invoice_number}
+                        className="glass-input w-40 h-8 text-xs px-2 focus:ring-primary focus:border-primary border-transparent hover:border-white/20 bg-transparent hover:bg-white/5 transition-colors"
+                        value={inputReceipts[item.id] !== undefined ? inputReceipts[item.id] : (item.marketplace_receipt || '')}
+                        onChange={e => handleReceiptChange(item.id, e.target.value)}
+                        onBlur={() => handleReceiptBlur(item.id, item.marketplace_receipt || '')}
+                        disabled={savingReceiptId === item.id}
+                      />
+                      {savingReceiptId === item.id && <span className="absolute right-2 top-2 w-3 h-3 border-2 border-primary border-t-transparent rounded-full animate-spin"></span>}
+                    </div>
+                  </td>
                   <td className="px-4 py-3 text-orange-400 font-bold">{item.customers?.name || item.customers?.type}</td>
                   <td className="px-4 py-3 text-right font-bold text-foreground">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
                   <td className="px-4 py-3 text-right">

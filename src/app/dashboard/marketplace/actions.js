@@ -147,3 +147,12 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     return { success: false, error: err.message }
   }
 }
+
+export async function updateMarketplaceReceipt(orderId, receipt) {
+  const supabase = await createClient();
+  const { error } = await supabase.from('sales_orders').update({ marketplace_receipt: receipt }).eq('id', orderId);
+  if (error) return { success: false, error: error.message };
+  revalidatePath('/dashboard/marketplace');
+  revalidatePath('/dashboard/sales');
+  return { success: true };
+}
