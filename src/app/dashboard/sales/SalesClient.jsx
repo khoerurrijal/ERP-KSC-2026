@@ -401,13 +401,9 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                   
                   let itemStatuses = productionStatuses;
                   if (item.order_type?.toUpperCase() === 'POLOS') {
-                    itemStatuses = [
-                      productionStatuses[1] || 'BARU MASUK',
-                      productionStatuses[5] || 'SIAP KIRIM',
-                      productionStatuses[6] || 'DIKIRIM',
-                      productionStatuses[7] || 'SUDAH DIAMBIL',
-                      productionStatuses[8] || 'SELESAI'
-                    ].filter(Boolean);
+                    const polosStatuses = ['BARU MASUK', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'];
+                    itemStatuses = productionStatuses.filter(s => polosStatuses.includes(s.toUpperCase()));
+                    if (itemStatuses.length === 0) itemStatuses = polosStatuses;
                   }
                   
                   return (
