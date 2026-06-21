@@ -34,7 +34,7 @@ export default async function DashboardLayout({ children }) {
   const allowedMenus = rolePermissions[userRole] || []
 
   return (
-    <div className="min-h-screen bg-background text-foreground flex">
+    <div className="min-h-screen bg-transparent text-foreground flex">
       {/* Sidebar */}
       <Sidebar allowedMenus={allowedMenus} userRole={userRole} />
 

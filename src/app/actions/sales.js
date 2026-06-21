@@ -383,6 +383,9 @@ export async function updateSalesOrder(soId, payload) {
 
       if (isExisting) {
         preparedItem.id = item.id;
+      } else {
+        // Generate UUID for new items to prevent upsert null constraint error
+        preparedItem.id = crypto.randomUUID();
       }
 
       preparedItems.push(preparedItem)
