@@ -33,7 +33,7 @@ export async function updateSession(request) {
   } = await supabase.auth.getUser()
 
   // Define public routes
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/';
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/api/whatsapp/webhook');
 
   // Protect all non-public routes
   if (!user && !isPublicRoute) {
