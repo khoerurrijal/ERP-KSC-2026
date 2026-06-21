@@ -13,10 +13,11 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const FONNTE_API_URL = 'https://api.fonnte.com/send';
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 
-const SYSTEM_PROMPT = `
+const SYSTEM_PROMPT = (pushname) => `
 Kamu adalah Customer Service King Sablon Cup. Namamu adalah Ina.
 Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
 King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
+Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
 
 PENTING - KNOWLEDGE BASE KING SABLON CUP:
 1. Waktu Proses Sablon:
@@ -33,6 +34,7 @@ PENTING - KNOWLEDGE BASE KING SABLON CUP:
 
 Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
+PENTING: Setiap kali kamu menemukan data pesanan pelanggan, kamu WAJIB memberikan link Tracking Publik berikut agar mereka bisa memantau sendiri: https://erpkscv1.vercel.app/track/[NOMOR_INVOICE] (ganti [NOMOR_INVOICE] dengan invoice yang sesuai).
 Jika data tidak ditemukan, katakan dengan sopan bahwa data tidak ditemukan dan mohon cek ulang nomor invoicenya.
 Jangan menjanjikan sesuatu yang tidak ada di database atau diluar Knowledge Base di atas.
 `;
@@ -71,6 +73,7 @@ export async function POST(req) {
 
     const sender = body.sender; // Phone number
     const message = body.message || body.text || ''; // The message content
+    const pushname = body.pushname || body.name || 'Kakak'; // WhatsApp Contact Name
 
     if (!sender || !message) {
       return NextResponse.json({ success: false, error: 'Missing sender or message' }, { status: 400 });
@@ -139,7 +142,7 @@ export async function POST(req) {
     // 4. Setup Gemini with Tools
     const model = genAI.getGenerativeModel({
       model: "gemini-2.5-flash",
-      systemInstruction: SYSTEM_PROMPT,
+      systemInstruction: SYSTEM_PROMPT(pushname),
       tools: [{
         functionDeclarations: [{
           name: "cek_pesanan",
@@ -169,6 +172,9 @@ export async function POST(req) {
     const functionCall = result.response.functionCalls()?.[0];
     
     if (functionCall && functionCall.name === "cek_pesanan") {
+      // Send immediate waiting message via Fonnte before querying database
+      await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
+
       const searchQuery = functionCall.args.search_query;
       
       // Query Database
