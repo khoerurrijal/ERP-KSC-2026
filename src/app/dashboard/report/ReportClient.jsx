@@ -5,7 +5,10 @@ import { TrendingDown, TrendingUp, Wallet, AlertOctagon, Tag, Building2, FileTex
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function ReportClient({ transactions = [], summary = {}, dropdownConfig = {} }) {
+import { BarChart3, PieChart } from 'lucide-react'
+
+export default function ReportClient({ transactions = [], summary = {}, analytics = {}, dropdownConfig = {} }) {
+  const [activeTab, setActiveTab] = useState('buku_besar')
   const [filterRef, setFilterRef] = useState('')
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false)
   
@@ -124,8 +127,26 @@ export default function ReportClient({ transactions = [], summary = {}, dropdown
         </div>
       </header>
 
-      {/* 1. BREAKDOWN MUTASI KHUSUS KING */}
-      <section className="space-y-6">
+      {/* TABS Navigation */}
+      <div className="flex bg-white/5 p-1 rounded-2xl w-full sm:w-fit border border-white/10 mt-6">
+        <button 
+          onClick={() => setActiveTab('buku_besar')}
+          className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'buku_besar' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-foreground/60 hover:text-foreground hover:bg-white/5'}`}
+        >
+          <Wallet className="w-4 h-4" /> Kas & Buku Besar
+        </button>
+        <button 
+          onClick={() => setActiveTab('analisa_laba')}
+          className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'analisa_laba' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-foreground/60 hover:text-foreground hover:bg-white/5'}`}
+        >
+          <PieChart className="w-4 h-4" /> Analisa Penjualan
+        </button>
+      </div>
+
+      {activeTab === 'buku_besar' ? (
+        <>
+          {/* 1. BREAKDOWN MUTASI KHUSUS KING */}
+          <section className="space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
             <FileText className="w-5 h-5 text-yellow-500" />
@@ -479,6 +500,150 @@ export default function ReportClient({ transactions = [], summary = {}, dropdown
               </button>
             </div>
           </div>
+        </div>
+      )}
+      </>
+      ) : (
+        /* TAB 2: ANALISA PENJUALAN & LABA */
+        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
+          
+          <section className="space-y-6">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
+                <BarChart3 className="w-5 h-5 text-purple-400" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Pemecahan Omset Penjualan</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              <MetricCard 
+                title="Gelas Sablon & Printing"
+                value={analytics.omset_sablon}
+                subtitle="Penjualan khusus sablon cup"
+                color="text-purple-400"
+                bg="bg-purple-500/5"
+                border="border-purple-500/20"
+                glow="bg-purple-500/20"
+              />
+              <MetricCard 
+                title="Gelas Polos"
+                value={analytics.omset_polos}
+                subtitle="Penjualan cup tanpa sablon"
+                color="text-blue-400"
+                bg="bg-blue-500/5"
+                border="border-blue-500/20"
+                glow="bg-blue-500/20"
+              />
+              <MetricCard 
+                title="Sablon Plastik"
+                value={analytics.omset_plastik}
+                subtitle="Sablon kantong plastik"
+                color="text-orange-400"
+                bg="bg-orange-500/5"
+                border="border-orange-500/20"
+                glow="bg-orange-500/20"
+              />
+              <MetricCard 
+                title="Sablon Lid Sealer"
+                value={analytics.omset_sealer}
+                subtitle="Sablon penutup gelas"
+                color="text-pink-400"
+                bg="bg-pink-500/5"
+                border="border-pink-500/20"
+                glow="bg-pink-500/20"
+              />
+              <div className="col-span-full">
+                <div className="rounded-3xl p-8 flex flex-col justify-center border border-green-500/40 bg-gradient-to-br from-green-500/10 to-transparent relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-2xl shadow-green-500/10">
+                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-green-500/20 blur-3xl rounded-full" />
+                  <span className="text-sm font-black text-green-400 uppercase tracking-widest relative z-10">Total Omset Bulan Ini</span>
+                  <span className="text-5xl font-black mt-3 text-green-400 relative z-10">
+                    Rp {Number(analytics.total_omset || 0).toLocaleString('id-ID')}
+                  </span>
+                  <span className="text-sm font-medium text-green-500/70 mt-2 relative z-10 flex gap-2">
+                    {analytics.piutang_omset > 0 && <span className="text-yellow-400">(Terdapat Piutang: Rp {analytics.piutang_omset.toLocaleString('id-ID')})</span>}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-6 pt-6 border-t border-white/5">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
+                <PieChart className="w-5 h-5 text-green-400" />
+              </div>
+              <h2 className="text-xl font-bold text-foreground">Bagi Hasil & Royalty (HPP Lunas)</h2>
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* KOTAK GLOBAL */}
+              <div className="rounded-3xl p-8 border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent relative overflow-hidden group">
+                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/20 blur-3xl rounded-full" />
+                <h3 className="font-black text-blue-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GLOBAL</h3>
+                
+                <div className="space-y-4 relative z-10">
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium">Nilai HPP Pokok (Modal Asli)</span>
+                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_global || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium">Profit Kotor Global (Margin)</span>
+                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_global || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium flex items-center gap-2">
+                      Royalty Sewa Mesin <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Owner Only</span>
+                    </span>
+                    <span className="font-bold text-yellow-400">Rp {Number(analytics.royalty_mesin || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  
+                  <div className="pt-4 mt-6 border-t border-blue-500/30">
+                    <div className="flex flex-col gap-1 mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
+                      <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Hak Bersih Owner Global (Akhir Bulan)</span>
+                      <span className="text-2xl font-black text-blue-400">
+                        Rp {((Number(analytics.margin_global || 0) * 0.5) + Number(analytics.royalty_mesin || 0)).toLocaleString('id-ID')}
+                      </span>
+                      <span className="text-xs text-blue-400/60 font-medium mt-1">Rumus: (50% x Profit Kotor Global) + Royalty Sewa Mesin</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* KOTAK GUDANG */}
+              <div className="rounded-3xl p-8 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent relative overflow-hidden group">
+                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 blur-3xl rounded-full" />
+                <h3 className="font-black text-purple-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GUDANG</h3>
+                
+                <div className="space-y-4 relative z-10">
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium">Nilai HPP Pokok (Modal Asli)</span>
+                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_gudang || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium">Profit Gudang (Margin)</span>
+                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_gudang || 0).toLocaleString('id-ID')}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
+                    <span className="text-foreground/60 font-medium flex items-center gap-2">
+                      Suntikan Profit dari Global <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">50% Margin</span>
+                    </span>
+                    <span className="font-bold text-blue-400">Rp {(Number(analytics.margin_global || 0) * 0.5).toLocaleString('id-ID')}</span>
+                  </div>
+                  
+                  <div className="pt-4 mt-6 border-t border-purple-500/30">
+                    <div className="flex flex-col gap-1 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
+                      <span className="text-xs font-black text-purple-400 uppercase tracking-widest">Hak Bersih Gudang (Akhir Bulan)</span>
+                      <span className="text-2xl font-black text-purple-400">
+                        Rp {(Number(analytics.margin_gudang || 0) + (Number(analytics.margin_global || 0) * 0.5)).toLocaleString('id-ID')}
+                      </span>
+                      <span className="text-xs text-purple-400/60 font-medium mt-1">Rumus: Profit Gudang + (50% x Profit Kotor Global)</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
         </div>
       )}
 

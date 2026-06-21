@@ -24,19 +24,84 @@ export async function saveProductionProgress(payload) {
     const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', payload.job_id)
     const totalProcessed = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0)
     
-    const { data: jobInfo } = await supabase.from('sales_items').select('qty').eq('id', payload.job_id).single()
-    
-    let isFinished = false
-    if (jobInfo && totalProcessed >= jobInfo.qty) {
-      await supabase.from('sales_items').update({ status: 'SUDAH JADI' }).eq('id', payload.job_id)
-      isFinished = true
-    }
+    // We update the item status via the new centralized auto-status handler
+    await handleAutoStatusUpdate(payload.job_id);
 
     revalidatePath('/dashboard/production')
-    return { success: true, isFinished }
+    return { success: true }
 } catch (err) {
     console.error('Error saving production log:', err)
     return { success: false, error: err.message }
+  }
+}
+
+export async function handleAutoStatusUpdate(itemId) {
+  const supabase = await createClient()
+
+  // Ambil data item dan invoice
+  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status)').eq('id', itemId).single()
+  if (!item) return;
+
+  const so = item.sales_orders;
+  if (!so) return;
+
+  const isLunas = so.payment_status === 'LUNAS';
+  const isPaid = so.payment_status === 'LUNAS' || so.payment_status === 'DP';
+
+  // Hitung qty processed
+  const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', itemId)
+  const qtyProcessed = (logs || []).reduce((sum, log) => sum + (log.qty_processed || 0), 0)
+  
+  let newStatus = item.status || 'BARU MASUK';
+  const oldStatus = newStatus;
+
+  // Hitung target sebenarnya (memperhitungkan unit_multiplier misal jika beli per dus)
+  const targetQty = item.qty * (item.unit_multiplier || 1);
+
+  if (item.order_type?.toUpperCase() === 'POLOS') {
+    // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas
+    if (!isPaid) {
+      newStatus = 'BARU MASUK';
+    } else {
+      if (newStatus !== 'DIKIRIM' && newStatus !== 'SUDAH DIAMBIL' && newStatus !== 'SELESAI') {
+        newStatus = 'SIAP KIRIM';
+      }
+    }
+  } else {
+    // RULE UNTUK SABLON
+    // RULE 1: Jika Qty Dikerjakan > 0 tapi < Target
+    if (qtyProcessed > 0 && qtyProcessed < targetQty) {
+      newStatus = 'PROSES';
+    }
+
+    // RULE 2: Jika Qty Dikerjakan == Target
+    if (qtyProcessed >= targetQty) {
+      if (newStatus !== 'DIKIRIM' && newStatus !== 'SUDAH DIAMBIL' && newStatus !== 'SELESAI') {
+        newStatus = 'SIAP KIRIM'; // Otomatis lompat ke Siap Kirim (indikator Menunggu Lunas akan nyala di frontend kalau belum lunas)
+      }
+    } else if (qtyProcessed === 0) {
+      // Jika qty = 0 (bisa jadi direset oleh admin)
+      // Cek apakah ini data lama yang tidak punya log sama sekali tapi statusnya sudah selesai/dikirim
+      const hasNoLogs = !logs || logs.length === 0;
+      const isOldDataFinished = hasNoLogs && ['SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'].includes(oldStatus);
+      
+      if (!isOldDataFinished) {
+        if (!isPaid) {
+          newStatus = 'BARU MASUK';
+        } else {
+          newStatus = 'SIAP PROSES';
+        }
+      }
+    }
+  }
+
+  // RULE 3: Finalisasi Fisik (Dikirim -> Selesai)
+  if ((newStatus === 'DIKIRIM' || newStatus === 'SUDAH DIAMBIL') && isLunas) {
+    newStatus = 'SELESAI';
+  }
+
+  if (newStatus !== oldStatus) {
+    await supabase.from('sales_items').update({ status: newStatus }).eq('id', itemId);
   }
 }
 
@@ -51,10 +116,47 @@ export async function updateSalesOrderStatus(itemId, status) {
     
     if (error) throw error
 
+    // Re-evaluasi menggunakan auto status handler agar jika diubah ke Dikirim + Lunas otomatis Selesai
+    await handleAutoStatusUpdate(itemId);
+
     revalidatePath('/dashboard/production')
     return { success: true }
   } catch (err) {
     console.error('Error updating status:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+export async function correctProductionProgress(jobId, newTotalQty, employeeId) {
+  const supabase = await createClient()
+
+  try {
+    const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', jobId)
+    const currentTotal = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0)
+    
+    const adjustment = Number(newTotalQty) - currentTotal;
+    
+    if (adjustment !== 0) {
+      const { error } = await supabase
+        .from('production_logs')
+        .insert([{
+          job_id: jobId,
+          employee_id: employeeId,
+          qty_processed: adjustment,
+          qty_defect: 0,
+          notes: 'Koreksi Qty oleh Admin',
+          processed_date: new Date().toISOString()
+        }])
+      
+      if (error) throw error;
+      
+      await handleAutoStatusUpdate(jobId);
+    }
+    
+    revalidatePath('/dashboard/production')
+    return { success: true }
+  } catch (err) {
+    console.error('Error correcting progress:', err)
     return { success: false, error: err.message }
   }
 }

@@ -25,6 +25,7 @@ export default async function ProductionPage() {
     .select(`
       id,
       qty,
+      unit_multiplier,
       status,
       mockup_url,
       order_type,
@@ -32,7 +33,7 @@ export default async function ProductionPage() {
       products (name, workshop_code),
       production_logs (qty_processed)
     `)
-    .eq('order_type', 'SABLON')
+    .in('order_type', ['SABLON', 'PRINTING'])
     .or('status.in.(PROSES,BARU MASUK,SUDAH JADI,DIKIRIM,TERKIRIM,Proses),status.is.null')
     .order('id', { ascending: false })
     .limit(500)
@@ -41,7 +42,8 @@ export default async function ProductionPage() {
   const productionJobs = (rawItems || []).map(item => ({
     id: item.id,
     so_id: item.sales_orders?.id,
-    qty_target: item.qty,
+    order_type: item.order_type,
+    qty_target: item.qty * (item.unit_multiplier || 1),
     sales_order_items: {
       qty: item.qty,
       sales_orders: { 

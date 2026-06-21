@@ -12,10 +12,7 @@ export default async function ReportPage({ searchParams }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })()
 
-  // Fetch virtual_balance from cashflow_config
-  const { data: configData } = await supabase.from('system_settings').select('value').eq('key', 'cashflow_config').single()
-  const cashflow_config = configData?.value || {}
-  const virtual_balance = Number(cashflow_config.virtual_balance || 42289347)
+
 
   // Fetch all transactions with a high limit to bypass the 1000 default
   const { data: transactions } = await supabase
@@ -31,10 +28,10 @@ export default async function ReportPage({ searchParams }) {
   // Fetch sales items to compute Pemakaian Gudang & Global dynamically
   const { data: salesItems } = await supabase
     .from('sales_items')
-    .select('beli_gudang, beli_global, sales_orders!inner(date, payment_status)')
+    .select('order_type, hpp_price, total_price, qty, unit_multiplier, beli_gudang, beli_global, royalty_fee, products(category), sales_orders!inner(date, payment_status, status)')
     .gte('sales_orders.date', `${selectedMonth}-01`)
     .lte('sales_orders.date', maxDate)
-    .eq('sales_orders.payment_status', 'LUNAS')
+    .neq('sales_orders.status', 'BATAL')
 
   const allTransactions = transactions || []
   const validTransactions = allTransactions.filter(t => t.date && t.date.startsWith(selectedMonth))
@@ -56,11 +53,10 @@ export default async function ReportPage({ searchParams }) {
     gudang: { masuk: 0, keluar: 0, akhir: 0 },
     global: { masuk: 0, keluar: 0, akhir: 0 },
     tabungan: { masuk: 0, keluar: 0, akhir: 0 },
-    total_buku_besar: 0,
-    total_kas_fisik: virtual_balance // dynamically fetched from settings
+    total_buku_besar: 0
   }
 
-  // Calculate accumulated balance from history
+  // Calculate accumulated balance from history for Gudang, Global, Tabungan
   historyTransactions.forEach(t => {
     const amountIn = Number(t.amount_in || 0)
     const amountOut = Number(t.amount_out || 0)
@@ -71,7 +67,14 @@ export default async function ReportPage({ searchParams }) {
       summary.global.akhir += (amountIn - amountOut)
     } else if (t.workshop_code === 'TABUNGAN' || ((t.description || '').toLowerCase().includes('tabungan'))) {
       summary.tabungan.akhir += (amountIn - amountOut)
-    } else if (t.workshop_code === 'KING') {
+    }
+  })
+
+  // King balance resets every month, so we ONLY calculate for the selected month
+  validTransactions.forEach(t => {
+    if (t.workshop_code === 'KING') {
+      const amountIn = Number(t.amount_in || 0)
+      const amountOut = Number(t.amount_out || 0)
       summary.king.saldo_bersih += (amountIn - amountOut)
     }
   })
@@ -82,7 +85,10 @@ export default async function ReportPage({ searchParams }) {
   const SETTLEMENT_KING_OUT = 4100000
   const SETTLEMENT_TABUNGAN_IN = 2000000
 
-  summary.king.saldo_bersih -= (SETTLEMENT_KING_OUT * numberOfMonthsPassed)
+  // For King, since it resets monthly, we ONLY subtract the 4.1M for the current month!
+  summary.king.saldo_bersih -= SETTLEMENT_KING_OUT
+  
+  // For Tabungan, since it's cumulative, we add 2M per month of history
   summary.tabungan.akhir += (SETTLEMENT_TABUNGAN_IN * numberOfMonthsPassed)
 
   // Calculate physical method balances from ALL HISTORY
@@ -102,11 +108,64 @@ export default async function ReportPage({ searchParams }) {
   summary.king.pengeluaran_tetap = SETTLEMENT_KING_OUT
   summary.tabungan.masuk += SETTLEMENT_TABUNGAN_IN
 
-  // Calculate HPP from sales items
+  // Calculate analytics
+  const analytics = {
+    omset_polos: 0,
+    omset_sablon: 0,
+    omset_plastik: 0,
+    omset_sealer: 0,
+    omset_lainnya: 0,
+    
+    hpp_gudang: 0,
+    hpp_global: 0,
+    margin_gudang: 0,
+    margin_global: 0,
+    royalty_mesin: 0,
+    
+    total_omset: 0,
+    piutang_omset: 0
+  };
+
   if (salesItems) {
     salesItems.forEach(item => {
-      summary.king.pemakaian_gudang += Number(item.beli_gudang || 0)
-      summary.king.pemakaian_global += Number(item.beli_global || 0)
+      // Hanya menghitung HPP ke saldo buku jika Lunas
+      if (item.sales_orders.payment_status === 'LUNAS') {
+        summary.king.pemakaian_gudang += Number(item.beli_gudang || 0)
+        summary.king.pemakaian_global += Number(item.beli_global || 0)
+      }
+
+      // Hitung analitik omset tanpa memandang lunas/belum lunas, asalkan tidak batal
+      const cat = (item.products?.category || '').toLowerCase()
+      const isPlastik = cat.includes('plastik')
+      const isSealer = cat.includes('sealer')
+      const type = (item.order_type || '').toLowerCase()
+
+      const totalHarga = Number(item.total_price || 0)
+      
+      if (isPlastik && type === 'sablon') analytics.omset_plastik += totalHarga
+      else if (isSealer) analytics.omset_sealer += totalHarga
+      else if (type === 'sablon' || type === 'printing') analytics.omset_sablon += totalHarga
+      else if (type === 'polos' || !type) analytics.omset_polos += totalHarga
+      else analytics.omset_lainnya += totalHarga
+
+      analytics.total_omset += totalHarga
+      if (item.sales_orders.payment_status !== 'LUNAS') {
+        analytics.piutang_omset += totalHarga
+      }
+
+      const totalHppAsli = Number(item.hpp_price || 0) * Number(item.qty || 0) * Number(item.unit_multiplier || 1)
+      const beliGudang = Number(item.beli_gudang || 0)
+      const beliGlobal = Number(item.beli_global || 0)
+
+      if (beliGudang > 0) {
+        analytics.hpp_gudang += totalHppAsli
+        analytics.margin_gudang += (beliGudang - totalHppAsli)
+      } else if (beliGlobal > 0) {
+        analytics.hpp_global += totalHppAsli
+        analytics.margin_global += (beliGlobal - totalHppAsli)
+      }
+      
+      analytics.royalty_mesin += Number(item.royalty_fee || 0)
     })
   }
 
@@ -140,5 +199,5 @@ export default async function ReportPage({ searchParams }) {
   const { data: dropdownSettings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
   const dropdownConfig = dropdownSettings?.value || {}
 
-  return <ReportClient transactions={validTransactions} summary={summary} dropdownConfig={dropdownConfig} />
+  return <ReportClient transactions={validTransactions} summary={summary} analytics={analytics} dropdownConfig={dropdownConfig} />
 }

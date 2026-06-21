@@ -11,13 +11,7 @@ export default async function NewSalesOrderPage() {
   const { data: settings } = await supabase.from('system_settings').select('*')
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
 
-  const { data: matrixData } = await supabase.from('sablon_matrix').select('*')
-  const matrix = {}
-  if (matrixData) {
-    matrixData.forEach(row => {
-      matrix[row.category] = row
-    })
-  }
+  const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   return (
     <div className="min-h-[80vh]">
@@ -26,7 +20,7 @@ export default async function NewSalesOrderPage() {
         products={products || []} 
         workshops={workshops || []}
         dropdownConfig={dropdownConfig}
-        matrix={matrix}
+        pricelistConfig={pricelistConfig}
       />
     </div>
   )

@@ -9,7 +9,6 @@ export default function SettingsLayout({ children }) {
 
   const tabs = [
     { name: 'Sistem Konfigurasi', path: '/dashboard/settings', icon: Settings, exact: true },
-    { name: 'Pricelist & Margin', path: '/dashboard/settings/pricelist', icon: Wallet, exact: false },
     { name: 'Skema Gaji', path: '/dashboard/settings/salary-schemas', icon: Users, exact: false },
   ]
 

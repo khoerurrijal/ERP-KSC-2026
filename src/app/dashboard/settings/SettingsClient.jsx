@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users } from 'lucide-react'
-import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles } from './actions'
+import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig } from './actions'
 
 export default function SettingsClient({ initialSettings }) {
   const [activeTab, setActiveTab] = useState('dropdowns')
@@ -27,8 +27,21 @@ export default function SettingsClient({ initialSettings }) {
     king_fixed_expenses: initialSettings.cashflow_config?.king_fixed_expenses || 4100000,
     tabungan_fixed_in: initialSettings.cashflow_config?.tabungan_fixed_in || 2000000,
     profit_global_percent: initialSettings.cashflow_config?.profit_global_percent || 10,
-    zakat_percent: initialSettings.cashflow_config?.zakat_percent || 3,
-    virtual_balance: initialSettings.cashflow_config?.virtual_balance || 42289347
+    zakat_percent: initialSettings.cashflow_config?.zakat_percent || 3
+  })
+  // State for Pricelist & Margin
+  const [pricelist, setPricelist] = useState(initialSettings.pricelist_config || {
+    profit_gudang_nominal: 50,
+    profit_global_percent: 10,
+    margin_jual_polos_percent: 15,
+    save_profit_percent: 30,
+    sablon_matrix: {
+      "BOTOL": { "1": 0, "10": 0, "100": 1200, "500": 850, "1000": 500, "5000": 500, "10000": 500 },
+      "BOX DUS": { "1": 0, "10": 0, "100": 1500, "500": 300, "1000": 200, "5000": 200, "10000": 200 },
+      "CUP GOCUP": { "1": 0, "10": 0, "100": 0, "500": 260, "1000": 200, "5000": 170, "10000": 150 },
+      "CUP INJECT": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 },
+      "CUP PET": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 }
+    }
   })
 
   // State for Store Config
@@ -166,6 +179,14 @@ export default function SettingsClient({ initialSettings }) {
     setIsSaving(false)
   }
 
+  const handleSavePricelist = async () => {
+    setIsSaving(true)
+    setError(null)
+    const res = await updatePricelistConfig(pricelist)
+    if (!res.success) setError(res.error)
+    setIsSaving(false)
+  }
+
   const handleSaveStore = async () => {
     setIsSaving(true)
     setError(null)
@@ -227,7 +248,18 @@ export default function SettingsClient({ initialSettings }) {
           }`}
         >
           <Banknote className="w-4 h-4" />
-          Pengaturan Alur Kas & Profit
+          Pengaturan Alur Kas Tetap
+        </button>
+        <button
+          onClick={() => setActiveTab('pricelist')}
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'pricelist' 
+              ? 'border-yellow-400 text-yellow-400' 
+              : 'border-transparent text-foreground/50 hover:text-foreground/80'
+          }`}
+        >
+          <Percent className="w-4 h-4" />
+          Pricelist & Margin
         </button>
         <button
           onClick={() => setActiveTab('store')}
@@ -467,26 +499,7 @@ export default function SettingsClient({ initialSettings }) {
                   </div>
                 </div>
               </div>
-              <div className="h-px bg-white/10 w-full my-4" />
 
-              {/* Saldo Kas Virtual */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
-                <div>
-                  <label className="text-sm font-bold text-foreground/80">Saldo Kas Virtual (Rp)</label>
-                  <p className="text-xs text-foreground/40 mt-1">Angka penyeimbang kas yang akan tampil sebagai Kas Fisik Realtime di Laporan (Report).</p>
-                </div>
-                <div className="relative">
-                  <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">
-                    Rp
-                  </div>
-                  <input
-                    type="number"
-                    value={cashflow.virtual_balance}
-                    onChange={(e) => setCashflow({ ...cashflow, virtual_balance: Number(e.target.value) })}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-right focus:outline-none focus:border-primary/50 text-foreground font-mono text-lg text-yellow-400"
-                  />
-                </div>
-              </div>
             </div>
           </div>
 
@@ -498,6 +511,160 @@ export default function SettingsClient({ initialSettings }) {
             >
               <Save className="w-5 h-5" />
               {isSaving ? 'Menyimpan...' : 'Simpan Pengaturan Alur Kas'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Content: Pricelist & Margin */}
+      {activeTab === 'pricelist' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+            
+            {/* Kiri: Formula Jual Polos & Internal */}
+            <div className="xl:col-span-4 space-y-6">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 h-full">
+                <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
+                  <Percent className="w-5 h-5 text-yellow-400" />
+                  Formula Margin & Profit
+                </h3>
+                
+                <div className="space-y-6">
+                  {/* Gudang Nominal */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-foreground/80">Profit Gudang (Rp / Pcs)</label>
+                    <p className="text-xs text-foreground/40 mt-1">Margin profit Gudang dalam Rupiah (angka mati) per Pcs.</p>
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">Rp</div>
+                      <input
+                        type="number"
+                        value={pricelist.profit_gudang_nominal}
+                        onChange={(e) => setPricelist({ ...pricelist, profit_gudang_nominal: Number(e.target.value) })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Global Profit */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-foreground/80">Profit Global (%)</label>
+                    <p className="text-xs text-foreground/40 mt-1">Margin profit Global dari HPP Dasar barang.</p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={pricelist.profit_global_percent}
+                        onChange={(e) => setPricelist({ ...pricelist, profit_global_percent: Number(e.target.value) })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-3 focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-foreground/40">
+                        <Percent className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="h-px bg-white/10 w-full my-4" />
+
+                  {/* Margin Jual Polos */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-foreground/80">Margin Jual Polos (%)</label>
+                    <p className="text-xs text-foreground/40 mt-1">Margin keuntungan King saat menjual barang polos ke Customer (sebelum Save Profit).</p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={pricelist.margin_jual_polos_percent}
+                        onChange={(e) => setPricelist({ ...pricelist, margin_jual_polos_percent: Number(e.target.value) })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl pl-4 pr-10 py-3 focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-foreground/40">
+                        <Percent className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Save Profit */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-yellow-400">Tambahan Save Profit (%)</label>
+                    <p className="text-xs text-foreground/40 mt-1">Bantalan mark-up otomatis di atas harga akhir (Polos/Sablon) sebagai ruang diskon (Save Profit).</p>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        value={pricelist.save_profit_percent}
+                        onChange={(e) => setPricelist({ ...pricelist, save_profit_percent: Number(e.target.value) })}
+                        className="w-full bg-yellow-400/10 border border-yellow-400/30 rounded-xl pl-4 pr-10 py-3 focus:outline-none focus:border-yellow-400/80 text-yellow-400 font-mono font-bold"
+                      />
+                      <div className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none text-yellow-400/40">
+                        <Percent className="w-4 h-4" />
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+
+            {/* Kanan: Matrix Jasa Sablon */}
+            <div className="xl:col-span-8 space-y-6">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 h-full overflow-hidden flex flex-col">
+                <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                  <ListPlus className="w-5 h-5 text-yellow-400" />
+                  Matrix Tarif Jasa Sablon (Per Pcs)
+                </h3>
+                <p className="text-sm text-foreground/60 mb-6">Tarif jasa sablon murni (Rp) yang akan dijumlahkan dengan HPP King berdasarkan Kategori dan Tiering Qty.</p>
+                
+                <div className="overflow-x-auto custom-scrollbar flex-1">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Kategori</th>
+                        {['1', '10', '100', '500', '1000', '5000', '10000'].map(tier => (
+                          <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
+                            &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {Object.keys(pricelist.sablon_matrix || {}).map((category) => (
+                        <tr key={category} className="hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-4 font-bold text-yellow-400 whitespace-nowrap">{category}</td>
+                          {['1', '10', '100', '500', '1000', '5000', '10000'].map(tier => (
+                            <td key={tier} className="px-2 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-[10px] text-foreground/40 font-mono">Rp</span>
+                                <input
+                                  type="number"
+                                  value={pricelist.sablon_matrix[category][tier]}
+                                  onChange={(e) => {
+                                    const newMatrix = { ...pricelist.sablon_matrix }
+                                    newMatrix[category] = { ...newMatrix[category], [tier]: Number(e.target.value) }
+                                    setPricelist({ ...pricelist, sablon_matrix: newMatrix })
+                                  }}
+                                  className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
+                                />
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {Object.keys(pricelist.sablon_matrix || {}).length === 0 && (
+                    <div className="text-center py-12 text-foreground/40 italic">Belum ada matriks kategori.</div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSavePricelist}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-yellow-400 text-black px-8 py-3 rounded-xl font-bold hover:bg-yellow-500 transition-all active:scale-95 shadow-[0_0_20px_rgba(250,204,21,0.3)] disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {isSaving ? 'Menyimpan...' : 'Simpan Pricelist & Margin'}
             </button>
           </div>
         </div>

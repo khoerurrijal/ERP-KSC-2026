@@ -48,21 +48,14 @@ export async function recalculateProductPrices(productCode) {
     const totalHpp = recentItems.reduce((sum, item) => sum + Number(item.unit_price || 0), 0)
     const hppMurni = totalHpp / recentItems.length
 
-    // 4. Hitung Base Price (Gudang 5%, Global 10%)
-    const workshop = (product.workshop_code || '').toUpperCase()
-    const markupMultiplier = workshop === 'GLOBAL' ? 1.10 : 1.05
-    const basePrice = hppMurni * markupMultiplier
-
-    // 5. Hitung Price Polos (Base + 15%)
-    const pricePolos = basePrice * 1.15
-
-    // 6. Update Master Produk
+    // 4. Update Master Produk (base_price = HPP Murni)
+    // Harga jual akhir akan dihitung dinamis di frontend (kasir) menggunakan pricelist_config
     const { error: updateErr } = await supabase
       .from('products')
       .update({
         hpp_murni: hppMurni,
-        base_price: basePrice,
-        price_polos: pricePolos
+        base_price: hppMurni,
+        price_polos: hppMurni // price_polos disimpan sama dengan hpp_murni sebagai backward compatibility
       })
       .eq('product_code', productCode)
 
@@ -71,7 +64,7 @@ export async function recalculateProductPrices(productCode) {
       return { success: false }
     }
 
-    return { success: true, hpp_murni: hppMurni, base_price: basePrice, price_polos: pricePolos }
+    return { success: true, hpp_murni: hppMurni, base_price: hppMurni, price_polos: hppMurni }
   } catch (err) {
     console.error('Exception in recalculateProductPrices:', err)
     return { success: false }

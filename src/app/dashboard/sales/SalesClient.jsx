@@ -3,21 +3,27 @@
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Share2, ExternalLink } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { addSalesPayment } from '@/app/actions/sales'
+import { addSalesPayment, updateSalesItemStatus } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
+const STATUS_ORDER = ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
+
+export default function SalesClient({ salesOrders = [], salesItems = [], dropdownConfig = {} }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
 
+  // Tab State: 'INVOICE' | 'ITEMS'
+  const [activeTab, setActiveTab] = useState('INVOICE')
+
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') // ACTIVE, SELESAI, ALL
+  const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') 
+  const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
   
   const filterMonth = searchParams.get('month') || (() => {
     const now = new Date()
@@ -25,6 +31,7 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
   })()
   
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
+  const [itemSortConfig, setItemSortConfig] = useState({ key: 'created_at', direction: 'desc' })
   
   // Modal Edit State
   const [editingOrder, setEditingOrder] = useState(null)
@@ -35,6 +42,9 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
   const [newPaymentMethod, setNewPaymentMethod] = useState('BCA')
   const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0])
   const [isSaving, setIsSaving] = useState(false)
+
+  // Items status loading
+  const [updatingItem, setUpdatingItem] = useState(null)
 
   const handleEditClick = async (order) => {
     setEditingOrder(order)
@@ -48,35 +58,53 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
       .eq('so_id', order.id)
       .eq('reference', 'PENJUALAN')
       .order('date', { ascending: true })
+    
     setPaymentHistory(data || [])
     setIsLoadingHistory(false)
   }
 
   const closeEditModal = () => {
     setEditingOrder(null)
+    setPaymentHistory([])
   }
 
   const handleSaveEdit = async () => {
-    if (!newPaymentAmount || Number(newPaymentAmount) <= 0) {
-      alert('Masukkan nominal pembayaran yang valid!')
+    if (!newPaymentAmount || isNaN(newPaymentAmount) || Number(newPaymentAmount) <= 0) {
+      alert('Masukkan nominal pembayaran yang valid')
       return
     }
 
     setIsSaving(true)
-    try {
-      const res = await addSalesPayment(editingOrder.id, Number(newPaymentAmount), newPaymentMethod, newPaymentDate)
-      if (res.success) {
-        alert('Pembayaran berhasil ditambahkan!')
-        closeEditModal()
-        router.refresh()
-      } else {
-        alert('Gagal menambah pembayaran: ' + res.error)
-      }
-    } catch (err) {
-      console.error(err)
-      alert('Terjadi kesalahan')
-    } finally {
-      setIsSaving(false)
+    const { success, error } = await addSalesPayment(editingOrder.id, {
+      amount: Number(newPaymentAmount),
+      method: newPaymentMethod,
+      date: newPaymentDate
+    })
+    setIsSaving(false)
+
+    if (success) {
+      closeEditModal()
+    } else {
+      alert(error || 'Gagal menyimpan pembayaran')
+    }
+  }
+
+  const handleItemStatusChange = async (itemId, currentStatus, newStatus) => {
+    // Check for backward movement
+    const currIdx = STATUS_ORDER.indexOf((currentStatus || 'BARU MASUK').toUpperCase());
+    const newIdx = STATUS_ORDER.indexOf((newStatus).toUpperCase());
+
+    if (newIdx < currIdx) {
+      const confirm = window.confirm(`Peringatan: Anda akan memundurkan status barang ke tahap produksi sebelumnya ("${newStatus}"). Apakah Anda yakin ingin melanjutkan?`);
+      if (!confirm) return;
+    }
+
+    setUpdatingItem(itemId);
+    const { success, error } = await updateSalesItemStatus(itemId, newStatus);
+    setUpdatingItem(null);
+
+    if (!success) {
+      alert(error || 'Gagal update status item');
     }
   }
 
@@ -86,170 +114,343 @@ export default function SalesClient({ salesOrders = [], dropdownConfig = {} }) {
     setSortConfig({ key, direction })
   }
 
-  const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return null
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
+  const handleItemSort = (key) => {
+    let direction = 'asc'
+    if (itemSortConfig.key === key && itemSortConfig.direction === 'asc') direction = 'desc'
+    setItemSortConfig({ key, direction })
   }
 
-  // Pisahkan order marketplace. Marketplace hanya jika marketplace_receipt ada isinya
-  const nonMarketplaceOrders = salesOrders.filter(so => !so.marketplace_receipt)
-
-  const filteredAndSorted = useMemo(() => {
-    let result = nonMarketplaceOrders.filter(so => {
-      const query = String(searchQuery || '').toLowerCase()
-      const matchSearch = String(so.invoice_number || '').toLowerCase().includes(query) || 
-                          String(so.customers?.name || '').toLowerCase().includes(query)
+  // Memoized Invoice Data
+  const filteredAndSortedOrders = useMemo(() => {
+    let filtered = salesOrders.filter(order => {
+      const matchSearch = order.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          order.customers?.name?.toLowerCase().includes(searchQuery.toLowerCase())
       
-      // Filter payment status
+      const orderMonth = order.date?.substring(0, 7)
+      const matchMonth = filterMonth ? orderMonth === filterMonth : true
+
       let matchStatus = true
-      if (filterStatus === 'LUNAS') {
-        matchStatus = so.payment_status === 'LUNAS'
-      } else if (filterStatus === 'BELUM_LUNAS') {
-        matchStatus = so.payment_status === 'BELUM LUNAS' || so.payment_status === 'DP'
+      if (filterStatus === 'BELUM_LUNAS') {
+        matchStatus = order.payment_status === 'BELUM LUNAS' || order.payment_status === 'DP'
+      } else if (filterStatus === 'LUNAS') {
+        matchStatus = order.payment_status === 'LUNAS'
       }
 
-      let matchMonth = true
-      if (filterMonth && !searchQuery) {
-        const orderMonth = new Date(so.date).toISOString().substring(0, 7) // YYYY-MM
-        matchMonth = orderMonth === filterMonth
-      }
-
-      return matchSearch && matchStatus && matchMonth
+      return matchSearch && matchMonth && matchStatus
     })
 
-    result.sort((a, b) => {
-      let valA = a[sortConfig.key]
-      let valB = b[sortConfig.key]
-      
-      // Handle nested fields if needed (e.g., customers.name)
+    return filtered.sort((a, b) => {
+      let aVal = a[sortConfig.key]
+      let bVal = b[sortConfig.key]
+
       if (sortConfig.key === 'customers_name') {
-         valA = a.customers?.name || ''
-         valB = b.customers?.name || ''
+        aVal = a.customers?.name || ''
+        bVal = b.customers?.name || ''
       }
 
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
+  }, [salesOrders, searchQuery, filterMonth, filterStatus, sortConfig])
 
-    return result
-  }, [nonMarketplaceOrders, searchQuery, filterStatus, filterMonth, sortConfig])
+  // Memoized Item Data
+  const filteredAndSortedItems = useMemo(() => {
+    let filtered = salesItems.filter(item => {
+      const matchSearch = item.sales_orders?.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.sales_orders?.customers?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                          item.products?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      const itemMonth = item.sales_orders?.date?.substring(0, 7)
+      const matchMonth = filterMonth ? itemMonth === filterMonth : true
+
+      let matchStatus = true
+      if (itemFilterStatus !== 'ALL') {
+        matchStatus = (item.status || 'BARU MASUK').toUpperCase() === itemFilterStatus
+      }
+
+      return matchSearch && matchMonth && matchStatus
+    })
+
+    return filtered.sort((a, b) => {
+      let aVal = a[itemSortConfig.key]
+      let bVal = b[itemSortConfig.key]
+
+      if (itemSortConfig.key === 'customers_name') {
+        aVal = a.sales_orders?.customers?.name || ''
+        bVal = b.sales_orders?.customers?.name || ''
+      } else if (itemSortConfig.key === 'invoice_number') {
+        aVal = a.sales_orders?.invoice_number || ''
+        bVal = b.sales_orders?.invoice_number || ''
+      } else if (itemSortConfig.key === 'product_name') {
+        aVal = a.products?.name || ''
+        bVal = b.products?.name || ''
+      }
+
+      if (aVal < bVal) return itemSortConfig.direction === 'asc' ? -1 : 1
+      if (aVal > bVal) return itemSortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+  }, [salesItems, searchQuery, filterMonth, itemFilterStatus, itemSortConfig])
+
+  const totalOmset = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0), [salesOrders, filterMonth])
+  const totalPiutang = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0), [salesOrders, filterMonth])
+
+  const renderSortIcon = (key, config) => {
+    if (config.key !== key) return <span className="inline-block w-3 opacity-0">&#8597;</span>
+    return config.direction === 'asc' ? <ChevronUp className="inline-block w-3 h-3 text-primary" /> : <ChevronDown className="inline-block w-3 h-3 text-primary" />
+  }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-6">
+      {/* Header and KPI */}
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-green-400" />
-            Daftar Sales Orders (SO)
+          <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-primary" /> Transaksi Penjualan
           </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kelola penjualan dan riwayat pesanan (Non-Marketplace).</p>
+          <p className="text-sm text-foreground/60 mt-1">Kelola invoice dan pelacakan status produksi barang.</p>
         </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3">
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
-            <input 
-              type="text" 
-              placeholder="Cari invoice/pelanggan..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              className="glass-input !pl-10 h-10 w-full text-sm"
-            />
-          </div>
-          <div className="hidden sm:block">
-            <MonthFilter />
-          </div>
-          <button onClick={() => setShowFilters(!showFilters)} className={`btn-secondary h-10 px-4 flex items-center gap-2 text-sm ${showFilters ? 'bg-white/10' : ''}`}>
-            <Filter className="w-4 h-4" /> Filter
-          </button>
-          <Link href="/dashboard/sales/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap">
-            <Plus className="w-4 h-4" />
-            Buat SO Baru
-          </Link>
-        </div>
+        <Link href="/dashboard/sales/new" className="btn-primary px-4 h-10 text-sm flex items-center gap-2 whitespace-nowrap">
+          <Plus className="w-4 h-4" /> Buat Sales Order Baru
+        </Link>
       </header>
 
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="glass-card p-4 rounded-xl flex items-center gap-4">
+          <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
+            <TrendingUp className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-foreground/60 font-medium">Total Omset (Bulan Ini)</p>
+            <p className="text-xl font-bold text-white">Rp {totalOmset.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+        <div className="glass-card p-4 rounded-xl flex items-center gap-4">
+          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center text-red-500">
+            <Clock className="w-6 h-6" />
+          </div>
+          <div>
+            <p className="text-sm text-foreground/60 font-medium">Total Piutang Berjalan</p>
+            <p className="text-xl font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID')}</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex bg-white/5 p-1 rounded-xl w-fit">
+        <button 
+          onClick={() => setActiveTab('INVOICE')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'INVOICE' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
+        >
+          <FileText className="w-4 h-4" /> Data Invoice & Pembayaran
+        </button>
+        <button 
+          onClick={() => setActiveTab('ITEMS')}
+          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'ITEMS' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
+        >
+          <Package className="w-4 h-4" /> Status Item Produksi
+        </button>
+      </div>
+
+      {/* Filter Bar */}
+      <div className="flex flex-col sm:flex-row items-center gap-3">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40" />
+          <input 
+            type="text" 
+            placeholder={activeTab === 'INVOICE' ? "Cari no invoice, pelanggan..." : "Cari produk, invoice, pelanggan..."}
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="glass-input pl-9 w-full h-10"
+          />
+        </div>
+        
+        <div className="hidden sm:block">
+          <MonthFilter />
+        </div>
+        
+        <button 
+          onClick={() => setShowFilters(!showFilters)}
+          className={`h-10 px-4 rounded-xl border flex items-center gap-2 text-sm font-medium transition-all ${showFilters ? 'bg-primary/20 border-primary text-primary' : 'bg-white/5 border-white/10 text-foreground/70 hover:text-white'}`}
+        >
+          <Filter className="w-4 h-4" /> Filter {showFilters ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+        </button>
+      </div>
+
+      {/* Additional Filters Wrapper */}
       {showFilters && (
         <div className="glass-card p-4 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2 mb-6 relative z-50">
           <div className="space-y-1 block sm:hidden">
             <label className="text-xs text-foreground/60">Bulan</label>
             <MonthFilter />
           </div>
-          <div className="space-y-1">
-            <label className="text-xs text-foreground/60">Status Pembayaran</label>
-            <CustomSelect 
-              value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)} 
-              options={[
-                { value: "ALL", label: "Semua Pembayaran" },
-                { value: "BELUM_LUNAS", label: "Belum Lunas / DP" },
-                { value: "LUNAS", label: "Lunas" }
-              ]}
-            />
-          </div>
+          
+          {activeTab === 'INVOICE' ? (
+            <div className="space-y-1">
+              <label className="text-xs text-foreground/60">Status Pembayaran</label>
+              <CustomSelect 
+                value={filterStatus} 
+                onChange={e => setFilterStatus(e.target.value)} 
+                options={[
+                  { value: "ALL", label: "Semua Pembayaran" },
+                  { value: "BELUM_LUNAS", label: "Belum Lunas / DP" },
+                  { value: "LUNAS", label: "Lunas" }
+                ]}
+              />
+            </div>
+          ) : (
+            <div className="space-y-1">
+              <label className="text-xs text-foreground/60">Status Barang (Item)</label>
+              <CustomSelect 
+                value={itemFilterStatus} 
+                onChange={e => setItemFilterStatus(e.target.value)} 
+                options={[
+                  { value: "ALL", label: "Semua Status" },
+                  ...STATUS_ORDER.map(s => ({ value: s, label: s }))
+                ]}
+              />
+            </div>
+          )}
         </div>
       )}
 
+      {/* MAIN CONTENT AREA */}
       <div className="glass-card overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
-              <tr>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customers_name')}>Pelanggan {renderSortIcon('customers_name')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('grand_total')}>Total Nominal {renderSortIcon('grand_total')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_status')}>Status Bayar {renderSortIcon('payment_status')}</th>
-                <th className="px-6 py-4 font-medium text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredAndSorted.length === 0 ? (
+        {activeTab === 'INVOICE' ? (
+          /* TAB 1: INVOICES */
+          <div className="overflow-x-auto min-h-[400px]">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
-                    Belum ada riwayat Sales Order.
-                  </td>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date', sortConfig)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', sortConfig)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('grand_total')}>Total Nominal {renderSortIcon('grand_total', sortConfig)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_status')}>Status Bayar {renderSortIcon('payment_status', sortConfig)}</th>
+                  <th className="px-6 py-4 font-medium text-right">Aksi</th>
                 </tr>
-              ) : filteredAndSorted.map((item) => {
-                return (
-                  <tr 
-                    key={item.id} 
-                    className="hover:bg-white/5 transition-colors cursor-pointer group"
-                    onClick={(e) => {
-                      if (e.target.closest('button') || e.target.closest('a')) return
-                      window.open(`/track/${item.id}`, '_blank')
-                    }}
-                  >
-                    <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
-                    <td className="px-6 py-4 text-foreground/90 font-medium">{item.customers?.name}</td>
-                    <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.grand_total || item.total_amount || 0).toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {item.payment_status}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                      {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
-                        <Link href={`/dashboard/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1">
-                          <Edit3 className="w-3 h-3" /> Edit Item
-                        </Link>
-                      )}
-
-                      <button onClick={() => handleEditClick(item)} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1">
-                        <Edit className="w-3 h-3" /> Update
-                      </button>
-                      <Link href={`/dashboard/sales/${item.id}/invoice`} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1">
-                        Invoice
-                      </Link>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredAndSortedOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
+                      Belum ada riwayat Sales Order.
                     </td>
                   </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
+                ) : filteredAndSortedOrders.map((item) => {
+                  return (
+                    <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                      <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                      <td className="px-6 py-4 text-foreground/90 font-medium">
+                        {item.customers?.name}
+                        <br/><span className="text-[10px] text-foreground/50">{item.invoice_number}</span>
+                      </td>
+                      <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.grand_total || item.total_amount || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                          {item.payment_status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                        <a href={`/track/${item.id}`} target="_blank" className="text-white/40 hover:text-white font-medium text-xs flex items-center gap-1 transition-colors">
+                          <ExternalLink className="w-3 h-3" /> Track
+                        </a>
+                        {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
+                          <Link href={`/dashboard/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                            <Edit3 className="w-3 h-3" /> Edit
+                          </Link>
+                        )}
+                        <button onClick={() => handleEditClick(item)} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1 transition-colors">
+                          <Clock className="w-3 h-3" /> Bayar
+                        </button>
+                        <Link href={`/dashboard/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                          <Printer className="w-3 h-3" /> Print
+                        </Link>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          /* TAB 2: ITEMS */
+          <div className="overflow-x-auto min-h-[400px]">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
+                <tr>
+                  <th className="px-4 py-4 font-medium">SO Date / Ref</th>
+                  <th className="px-4 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', itemSortConfig)}</th>
+                  <th className="px-4 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('product_name')}>Produk {renderSortIcon('product_name', itemSortConfig)}</th>
+                  <th className="px-4 py-4 font-medium text-center">Qty</th>
+                  <th className="px-4 py-4 font-medium text-right">Status Operasional</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredAndSortedItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
+                      Belum ada data barang.
+                    </td>
+                  </tr>
+                ) : filteredAndSortedItems.map((item) => {
+                  const currentStatus = (item.status || 'BARU MASUK').toUpperCase();
+                  const isUpdating = updatingItem === item.id;
+                  
+                  return (
+                    <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <p className="text-foreground/90">{item.sales_orders?.date ? new Date(item.sales_orders.date).toLocaleDateString('id-ID') : '-'}</p>
+                        <p className="text-[10px] text-foreground/50">{item.sales_orders?.invoice_number}</p>
+                      </td>
+                      <td className="px-4 py-3 text-foreground/90 font-medium">
+                        {item.sales_orders?.customers?.name}
+                        {item.sales_orders?.payment_status === 'LUNAS' ? 
+                          <span className="ml-2 text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">LUNAS</span> : 
+                          <span className="ml-2 text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
+                      </td>
+                      <td className="px-4 py-3">
+                        <p className="text-foreground/90 font-bold">{item.products?.name || item.product_code}</p>
+                        <p className="text-[10px] text-primary">{item.order_type} {item.mockup_url ? '(Custom)' : ''}</p>
+                      </td>
+                      <td className="px-4 py-3 text-center">
+                        <span className="font-bold text-white bg-white/10 px-2 py-1 rounded-md">
+                          {Number(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')} Pcs
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        <div className="relative inline-block w-40 text-left">
+                          <select 
+                            value={currentStatus}
+                            disabled={isUpdating}
+                            onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
+                            className={`w-full appearance-none outline-none border rounded-lg px-3 py-1.5 text-xs font-bold transition-all
+                              ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+                              ${currentStatus === 'SELESAI' || currentStatus === 'DIKIRIM' || currentStatus === 'SUDAH DIAMBIL' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
+                                currentStatus === 'PROSES' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 
+                                currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 
+                                'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
+                          >
+                            {STATUS_ORDER.map(statusOption => (
+                              <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
+                                {statusOption}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-current pointer-events-none opacity-50" />
+                        </div>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
-      
-      {/* Modal Edit */}
+
+      {/* Modal Edit Pembayaran (Unchanged) */}
       {editingOrder && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">

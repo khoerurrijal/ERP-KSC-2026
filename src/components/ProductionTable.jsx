@@ -1,10 +1,11 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Plus, Factory, X, CheckCircle2, Package, Save, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
 
-import { saveProductionProgress, updateSalesOrderStatus } from '@/app/dashboard/production/actions'
+import { saveProductionProgress, updateSalesOrderStatus, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
+import TrackingTimeline from '@/components/TrackingTimeline'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
@@ -14,9 +15,11 @@ const getDisplayStatus = (st) => {
 const getStatusColor = (st) => {
   const s = getDisplayStatus(st)
   if (s === 'BARU MASUK') return 'bg-yellow-500/10 text-yellow-500 border-yellow-500/20'
+  if (s === 'SIAP PROSES' || s === 'PERSIAPAN GUDANG') return 'bg-orange-500/10 text-orange-400 border-orange-500/20'
   if (s === 'PROSES') return 'bg-blue-500/10 text-blue-500 border-blue-500/20'
   if (s === 'SUDAH JADI') return 'bg-green-400/20 text-green-300 border-green-400/40 shadow-[0_0_10px_rgba(74,222,128,0.2)]'
-  if (s === 'DIKIRIM' || s === 'TERKIRIM') return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
+  if (s === 'SIAP KIRIM') return 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+  if (s === 'DIKIRIM' || s === 'SUDAH DIAMBIL') return 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20'
   if (s === 'SELESAI') return 'bg-green-500/10 text-green-500 border-green-500/20'
   return 'bg-white/10 text-foreground border-white/20'
 }
@@ -29,6 +32,10 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [selectedStatusJob, setSelectedStatusJob] = useState(null)
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   
+  // Correction Modal
+  const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false)
+  const [correctionQty, setCorrectionQty] = useState('')
+
   // Form State
   const [employeeId, setEmployeeId] = useState('')
   const [qtyProcessed, setQtyProcessed] = useState('')
@@ -36,105 +43,23 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [notes, setNotes] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
-  const [sortConfigSO, setSortConfigSO] = useState({ key: 'target_date', direction: 'asc' })
 
-  // TAB 2: Tracking Produksi (Detail Item)
-  // Aturan: Hanya tampilkan PROSES atau BARU MASUK
+  // TAB 2: Tracking Produksi (Input Qty by Operator)
   const filteredJobs = (productionJobs || []).filter(j => 
-    (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
+    j.order_type !== 'POLOS' && 
+    (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
      (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
-  // TAB 1: Tracking Sales Order (Detail Item)
-  // Aturan: Tampilkan SUDAH JADI, DIKIRIM, TERKIRIM
+  // TAB 1: Tracking Sales Order (Visual Timeline)
   const trackingSoItems = (productionJobs || []).filter(j => 
-    (j.item_status?.toUpperCase() === 'SUDAH JADI' || 
-     j.item_status?.toUpperCase() === 'DIKIRIM' || 
-     j.item_status?.toUpperCase() === 'TERKIRIM') &&
+    j.item_status?.toUpperCase() !== 'SELESAI' && j.item_status?.toUpperCase() !== 'DIBATALKAN' &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
      (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
   )
-
-  const sortedTrackingSoItems = useMemo(() => {
-    let result = [...trackingSoItems]
-    result.sort((a, b) => {
-      let valA = ''
-      let valB = ''
-      switch (sortConfigSO.key) {
-        case 'invoice_number':
-          valA = a.sales_order_items?.sales_orders?.invoice_number || ''
-          valB = b.sales_order_items?.sales_orders?.invoice_number || ''
-          break;
-        case 'customer_name':
-          valA = a.sales_order_items?.sales_orders?.customers?.name || ''
-          valB = b.sales_order_items?.sales_orders?.customers?.name || ''
-          break;
-        case 'product_name':
-          valA = a.sales_order_items?.products?.product_name || a.sales_order_items?.products?.name || ''
-          valB = b.sales_order_items?.products?.product_name || b.sales_order_items?.products?.name || ''
-          break;
-        case 'target_date':
-          valA = a.target_date || ''
-          valB = b.target_date || ''
-          break;
-        case 'item_status':
-          valA = a.item_status || ''
-          valB = b.item_status || ''
-          break;
-      }
-      if (valA < valB) return sortConfigSO.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfigSO.direction === 'asc' ? 1 : -1
-      return 0
-    })
-    return result
-  }, [trackingSoItems, sortConfigSO])
-
-  const handleSortSO = (key) => {
-    let direction = 'asc'
-    if (sortConfigSO.key === key && sortConfigSO.direction === 'asc') direction = 'desc'
-    setSortConfigSO({ key, direction })
-  }
-
-  const renderSortIconSO = (key) => {
-    if (sortConfigSO.key !== key) return null
-    return sortConfigSO.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
-  }
-
-  // Tracking Sales Order (Grouped by Invoice)
-  const groupedOrders = useMemo(() => {
-    const groups = {}
-    productionJobs.forEach(job => {
-      const soId = job.so_id
-      if (!soId) return
-
-      if (!groups[soId]) {
-        groups[soId] = {
-          id: soId,
-          invoice_number: job.sales_order_items?.sales_orders?.invoice_number,
-          customer_name: job.sales_order_items?.sales_orders?.customers?.name,
-          target_date: job.target_date,
-          status: job.status,
-          items: [],
-          allFinished: true
-        }
-      }
-      
-      const isFinished = job.qty_processed >= job.qty_target
-      if (!isFinished) {
-        groups[soId].allFinished = false
-      }
-
-      groups[soId].items.push(job)
-    })
-
-    return Object.values(groups).filter(so => 
-      (so.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (so.customer_name || '').toLowerCase().includes(searchQuery.toLowerCase())
-    )
-  }, [productionJobs, searchQuery])
 
   const handleOpenModal = (job) => {
     setSelectedJob(job)
@@ -148,6 +73,37 @@ export default function ProductionTable({ productionJobs, operators = [], curren
     setQtyProcessed('')
     setQtyDefect('')
     setNotes('')
+  }
+
+  const handleOpenCorrection = (job) => {
+    setSelectedJob(job)
+    setCorrectionQty(job.qty_processed || 0)
+    setEmployeeId('')
+    setIsCorrectionModalOpen(true)
+  }
+
+  const submitCorrection = async () => {
+    if (!employeeId) {
+      alert("Harap pilih Admin/Operator yang bertanggung jawab atas koreksi ini.");
+      return;
+    }
+    const confirm = window.confirm(`Anda yakin ingin mengubah Qty Dikerjakan menjadi ${correctionQty} pcs? Ini akan memundurkan/mengubah status item secara otomatis.`);
+    if (!confirm) return;
+
+    setLoading(true)
+    try {
+      const res = await correctProductionProgress(selectedJob.id, parseInt(correctionQty) || 0, employeeId);
+      if (res.success) {
+        alert("Koreksi Qty berhasil disimpan.");
+        window.location.reload();
+      } else {
+        alert("Gagal: " + res.error);
+      }
+    } catch (e) {
+      alert("Error system");
+    } finally {
+      setLoading(false);
+    }
   }
 
   const handleSubmitQty = async () => {
@@ -167,14 +123,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       })
 
       if (res.success) {
-        if (res.isFinished || (parseInt(qtyProcessed) + selectedJob.qty_processed >= selectedJob.qty_target)) {
-          alert(`Pesanan sudah jadi! (Tercatat tambahan ${qtyProcessed} pcs). Item akan dipindahkan ke tab Tracking Sales Order.`)
-          window.location.reload()
-        } else {
-          alert(`Berhasil mencatat ${qtyProcessed} pcs.`)
-          handleCloseModal()
-          window.location.reload()
-        }
+        alert(`Berhasil mencatat progress.`);
+        window.location.reload()
       } else {
         alert('Gagal mencatat: ' + res.error)
       }
@@ -243,73 +193,58 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       </div>
 
       {activeTab === 'SO' && (
-        <div className="glass-card overflow-hidden animate-in fade-in">
-          <div className="overflow-x-auto min-h-[400px]">
-            <table className="w-full text-sm text-left">
-              <thead className="text-xs text-foreground/60 uppercase bg-white/5 border-b border-white/10">
-                <tr>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSortSO('invoice_number')}>No. Invoice {renderSortIconSO('invoice_number')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSortSO('customer_name')}>Customer {renderSortIconSO('customer_name')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSortSO('product_name')}>Item Sablon {renderSortIconSO('product_name')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSortSO('target_date')}>Target Selesai {renderSortIconSO('target_date')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSortSO('item_status')}>Status Item {renderSortIconSO('item_status')}</th>
-                  <th className="px-6 py-4 font-medium text-right">Aksi</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-white/5">
-                {sortedTrackingSoItems.length === 0 ? (
-                  <tr>
-                    <td colSpan="6" className="px-6 py-12 text-center text-foreground/50">
-                      Tidak ada pesanan yang siap dikonfirmasi (Sudah Jadi / Dikirim).
-                    </td>
-                  </tr>
-                ) : (
-                  sortedTrackingSoItems.map((item) => (
-                    <tr key={item.id} className="hover:bg-white/[0.02] transition-colors">
-                      <td className="px-6 py-4 font-medium">
-                        {item.sales_order_items?.sales_orders?.invoice_number || '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium text-white">{item.sales_order_items?.sales_orders?.customers?.name || '-'}</div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="font-medium">{item.sales_order_items?.products?.product_name || '-'}</div>
-                        <div className="text-xs text-foreground/60 mt-1">{item.sales_order_items?.qty} pcs</div>
-                      </td>
-                      <td className="px-6 py-4 text-foreground/60">
-                        {item.target_date ? new Date(item.target_date).toLocaleDateString('id-ID') : '-'}
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(item.item_status)}`}>
-                          {getDisplayStatus(item.item_status)}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {getDisplayStatus(item.item_status) === 'SUDAH JADI' && (
-                            <button 
-                              onClick={() => handleOpenStatusModal(item)}
-                              className="px-3 py-1.5 text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                            >
-                              Konfirmasi Kirim
-                            </button>
-                          )}
-                          {getDisplayStatus(item.item_status) === 'DIKIRIM' && (
-                            <button 
-                              onClick={() => handleOpenStatusModal(item)}
-                              className="px-3 py-1.5 text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_10px_rgba(234,179,8,0.2)]"
-                            >
-                              Update Status
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
-          </div>
+        <div className="space-y-4">
+          {trackingSoItems.length === 0 ? (
+             <div className="glass-card p-12 text-center text-foreground/50">
+               Tidak ada pesanan aktif.
+             </div>
+          ) : (
+            trackingSoItems.map(item => {
+              const paymentStatus = item.sales_order_items?.sales_orders?.payment_status || 'BELUM LUNAS'
+              return (
+                <div key={item.id} className="glass-card p-5 animate-in fade-in">
+                  <div className="flex flex-col md:flex-row justify-between mb-4">
+                    <div>
+                      <h3 className="font-bold text-lg text-white">{item.sales_order_items?.sales_orders?.customers?.name || 'Pelanggan'}</h3>
+                      <p className="text-sm text-foreground/70 uppercase">
+                        {item.sales_order_items?.products?.product_name || item.sales_order_items?.products?.name} ({item.qty_target} {item.unit || 'pcs'})
+                      </p>
+                      <p className="text-xs text-foreground/50 mt-1">{item.sales_order_items?.sales_orders?.invoice_number}</p>
+                    </div>
+                    <div className="mt-4 md:mt-0 flex gap-2 items-start">
+                       {/* Tombol Konfirmasi Pengiriman oleh Admin */}
+                       {getDisplayStatus(item.item_status) === 'SIAP KIRIM' && (
+                          <button 
+                            onClick={() => handleOpenStatusModal(item)}
+                            className="px-4 py-2 text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                          >
+                            Konfirmasi Kirim
+                          </button>
+                       )}
+                       {/* Tombol Koreksi Qty */}
+                       {getDisplayStatus(item.item_status) !== 'BARU MASUK' && getDisplayStatus(item.item_status) !== 'SELESAI' && (
+                          <button 
+                            onClick={() => handleOpenCorrection(item)}
+                            className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-all border border-red-500/20 tooltip"
+                            title="Koreksi / Revisi Qty Dikerjakan"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                       )}
+                    </div>
+                  </div>
+                  
+                  {/* Timeline UI Premium */}
+                  <TrackingTimeline 
+                    currentStatus={item.item_status} 
+                    paymentStatus={paymentStatus}
+                    targetDate={item.target_date} 
+                  />
+                  
+                </div>
+              )
+            })
+          )}
         </div>
       )}
 
@@ -339,6 +274,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-medium text-purple-400">
                       {item.sales_order_items?.sales_orders?.customers?.name || '-'}
+                      <div className="text-xs text-foreground/50">{item.sales_order_items?.sales_orders?.invoice_number}</div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="w-16 h-16 rounded-md bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden">
@@ -347,7 +283,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-foreground/90">{item.sales_order_items?.products?.name || '-'}</p>
-                      <p className="text-xs text-foreground/60">{item.qty_target} pcs</p>
+                      <p className="text-xs text-foreground/60">{item.qty_target} {item.unit || 'pcs'}</p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-bold text-green-400">{item.qty_processed} pcs</p>
@@ -362,8 +298,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <button onClick={() => handleOpenModal(item)} className="text-accent hover:text-accent/80 font-medium text-xs">
-                        Input Qty Dikerjakan
+                      <button onClick={() => handleOpenModal(item)} className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 font-medium text-xs rounded-lg transition-all">
+                        Input Qty
                       </button>
                     </td>
                   </tr>
@@ -449,34 +385,92 @@ export default function ProductionTable({ productionJobs, operators = [], curren
         </div>
       )}
 
-      {/* Modal Update Status */}
+      {/* Modal Koreksi Qty */}
+      {isCorrectionModalOpen && selectedJob && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-background border border-red-500/30 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.15)] w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-red-500/20 flex justify-between items-center bg-red-500/5">
+              <h3 className="font-bold text-red-400">Koreksi Qty Dikerjakan (Revisi)</h3>
+              <button onClick={() => setIsCorrectionModalOpen(false)} className="text-foreground/50 hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-foreground/80">Gunakan fitur ini jika terjadi kesalahan input Qty oleh operator, atau jika ada barang reject massal yang membuat progress harus diulang.</p>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80 mb-1 block">Otorisasi Admin <span className="text-red-400">*</span></label>
+                <CustomSelect 
+                  value={employeeId} 
+                  onChange={e => setEmployeeId(e.target.value)} 
+                  options={[
+                    { value: "", label: "- Pilih Admin / User -" },
+                    ...operators.map(op => ({ value: op.id, label: `${op.full_name} (${op.role_name})` }))
+                  ]}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Total Qty yang BENAR saat ini <span className="text-red-400">*</span></label>
+                <input 
+                  type="number" 
+                  min="0"
+                  max={selectedJob.qty_target}
+                  value={correctionQty} 
+                  onChange={e => setCorrectionQty(e.target.value)} 
+                  className="glass-input w-full font-bold text-lg" 
+                />
+                <p className="text-xs text-red-400/80">Status item akan **otomatis mundur** jika qty baru lebih kecil dari target.</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                 <button onClick={() => setIsCorrectionModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
+                 <button disabled={loading} onClick={submitCorrection} className="px-4 h-10 text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-all border border-red-500/30 disabled:opacity-50">
+                   {loading ? 'Menyimpan...' : 'Terapkan Koreksi'}
+                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal Update Status Manual (Siap Kirim -> Dikirim/Diambil) */}
       {isStatusModalOpen && selectedStatusJob && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h3 className="font-bold text-foreground">Update Status Item</h3>
+              <h3 className="font-bold text-foreground">Konfirmasi Pengiriman</h3>
               <button onClick={() => setIsStatusModalOpen(false)} className="text-foreground/50 hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
             <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground/80 mb-4">Ubah status untuk item sablon ini:</p>
+              <p className="text-sm text-foreground/80 mb-4">Pilih tindakan akhir untuk pesanan ini:</p>
               
               <div className="flex flex-col gap-3">
                 <button 
                   disabled={loading}
                   onClick={() => updateStatus('DIKIRIM')}
-                  className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium text-indigo-400 transition-colors"
+                  className="w-full text-left px-4 py-4 bg-white/5 hover:bg-indigo-500/10 border border-white/10 hover:border-indigo-500/30 rounded-xl font-medium text-indigo-400 transition-all flex items-center gap-3"
                 >
-                  Tandai sebagai "Dikirim"
+                  <Truck className="w-5 h-5" />
+                  <div>
+                    <p className="font-bold">Dikirim via Ekspedisi/Kurir</p>
+                    <p className="text-xs text-foreground/50 font-normal">Barang diserahkan ke pihak pengirim</p>
+                  </div>
                 </button>
                 <button 
                   disabled={loading}
                   onClick={() => updateStatus('SUDAH DIAMBIL')}
-                  className="w-full text-left px-4 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl font-medium text-emerald-400 transition-colors"
+                  className="w-full text-left px-4 py-4 bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/30 rounded-xl font-medium text-emerald-400 transition-all flex items-center gap-3"
                 >
-                  Tandai sebagai "Sudah Diambil"
+                  <CheckCircle2 className="w-5 h-5" />
+                  <div>
+                    <p className="font-bold">Diambil di Toko</p>
+                    <p className="text-xs text-foreground/50 font-normal">Konsumen mengambil langsung fisik barang</p>
+                  </div>
                 </button>
               </div>
             </div>

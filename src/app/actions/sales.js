@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 
 export async function calculateDynamicHPP(supabase, productCode, fallbackPrice) {
   try {
@@ -44,10 +45,10 @@ export async function createSalesOrder(payload) {
     const customerName = cust ? cust.name : customerId
 
     // Get profit margins from settings
-    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'cashflow_config').single();
-    const cashflowConfig = settings?.value || {};
-    const profitGudangPct = Number(cashflowConfig.profit_gudang_percent || 0);
-    const profitGlobalPct = Number(cashflowConfig.profit_global_percent || 0);
+    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'pricelist_config').single();
+    const pricelistConfig = settings?.value || {};
+    const profitGudangNom = Number(pricelistConfig.profit_gudang_nominal || 0);
+    const profitGlobalPct = Number(pricelistConfig.profit_global_percent || 0);
 
     // Pre-calculate HPP to save in sales_orders
     let totalHppGudang = 0;
@@ -71,7 +72,7 @@ export async function createSalesOrder(payload) {
       if (product) {
         const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1);
         if (product.workshop_code === 'GUDANG') {
-          totalHppGudang += itemHppTotal * (1 + (profitGudangPct / 100));
+          totalHppGudang += itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
         }
         if (product.workshop_code === 'GLOBAL') {
           totalHppGlobal += itemHppTotal * (1 + (profitGlobalPct / 100));
@@ -122,11 +123,11 @@ export async function createSalesOrder(payload) {
       let itemBeliGudang = 0;
       let itemBeliGlobal = 0;
 
-      if (product?.workshop_code === 'GUDANG') itemBeliGudang = itemHppTotal * (1 + (profitGudangPct / 100));
+      if (product?.workshop_code === 'GUDANG') itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
       if (product?.workshop_code === 'GLOBAL') itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100));
       
-      // Royalty selalu masuk ke Global
-      itemBeliGlobal += itemRoyalty;
+      // Royalty dipisah menjadi kolom sendiri (sesuai SOP baru)
+      // Tidak lagi dicampur ke itemBeliGlobal
 
       soItems.push({
         so_id: so.id,
@@ -140,7 +141,8 @@ export async function createSalesOrder(payload) {
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
         beli_gudang: itemBeliGudang,
-        beli_global: itemBeliGlobal
+        beli_global: itemBeliGlobal,
+        royalty_fee: itemRoyalty
       });
     }
 
@@ -208,6 +210,13 @@ export async function createSalesOrder(payload) {
           workshop_code: 'KING',
           so_id: so.id
         })
+      }
+    }
+
+    const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', so.id);
+    if (soItemsForStatus) {
+      for (const item of soItemsForStatus) {
+        await handleAutoStatusUpdate(item.id);
       }
     }
 
@@ -283,6 +292,14 @@ export async function addSalesPayment(soId, paymentAmount, paymentMethod, paymen
       }
     }
 
+    // Trigger auto status update for all items in this SO
+    const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', so.id);
+    if (soItemsForStatus) {
+      for (const item of soItemsForStatus) {
+        await handleAutoStatusUpdate(item.id);
+      }
+    }
+
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/transactions')
     return { success: true }
@@ -302,10 +319,10 @@ export async function updateSalesOrder(soId, payload) {
     const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get profit margins from settings
-    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'cashflow_config').single();
-    const cashflowConfig = settings?.value || {};
-    const profitGudangPct = Number(cashflowConfig.profit_gudang_percent || 0);
-    const profitGlobalPct = Number(cashflowConfig.profit_global_percent || 0);
+    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'pricelist_config').single();
+    const pricelistConfig = settings?.value || {};
+    const profitGudangNom = Number(pricelistConfig.profit_gudang_nominal || 0);
+    const profitGlobalPct = Number(pricelistConfig.profit_global_percent || 0);
 
     let totalBeliGudang = 0
     let totalBeliGlobal = 0
@@ -335,7 +352,7 @@ export async function updateSalesOrder(soId, payload) {
       let itemBeliGlobal = 0;
 
       if (product?.workshop_code === 'GUDANG') {
-        itemBeliGudang = itemHppTotal * (1 + (profitGudangPct / 100))
+        itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1))
         totalBeliGudang += itemBeliGudang
       }
       if (product?.workshop_code === 'GLOBAL') {
@@ -343,7 +360,8 @@ export async function updateSalesOrder(soId, payload) {
         totalBeliGlobal += itemBeliGlobal
       }
 
-      itemBeliGlobal += itemRoyalty
+      // Royalty dipisah menjadi kolom sendiri
+      // Tidak dicampur ke itemBeliGlobal
 
       const isExisting = String(item.id).length > 20;
 
@@ -359,7 +377,8 @@ export async function updateSalesOrder(soId, payload) {
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
         beli_gudang: itemBeliGudang,
-        beli_global: itemBeliGlobal
+        beli_global: itemBeliGlobal,
+        royalty_fee: itemRoyalty
       }
 
       if (isExisting) {
@@ -411,3 +430,30 @@ export async function updateSalesOrder(soId, payload) {
   }
 }
 
+export async function updateSalesItemStatus(itemId, newStatus) {
+  const supabase = await createClient()
+  try {
+    const { error } = await supabase
+      .from('sales_items')
+      .update({ status: newStatus })
+      .eq('id', itemId)
+    
+    if (error) throw new Error(error.message)
+
+    // Jika dibatalkan, kita juga mencari id sales_order-nya dan menghapus transaksi pembayaran (DP/Lunas)
+    if (newStatus === 'BATAL') {
+      const { data: itemData } = await supabase.from('sales_items').select('so_id').eq('id', itemId).single()
+      if (itemData && itemData.so_id) {
+        // Hapus transaksi kasir terkait SO ini agar saldo tidak menggantung
+        await supabase.from('transactions').delete().eq('so_id', itemData.so_id)
+      }
+    }
+    
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
+    return { success: true }
+  } catch (error) {
+    console.error('Update item status error:', error)
+    return { success: false, error: error.message }
+  }
+}

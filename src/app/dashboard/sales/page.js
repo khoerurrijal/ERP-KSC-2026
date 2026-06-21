@@ -21,8 +21,21 @@ export default async function SalesPage() {
 
   const salesOrders = rawOrders || [];
 
+  // Fetch all sales items for the new "Status Item" tab
+  const { data: rawItems } = await supabase
+    .from('sales_items')
+    .select(`
+      *,
+      sales_orders!inner(invoice_number, date, payment_status, customers(name)),
+      products(name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(1000)
+
+  const salesItems = rawItems || [];
+
   const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
   const dropdownConfig = settings?.value || {}
 
-  return <SalesClient salesOrders={salesOrders} dropdownConfig={dropdownConfig} />
+  return <SalesClient salesOrders={salesOrders} salesItems={salesItems} dropdownConfig={dropdownConfig} />
 }

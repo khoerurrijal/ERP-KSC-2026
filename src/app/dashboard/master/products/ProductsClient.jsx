@@ -122,7 +122,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
                 <th className="px-6 py-4 font-medium">Nama Produk</th>
                 <th className="px-6 py-4 font-medium">Kategori</th>
                 <th className="px-6 py-4 font-medium">Workshop</th>
-                <th className="px-6 py-4 font-medium">Harga Jual</th>
+                <th className="px-6 py-4 font-medium">HPP Murni (Modal)</th>
                 <th className="px-6 py-4 font-medium text-center">Status</th>
                 <th className="px-6 py-4 font-medium text-right">Aksi</th>
               </tr>
@@ -226,7 +226,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <label className="text-xs font-medium text-foreground/80">Harga Jual per PCS (Rp)</label>
+                  <label className="text-xs font-medium text-foreground/80">HPP Murni Dasar (Rp)</label>
                   <input 
                     type="number" 
                     value={sellingPrice} 

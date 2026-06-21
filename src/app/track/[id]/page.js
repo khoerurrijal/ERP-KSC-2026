@@ -21,6 +21,7 @@ export default async function PublicTrackingPage({ params }) {
         total_price,
         status,
         unit_multiplier,
+        order_type,
         products (name)
       )
     `)
@@ -42,12 +43,17 @@ export default async function PublicTrackingPage({ params }) {
     )
   }
 
-  // Find production logs for this order
-  const { data: logs } = await supabase
-    .from('production_logs')
-    .select('*')
-    .eq('sales_order_id', id)
-    .order('created_at', { ascending: false })
+  // Find production logs for this order's items
+  const itemIds = order.sales_items?.map(i => i.id) || []
+  let logs = []
+  if (itemIds.length > 0) {
+    const { data } = await supabase
+      .from('production_logs')
+      .select('*')
+      .in('job_id', itemIds)
+      .order('created_at', { ascending: false })
+    if (data) logs = data
+  }
 
   // Find company settings to get the brand logo/name
   const { data: settings } = await supabase
@@ -56,5 +62,10 @@ export default async function PublicTrackingPage({ params }) {
     .limit(1)
     .single()
 
-  return <TrackClient order={order} logs={logs || []} settings={settings || {}} />
+  // Fetch employees for mapping names
+  const { data: employees } = await supabase
+    .from('employees')
+    .select('id, full_name')
+
+  return <TrackClient order={order} logs={logs || []} settings={settings || {}} employees={employees || []} />
 }
