@@ -39,7 +39,7 @@ export async function handleAutoStatusUpdate(itemId) {
   const supabase = await createClient()
 
   // Ambil data item dan invoice
-  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status, marketplace_receipt)').eq('id', itemId).single()
+  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status, marketplace_receipt, customers(name))').eq('id', itemId).single()
   if (!item) return;
 
   const so = item.sales_orders;
@@ -47,7 +47,14 @@ export async function handleAutoStatusUpdate(itemId) {
 
   const isLunas = so.payment_status === 'LUNAS';
   const isPaid = so.payment_status === 'LUNAS' || so.payment_status === 'DP';
-  const isMarketplace = so.marketplace_receipt && so.marketplace_receipt.trim() !== '';
+  
+  const customerName = so.customers?.name?.toLowerCase() || '';
+  const isMarketplace = (so.marketplace_receipt && so.marketplace_receipt.trim() !== '') || 
+                        customerName.includes('shopee') || 
+                        customerName.includes('tokopedia') || 
+                        customerName.includes('tiktok') || 
+                        customerName.includes('lazada');
+                        
   const canProceed = isPaid || isMarketplace;
 
   // Hitung qty processed
@@ -125,17 +132,33 @@ export async function updateSalesOrderStatus(itemId, status) {
   const supabase = await createClient()
 
   try {
+    const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status)').eq('id', itemId).single()
+    let finalStatus = status;
+    const isLunas = item?.sales_orders?.payment_status === 'LUNAS';
+
+    const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'dropdown_config').single()
+    const dropdownConfig = settingsData?.value || {}
+    const statuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
+    
+    const ST_DIKIRIM = statuses[6] || 'DIKIRIM'
+    const ST_SUDAH_DIAMBIL = statuses[7] || 'SUDAH DIAMBIL'
+    const ST_SELESAI = statuses[8] || 'SELESAI'
+
+    // Finalisasi Fisik (Dikirim -> Selesai)
+    if ((finalStatus === ST_DIKIRIM || finalStatus === ST_SUDAH_DIAMBIL) && isLunas) {
+      finalStatus = ST_SELESAI;
+    }
+
     const { error } = await supabase
       .from('sales_items')
-      .update({ status: status })
+      .update({ status: finalStatus })
       .eq('id', itemId)
     
     if (error) throw error
 
-    // Re-evaluasi menggunakan auto status handler agar jika diubah ke Dikirim + Lunas otomatis Selesai
-    await handleAutoStatusUpdate(itemId);
-
     revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
     return { success: true }
   } catch (err) {
     console.error('Error updating status:', err)
