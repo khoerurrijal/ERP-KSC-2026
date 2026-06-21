@@ -418,7 +418,7 @@ export async function updateSalesOrder(soId, payload) {
 
     // Upsert the remaining items (inserts new ones, updates existing ones by id)
     const { error: itemsError } = await supabase.from('sales_items').upsert(preparedItems)
-    if (itemsError) throw new Error('Gagal update item pesanan.')
+    if (itemsError) throw new Error('Gagal update item pesanan: ' + itemsError.message)
 
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/transactions')

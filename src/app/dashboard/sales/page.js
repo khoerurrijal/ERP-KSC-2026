@@ -29,7 +29,6 @@ export default async function SalesPage() {
       sales_orders!inner(invoice_number, date, payment_status, customers(name)),
       products(name)
     `)
-    .order('created_at', { ascending: false })
     .limit(1000)
 
   const salesItems = rawItems || [];
