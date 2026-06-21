@@ -30,7 +30,7 @@ export default async function SalesPage() {
       products(name)
     `)
     .order('id', { ascending: false })
-    .limit(1000)
+    .limit(10000)
 
   const salesItems = rawItems || [];
 

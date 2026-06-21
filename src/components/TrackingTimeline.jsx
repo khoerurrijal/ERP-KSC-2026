@@ -51,7 +51,7 @@ export default function TrackingTimeline({
   }
 
   return (
-    <div className="w-full py-8 relative">
+    <div className="w-full pt-1 pb-8 relative">
       <div className="flex items-center justify-between w-full">
         {STATUS_STEPS.map((step, idx) => {
           const state = getStepState(step.key, step.label)
@@ -91,18 +91,18 @@ export default function TrackingTimeline({
             <React.Fragment key={idx}>
               {/* Node */}
               <div className="flex flex-col items-center relative z-10">
-                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${bgColor} ${glow}`}>
-                  <step.icon className={`w-3 h-3 sm:w-4 sm:h-4 ${iconColor}`} />
+                <div className={`w-4 h-4 sm:w-5 sm:h-5 rounded-full flex items-center justify-center border-2 transition-all duration-500 ${bgColor} ${glow}`}>
+                  <step.icon className={`w-2.5 h-2.5 sm:w-3 sm:h-3 ${iconColor}`} />
                 </div>
 
                 {/* Label ditaruh absolut di bawah agar tidak merusak flex */}
-                <div className="absolute top-10 text-center w-20 sm:w-24">
-                  <p className={`text-[9px] sm:text-[10px] font-bold transition-colors ${state === 'future' ? 'text-white/40' : state === 'active-blinking' ? 'text-yellow-400' : 'text-white/80'}`}>
+                <div className="absolute top-5 sm:top-6 text-center w-12 sm:w-16">
+                  <p className={`text-[7px] sm:text-[8px] font-bold leading-tight transition-colors ${state === 'future' ? 'text-white/40' : state === 'active-blinking' ? 'text-yellow-400' : 'text-white/80'}`}>
                     {step.label}
                   </p>
                   {step.label === 'Siap Kirim' && targetDate && state !== 'future' && (
-                    <p className="text-[8px] sm:text-[9px] text-white/40 mt-0.5 whitespace-nowrap">
-                      Est: {new Date(targetDate).toLocaleDateString('id-ID')}
+                    <p className="text-[7px] text-white/40 mt-0.5 whitespace-nowrap">
+                      {new Date(targetDate).toLocaleDateString('id-ID', {day: 'numeric', month: 'numeric'})}
                     </p>
                   )}
                 </div>
@@ -110,7 +110,7 @@ export default function TrackingTimeline({
 
               {/* Garis Penghubung (Flex 1) */}
               {idx < STATUS_STEPS.length - 1 && (
-                <div className="flex-1 h-[2px] bg-white/5 relative mx-1 sm:mx-2 overflow-hidden rounded-full">
+                <div className="flex-1 h-[2px] bg-white/5 relative mx-0.5 sm:mx-1 overflow-hidden rounded-full">
                   <div 
                     className="absolute left-0 top-0 h-full bg-gradient-to-r from-purple-500 to-purple-400 transition-all duration-1000 ease-out"
                     style={{ width: lineProgress }}

@@ -35,10 +35,9 @@ export default async function ProductionPage() {
       products (name, workshop_code),
       production_logs (qty_processed)
     `)
-    .in('order_type', ['SABLON', 'PRINTING'])
-    .or('status.in.(BARU MASUK,SIAP PROSES,PROSES,SUDAH JADI,SIAP KIRIM,DIKIRIM,SUDAH DIAMBIL,SELESAI,TERKIRIM,Proses),status.is.null')
+    .or('status.in.("BARU MASUK","SIAP PROSES","PROSES","SUDAH JADI","SIAP KIRIM","DIKIRIM","SUDAH DIAMBIL","SELESAI","TERKIRIM","Proses"),status.is.null')
     .order('id', { ascending: false })
-    .limit(500)
+    .limit(10000)
 
   // Transform to match UI structure
   const productionJobs = (rawItems || []).map(item => ({
@@ -60,6 +59,7 @@ export default async function ProductionPage() {
     target_date: item.sales_orders?.date,
     status: item.sales_orders?.status, // This is SO status
     item_status: item.status || 'Proses', // This is Item status
+    mockup_url: item.mockup_url, // Added mockup_url
     qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
   }))
 

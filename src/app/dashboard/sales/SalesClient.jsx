@@ -3,12 +3,13 @@
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
-import { addSalesPayment, updateSalesItemStatus } from '@/app/actions/sales'
+import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import MockupUploadModal from '@/components/MockupUploadModal'
 
 export default function SalesClient({ salesOrders = [], salesItems = [], dropdownConfig = {} }) {
   const router = useRouter()
@@ -26,6 +27,13 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
   const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') 
   const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
   
+  // Correction popup state
+  const [correctionModal, setCorrectionModal] = useState({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })
+  const [isCorrecting, setIsCorrecting] = useState(false) // For items tab
+
+  // Mockup popup state
+  const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
+
   const filterMonth = searchParams.get('month') || (() => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
@@ -96,8 +104,8 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
     const newIdx = productionStatuses.indexOf((newStatus).toUpperCase());
 
     if (newIdx < currIdx) {
-      const confirm = window.confirm(`Peringatan: Anda akan memundurkan status barang ke tahap produksi sebelumnya ("${newStatus}"). Apakah Anda yakin ingin melanjutkan?`);
-      if (!confirm) return;
+      setCorrectionModal({ isOpen: true, itemId, currentStatus, targetStatus: newStatus, targetQty: '' });
+      return;
     }
 
     setUpdatingItem(itemId);
@@ -106,6 +114,68 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
 
     if (!success) {
       alert(error || 'Gagal update status item');
+    }
+  }
+
+  const submitStatusCorrection = async () => {
+    if (!correctionModal.targetQty || isNaN(correctionModal.targetQty)) {
+      alert("Harap masukkan Qty yang benar saat ini.");
+      return;
+    }
+    
+    setIsCorrecting(true);
+    // Kita panggil action updateSalesItemStatus untuk memaksa update status
+    // Tapi kita juga bisa panggil action baru untuk update qty dan status sekaligus
+    // Karena ini khusus SalesClient, kita bisa gunakan fungsi khusus atau fetch langsung
+    
+    try {
+      const supabase = await createClient();
+      
+      // Update Qty di production_logs (koreksi selisih)
+      // Daripada menghitung selisih ribet, kita insert log koreksi khusus jika butuh,
+      // Tapi updateSalesItemStatus akan memaksa status berubah.
+      // Kita panggil fungsi update status biasa DITAMBAH insert log koreksi (atau biarkan fungsi server yang handle)
+      
+      // Untuk mempermudah, kita panggil updateSalesItemStatus, lalu insert log koreksi manual
+      await updateSalesItemStatus(correctionModal.itemId, correctionModal.targetStatus);
+      
+      // Insert log untuk reset qty
+      // Ambil current qty
+      const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', correctionModal.itemId);
+      const currentTotal = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0);
+      const adjustment = Number(correctionModal.targetQty) - currentTotal;
+      
+      if (adjustment !== 0) {
+        await supabase.from('production_logs').insert([{
+          job_id: correctionModal.itemId,
+          qty_processed: adjustment,
+          qty_defect: 0,
+          notes: `Koreksi Status Mundur (${correctionModal.currentStatus} -> ${correctionModal.targetStatus})`,
+          processed_date: new Date().toISOString()
+        }]);
+      }
+      
+      setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' });
+      window.location.reload(); // Reload untuk memperbarui data
+    } catch (e) {
+      alert("Terjadi kesalahan.");
+    } finally {
+      setIsCorrecting(false);
+    }
+  }
+
+  const handleCancelSalesOrder = async (soId, invoiceNumber) => {
+    const confirm = window.confirm(`Peringatan: Anda akan membatalkan pesanan ${invoiceNumber}. Ini akan mengembalikan stok tersedia dan menghapus riwayat pembayaran. Lanjutkan?`);
+    if (!confirm) return;
+
+    setUpdatingItem(soId); // Reuse updatingItem state for loading
+    const { success, error } = await cancelSalesOrder(soId);
+    setUpdatingItem(null);
+
+    if (!success) {
+      alert(error || 'Gagal membatalkan pesanan');
+    } else {
+      alert(`Pesanan ${invoiceNumber} berhasil dibatalkan.`);
     }
   }
 
@@ -349,25 +419,32 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                       </td>
                       <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.grand_total || item.total_amount || 0).toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4">
-                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'BATAL' ? 'bg-red-500/20 text-red-500' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                           {item.payment_status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                      <td className="px-6 py-4 text-right flex flex-wrap items-center justify-end gap-3">
                         <a href={`/track/${item.id}`} target="_blank" className="text-white/40 hover:text-white font-medium text-xs flex items-center gap-1 transition-colors">
                           <ExternalLink className="w-3 h-3" /> Track
                         </a>
-                        {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
-                          <Link href={`/dashboard/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
-                            <Edit3 className="w-3 h-3" /> Edit
-                          </Link>
+                        {item.payment_status !== 'BATAL' && (
+                          <>
+                            {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
+                              <Link href={`/dashboard/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                                <Edit3 className="w-3 h-3" /> Edit
+                              </Link>
+                            )}
+                            <button onClick={() => handleEditClick(item)} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1 transition-colors">
+                              <Clock className="w-3 h-3" /> Bayar
+                            </button>
+                            <button onClick={() => handleCancelSalesOrder(item.id, item.invoice_number)} disabled={updatingItem === item.id} className="text-red-500 hover:text-red-400 font-medium text-xs flex items-center gap-1 transition-colors disabled:opacity-50">
+                              <XCircle className="w-3 h-3" /> {updatingItem === item.id ? 'Loading...' : 'Batal'}
+                            </button>
+                            <Link href={`/dashboard/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                              <Printer className="w-3 h-3" /> Print
+                            </Link>
+                          </>
                         )}
-                        <button onClick={() => handleEditClick(item)} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1 transition-colors">
-                          <Clock className="w-3 h-3" /> Bayar
-                        </button>
-                        <Link href={`/dashboard/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
-                          <Printer className="w-3 h-3" /> Print
-                        </Link>
                       </td>
                     </tr>
                   )
@@ -381,11 +458,11 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-4 py-4 font-medium">SO Date / Ref</th>
-                  <th className="px-4 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', itemSortConfig)}</th>
-                  <th className="px-4 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('product_name')}>Produk {renderSortIcon('product_name', itemSortConfig)}</th>
-                  <th className="px-4 py-4 font-medium text-center">Qty</th>
-                  <th className="px-4 py-4 font-medium text-right">Status Operasional</th>
+                  <th className="px-4 py-3 font-medium">SO Date / Ref</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', itemSortConfig)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('product_name')}>Produk {renderSortIcon('product_name', itemSortConfig)}</th>
+                  <th className="px-4 py-3 font-medium text-center">Qty</th>
+                  <th className="px-4 py-3 font-medium text-right">Status Operasional</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -408,45 +485,64 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                   
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                      <td className="px-4 py-3">
-                        <p className="text-foreground/90">{item.sales_orders?.date ? new Date(item.sales_orders.date).toLocaleDateString('id-ID') : '-'}</p>
-                        <p className="text-[10px] text-foreground/50">{item.sales_orders?.invoice_number}</p>
+                      <td className="px-4 py-2 align-middle">
+                        <p className="text-xs text-foreground/80">{item.sales_orders?.date ? new Date(item.sales_orders.date).toLocaleDateString('id-ID') : '-'}</p>
+                        <p className="text-[9px] text-foreground/40 mt-0.5">{item.sales_orders?.invoice_number}</p>
                       </td>
-                      <td className="px-4 py-3 text-foreground/90 font-medium">
+                      <td className="px-4 py-2 align-middle text-xs font-semibold text-white/90">
                         {item.sales_orders?.customers?.name}
                         {item.sales_orders?.payment_status === 'LUNAS' ? 
-                          <span className="ml-2 text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded">LUNAS</span> : 
-                          <span className="ml-2 text-[9px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
+                          <span className="ml-2 text-[8px] font-bold bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded">LUNAS</span> : 
+                          <span className="ml-2 text-[8px] font-bold bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
                       </td>
-                      <td className="px-4 py-3">
-                        <p className="text-foreground/90 font-bold">{item.products?.name || item.product_code}</p>
-                        <p className="text-[10px] text-primary">{item.order_type} {item.mockup_url ? '(Custom)' : ''}</p>
+                      <td className="px-4 py-2 align-middle">
+                        <p className="text-xs text-white font-bold">{item.products?.name || item.product_code}</p>
+                        <p className="text-[9px] text-primary/80 mt-0.5"><span className="bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">{item.order_type}</span></p>
                       </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="font-bold text-white bg-white/10 px-2 py-1 rounded-md">
+                      <td className="px-4 py-2 align-middle text-center">
+                        <span className="font-semibold text-xs text-white/90">
                           {Number(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')} Pcs
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="relative inline-block w-40 text-left">
-                          <select 
-                            value={currentStatus}
-                            disabled={isUpdating}
-                            onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
-                            className={`w-full appearance-none outline-none border rounded-lg px-3 py-1.5 text-xs font-bold transition-all
-                              ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
-                              ${currentStatus === 'SELESAI' || currentStatus === 'DIKIRIM' || currentStatus === 'SUDAH DIAMBIL' ? 'bg-green-500/20 text-green-400 border-green-500/30' : 
-                                currentStatus === 'PROSES' ? 'bg-purple-500/20 text-purple-400 border-purple-500/30' : 
-                                currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 
-                                'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
+                      <td className="px-4 py-2 align-middle text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          <button 
+                            onClick={() => {
+                              if (item.mockup_url) {
+                                window.open(item.mockup_url, '_blank');
+                              } else {
+                                setMockupModal({ isOpen: true, itemId: item.id, url: '' });
+                              }
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault();
+                              setMockupModal({ isOpen: true, itemId: item.id, url: item.mockup_url || '' });
+                            }}
+                            title={item.mockup_url ? 'Klik Kiri: Lihat, Klik Kanan: Edit Mockup' : 'Set Mockup'}
+                            className={`p-1.5 rounded-md transition-all border ${item.mockup_url ? 'bg-primary/20 border-primary/30 text-primary hover:bg-primary/30' : 'bg-white/5 border-white/10 text-foreground/60 hover:bg-white/10'}`}
                           >
-                            {itemStatuses.map(statusOption => (
-                              <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
-                                {statusOption}
-                              </option>
-                            ))}
-                          </select>
-                          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-current pointer-events-none opacity-50" />
+                            <Camera className="w-3.5 h-3.5" />
+                          </button>
+                          <div className="relative inline-block w-36 text-left">
+                            <select 
+                              value={currentStatus}
+                              disabled={isUpdating}
+                              onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
+                              className={`w-full appearance-none outline-none border rounded-md px-2.5 py-1 text-[11px] font-bold transition-all
+                                ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+                                ${currentStatus === 'SELESAI' || currentStatus === 'DIKIRIM' || currentStatus === 'SUDAH DIAMBIL' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
+                                  currentStatus === 'PROSES' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 
+                                  currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
+                                  'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
+                            >
+                              {itemStatuses.map(statusOption => (
+                                <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
+                                  {statusOption}
+                                </option>
+                              ))}
+                            </select>
+                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-current pointer-events-none opacity-50" />
+                          </div>
                         </div>
                       </td>
                     </tr>
@@ -546,6 +642,55 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
           </div>
         </div>
       )}
+
+      {/* Modal Koreksi Status Mundur */}
+      {correctionModal.isOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-background border border-red-500/30 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.15)] w-full max-w-md overflow-hidden">
+            <div className="p-4 border-b border-red-500/20 flex justify-between items-center bg-red-500/5">
+              <h3 className="font-bold text-red-400">Koreksi Status & Qty</h3>
+              <button onClick={() => setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })} className="text-foreground/50 hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-foreground/80">
+                Anda memundurkan status dari <span className="font-bold text-white">{correctionModal.currentStatus}</span> ke <span className="font-bold text-red-400">{correctionModal.targetStatus}</span>. 
+                Sistem mendeteksi kemungkinan adanya kesalahan/pembatalan produksi.
+              </p>
+              
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-foreground/80">Total Qty yang BENAR Dikerjakan Saat Ini <span className="text-red-400">*</span></label>
+                <input 
+                  type="number" 
+                  min="0"
+                  value={correctionModal.targetQty} 
+                  onChange={e => setCorrectionModal({...correctionModal, targetQty: e.target.value})} 
+                  className="glass-input w-full font-bold text-lg border-red-500/30 focus:border-red-500/50" 
+                  placeholder="Misal: 0 atau 500"
+                />
+                <p className="text-xs text-red-400/80">Masukkan Qty saat ini (misal 0 jika diulang dari awal).</p>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-white/5 mt-4">
+                 <button onClick={() => setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })} className="btn-secondary px-4 h-10 text-sm">Batal</button>
+                 <button disabled={isCorrecting} onClick={submitStatusCorrection} className="px-4 h-10 text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-all border border-red-500/30 disabled:opacity-50 flex items-center gap-2">
+                   {isCorrecting ? 'Memproses...' : 'Terapkan Koreksi'}
+                 </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Mockup Upload Modal */}
+      <MockupUploadModal 
+        isOpen={mockupModal.isOpen} 
+        onClose={() => setMockupModal({ isOpen: false, itemId: null, url: '' })} 
+        itemId={mockupModal.itemId} 
+        initialUrl={mockupModal.url} 
+      />
 
     </div>
   )

@@ -410,13 +410,15 @@ export async function updateSalesOrder(soId, payload) {
     if (soError) throw new Error('Gagal update pesanan: ' + soError.message)
 
     // Handle items safely without wiping production logs
-    const existingItemIds = preparedItems.filter(i => i.id).map(i => i.id);
+    const existingItemIds = preparedItems.filter(i => String(i.id).length > 20).map(i => i.id);
 
     // Delete items that were removed in the UI
-    if (existingItemIds.length > 0) {
-      await supabase.from('sales_items').delete().eq('so_id', soId).not('id', 'in', `(${existingItemIds.join(',')})`);
-    } else {
-      await supabase.from('sales_items').delete().eq('so_id', soId);
+    const { data: currentDbItems } = await supabase.from('sales_items').select('id').eq('so_id', soId);
+    if (currentDbItems) {
+      const idsToDelete = currentDbItems.map(i => i.id).filter(id => !existingItemIds.includes(id));
+      if (idsToDelete.length > 0) {
+        await supabase.from('sales_items').delete().in('id', idsToDelete);
+      }
     }
 
     // Upsert the remaining items (inserts new ones, updates existing ones by id)
@@ -437,6 +439,25 @@ export async function updateSalesOrder(soId, payload) {
   } catch (error) {
     console.error('Update Sales Order Error:', error)
     return { success: false, error: error.message }
+  }
+}
+
+export async function updateMockupUrl(itemId, mockupUrl) {
+  const supabase = await createClient()
+  try {
+    const { error } = await supabase
+      .from('sales_items')
+      .update({ mockup_url: mockupUrl })
+      .eq('id', itemId)
+    
+    if (error) throw error;
+    
+    revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/sales')
+    return { success: true }
+  } catch (e) {
+    console.error('Error update mockup url:', e)
+    return { success: false, error: e.message }
   }
 }
 
@@ -464,6 +485,38 @@ export async function updateSalesItemStatus(itemId, newStatus) {
     return { success: true }
   } catch (error) {
     console.error('Update item status error:', error)
+    return { success: false, error: error.message }
+  }
+}
+
+export async function cancelSalesOrder(soId) {
+  const supabase = await createClient()
+
+  try {
+    // 1. Ubah status semua item menjadi BATAL (ini akan trigger pengembalian stok tersedia di DB)
+    const { error: itemsErr } = await supabase.from('sales_items')
+      .update({ status: 'BATAL' })
+      .eq('so_id', soId)
+    if (itemsErr) throw new Error(itemsErr.message)
+
+    // 2. Ubah status pembayaran invoice menjadi BATAL
+    const { error: soErr } = await supabase.from('sales_orders')
+      .update({ payment_status: 'BATAL' })
+      .eq('id', soId)
+    if (soErr) throw new Error(soErr.message)
+
+    // 3. Hapus semua riwayat transaksi uang terkait invoice ini
+    const { error: trxErr } = await supabase.from('transactions')
+      .delete()
+      .eq('so_id', soId)
+    if (trxErr) throw new Error(trxErr.message)
+
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/dashboard/inventory')
+    revalidatePath('/dashboard/report')
+    return { success: true }
+  } catch (error) {
+    console.error('Cancel Sales Order error:', error)
     return { success: false, error: error.message }
   }
 }

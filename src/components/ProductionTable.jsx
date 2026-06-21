@@ -1,11 +1,12 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
+import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Camera, Send, Truck } from 'lucide-react'
 
 import { saveProductionProgress, updateSalesOrderStatus, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
 import TrackingTimeline from '@/components/TrackingTimeline'
+import MockupUploadModal from '@/components/MockupUploadModal'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
@@ -44,9 +45,11 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [searchQuery, setSearchQuery] = useState('')
   const [loading, setLoading] = useState(false)
 
+  // Mockup popup state
+  const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
+
   // TAB 2: Tracking Produksi (Input Qty by Operator)
   const filteredJobs = (productionJobs || []).filter(j => 
-    j.order_type !== 'POLOS' && 
     (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
      (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -202,45 +205,37 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             trackingSoItems.map(item => {
               const paymentStatus = item.sales_order_items?.sales_orders?.payment_status || 'BELUM LUNAS'
               return (
-                <div key={item.id} className="glass-card p-5 animate-in fade-in">
-                  <div className="flex flex-col md:flex-row justify-between mb-4">
-                    <div>
-                      <h3 className="font-bold text-lg text-white">{item.sales_order_items?.sales_orders?.customers?.name || 'Pelanggan'}</h3>
-                      <p className="text-sm text-foreground/70 uppercase">
-                        {item.sales_order_items?.products?.product_name || item.sales_order_items?.products?.name} ({item.qty_target} {item.unit || 'pcs'})
-                      </p>
-                      <p className="text-xs text-foreground/50 mt-1">{item.sales_order_items?.sales_orders?.invoice_number}</p>
-                    </div>
-                    <div className="mt-4 md:mt-0 flex gap-2 items-start">
-                       {/* Tombol Konfirmasi Pengiriman oleh Admin */}
-                       {getDisplayStatus(item.item_status) === 'SIAP KIRIM' && (
-                          <button 
-                            onClick={() => handleOpenStatusModal(item)}
-                            className="px-4 py-2 text-xs font-bold bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
-                          >
-                            Konfirmasi Kirim
-                          </button>
-                       )}
-                       {/* Tombol Koreksi Qty */}
-                       {getDisplayStatus(item.item_status) !== 'BARU MASUK' && getDisplayStatus(item.item_status) !== 'SELESAI' && (
-                          <button 
-                            onClick={() => handleOpenCorrection(item)}
-                            className="p-2 bg-red-500/10 text-red-400 hover:bg-red-500/20 rounded-lg transition-all border border-red-500/20 tooltip"
-                            title="Koreksi / Revisi Qty Dikerjakan"
-                          >
-                            <RefreshCw className="w-4 h-4" />
-                          </button>
-                       )}
-                    </div>
+                <div key={item.id} className="glass-card p-3 sm:p-4 animate-in fade-in flex flex-col xl:flex-row items-center gap-4">
+                  {/* Bagian Kiri: Info Pelanggan */}
+                  <div className="w-full xl:w-[250px] shrink-0">
+                    <h3 className="font-bold text-base text-white">{item.sales_order_items?.sales_orders?.customers?.name || 'Pelanggan'}</h3>
+                    <p className="text-xs text-foreground/70 uppercase">
+                      {item.sales_order_items?.products?.product_name || item.sales_order_items?.products?.name} ({item.qty_target} {item.unit || 'pcs'})
+                    </p>
+                    <p className="text-[10px] text-foreground/50 mt-0.5">{item.sales_order_items?.sales_orders?.invoice_number}</p>
                   </div>
                   
-                  {/* Timeline UI Premium */}
-                  <TrackingTimeline 
-                    currentStatus={item.item_status} 
-                    paymentStatus={paymentStatus}
-                    targetDate={item.target_date} 
-                  />
-                  
+                  {/* Bagian Tengah: Timeline UI */}
+                  <div className="flex-1 w-full overflow-hidden min-w-0">
+                    <TrackingTimeline 
+                      currentStatus={item.item_status} 
+                      paymentStatus={paymentStatus}
+                      targetDate={item.target_date} 
+                    />
+                  </div>
+
+                  {/* Bagian Kanan: Aksi (Sembunyikan Koreksi dari sini) */}
+                  <div className="w-full xl:w-auto shrink-0 flex justify-end">
+                     {getDisplayStatus(item.item_status) === 'SIAP KIRIM' && (
+                        <button 
+                          onClick={() => handleOpenStatusModal(item)}
+                          title="Konfirmasi Kirim"
+                          className="w-8 h-8 flex items-center justify-center bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
+                        >
+                          <Send className="w-4 h-4" />
+                        </button>
+                     )}
+                  </div>
                 </div>
               )
             })
@@ -277,9 +272,13 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                       <div className="text-xs text-foreground/50">{item.sales_order_items?.sales_orders?.invoice_number}</div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="w-16 h-16 rounded-md bg-white/10 border border-white/20 flex items-center justify-center overflow-hidden">
-                         <span className="text-xs text-foreground/40">No Image</span>
-                      </div>
+                      {item.mockup_url ? (
+                        <a href={item.mockup_url} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
+                          <img src={item.mockup_url} className="w-full h-full object-cover" alt="Mockup" />
+                        </a>
+                      ) : (
+                        <span className="text-[10px] text-foreground/40 italic">-</span>
+                      )}
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-foreground/90">{item.sales_order_items?.products?.name || '-'}</p>
@@ -477,6 +476,14 @@ export default function ProductionTable({ productionJobs, operators = [], curren
           </div>
         </div>
       )}
+
+      {/* Mockup Upload Modal */}
+      <MockupUploadModal 
+        isOpen={mockupModal.isOpen} 
+        onClose={() => setMockupModal({ isOpen: false, itemId: null, url: '' })} 
+        itemId={mockupModal.itemId} 
+        initialUrl={mockupModal.url} 
+      />
 
     </div>
   )
