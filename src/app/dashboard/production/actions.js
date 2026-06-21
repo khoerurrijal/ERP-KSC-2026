@@ -52,7 +52,21 @@ export async function handleAutoStatusUpdate(itemId) {
   const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', itemId)
   const qtyProcessed = (logs || []).reduce((sum, log) => sum + (log.qty_processed || 0), 0)
   
-  let newStatus = item.status || 'BARU MASUK';
+  // Fetch dynamic statuses from config
+  const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'dropdown_config').single()
+  const dropdownConfig = settingsData?.value || {}
+  const statuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
+  
+  const ST_BARU_MASUK = statuses[1] || 'BARU MASUK'
+  const ST_SIAP_PROSES = statuses[2] || 'SIAP PROSES'
+  const ST_PROSES = statuses[3] || 'PROSES'
+  const ST_SUDAH_JADI = statuses[4] || 'SUDAH JADI'
+  const ST_SIAP_KIRIM = statuses[5] || 'SIAP KIRIM'
+  const ST_DIKIRIM = statuses[6] || 'DIKIRIM'
+  const ST_SUDAH_DIAMBIL = statuses[7] || 'SUDAH DIAMBIL'
+  const ST_SELESAI = statuses[8] || 'SELESAI'
+
+  let newStatus = item.status || ST_BARU_MASUK;
   const oldStatus = newStatus;
 
   // Hitung target sebenarnya (memperhitungkan unit_multiplier misal jika beli per dus)
@@ -61,43 +75,43 @@ export async function handleAutoStatusUpdate(itemId) {
   if (item.order_type?.toUpperCase() === 'POLOS') {
     // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas
     if (!isPaid) {
-      newStatus = 'BARU MASUK';
+      newStatus = ST_BARU_MASUK;
     } else {
-      if (newStatus !== 'DIKIRIM' && newStatus !== 'SUDAH DIAMBIL' && newStatus !== 'SELESAI') {
-        newStatus = 'SIAP KIRIM';
+      if (newStatus !== ST_DIKIRIM && newStatus !== ST_SUDAH_DIAMBIL && newStatus !== ST_SELESAI) {
+        newStatus = ST_SIAP_KIRIM;
       }
     }
   } else {
     // RULE UNTUK SABLON
     // RULE 1: Jika Qty Dikerjakan > 0 tapi < Target
     if (qtyProcessed > 0 && qtyProcessed < targetQty) {
-      newStatus = 'PROSES';
+      newStatus = ST_PROSES;
     }
 
     // RULE 2: Jika Qty Dikerjakan == Target
     if (qtyProcessed >= targetQty) {
-      if (newStatus !== 'DIKIRIM' && newStatus !== 'SUDAH DIAMBIL' && newStatus !== 'SELESAI') {
-        newStatus = 'SIAP KIRIM'; // Otomatis lompat ke Siap Kirim (indikator Menunggu Lunas akan nyala di frontend kalau belum lunas)
+      if (newStatus !== ST_DIKIRIM && newStatus !== ST_SUDAH_DIAMBIL && newStatus !== ST_SELESAI) {
+        newStatus = ST_SIAP_KIRIM; // Otomatis lompat ke Siap Kirim (indikator Menunggu Lunas akan nyala di frontend kalau belum lunas)
       }
     } else if (qtyProcessed === 0) {
       // Jika qty = 0 (bisa jadi direset oleh admin)
       // Cek apakah ini data lama yang tidak punya log sama sekali tapi statusnya sudah selesai/dikirim
       const hasNoLogs = !logs || logs.length === 0;
-      const isOldDataFinished = hasNoLogs && ['SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'].includes(oldStatus);
+      const isOldDataFinished = hasNoLogs && [ST_SUDAH_JADI, ST_SIAP_KIRIM, ST_DIKIRIM, ST_SUDAH_DIAMBIL, ST_SELESAI].includes(oldStatus);
       
       if (!isOldDataFinished) {
         if (!isPaid) {
-          newStatus = 'BARU MASUK';
+          newStatus = ST_BARU_MASUK;
         } else {
-          newStatus = 'SIAP PROSES';
+          newStatus = ST_SIAP_PROSES;
         }
       }
     }
   }
 
   // RULE 3: Finalisasi Fisik (Dikirim -> Selesai)
-  if ((newStatus === 'DIKIRIM' || newStatus === 'SUDAH DIAMBIL') && isLunas) {
-    newStatus = 'SELESAI';
+  if ((newStatus === ST_DIKIRIM || newStatus === ST_SUDAH_DIAMBIL) && isLunas) {
+    newStatus = ST_SELESAI;
   }
 
   if (newStatus !== oldStatus) {

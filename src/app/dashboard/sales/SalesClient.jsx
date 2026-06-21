@@ -10,12 +10,13 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-const STATUS_ORDER = ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
-
 export default function SalesClient({ salesOrders = [], salesItems = [], dropdownConfig = {} }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const supabase = createClient()
+
+  // Status order is now dynamic from settings
+  const productionStatuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
 
   // Tab State: 'INVOICE' | 'ITEMS'
   const [activeTab, setActiveTab] = useState('INVOICE')
@@ -91,8 +92,8 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
 
   const handleItemStatusChange = async (itemId, currentStatus, newStatus) => {
     // Check for backward movement
-    const currIdx = STATUS_ORDER.indexOf((currentStatus || 'BARU MASUK').toUpperCase());
-    const newIdx = STATUS_ORDER.indexOf((newStatus).toUpperCase());
+    const currIdx = productionStatuses.indexOf((currentStatus || 'BARU MASUK').toUpperCase());
+    const newIdx = productionStatuses.indexOf((newStatus).toUpperCase());
 
     if (newIdx < currIdx) {
       const confirm = window.confirm(`Peringatan: Anda akan memundurkan status barang ke tahap produksi sebelumnya ("${newStatus}"). Apakah Anda yakin ingin melanjutkan?`);
@@ -308,7 +309,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                 onChange={e => setItemFilterStatus(e.target.value)} 
                 options={[
                   { value: "ALL", label: "Semua Status" },
-                  ...STATUS_ORDER.map(s => ({ value: s, label: s }))
+                  ...productionStatuses.map(s => ({ value: s, label: s }))
                 ]}
               />
             </div>
@@ -432,7 +433,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                                 currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/20 text-blue-400 border-blue-500/30' : 
                                 'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
                           >
-                            {STATUS_ORDER.map(statusOption => (
+                            {productionStatuses.map(statusOption => (
                               <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
                                 {statusOption}
                               </option>

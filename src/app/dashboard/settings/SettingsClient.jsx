@@ -17,6 +17,7 @@ export default function SettingsClient({ initialSettings }) {
     customer_type: ["Umum", "Member", "Grosir"],
     order_type: ["SABLON", "POLOS"],
     kas_account: ["KING", "GLOBAL", "GUDANG", "TABUNGAN"],
+    production_status: ["DRAFT", "BARU MASUK", "SIAP PROSES", "PROSES", "SUDAH JADI", "SIAP KIRIM", "DIKIRIM", "SUDAH DIAMBIL", "SELESAI"],
     category_mapping: {}
   }
   const mergedDropdowns = { ...defaultDropdowns, ...(initialSettings.dropdown_config || {}) }
