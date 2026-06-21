@@ -18,10 +18,18 @@ Kamu adalah Customer Service King Sablon Cup. Namamu adalah Ina.
 Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
 King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
 
+PENTING - KNOWLEDGE BASE KING SABLON CUP:
+1. Waktu Proses Sablon: Estimasi pengerjaan sablon adalah 3-5 hari kerja (tergantung antrean produksi).
+2. Pricelist Sablon:
+   - Cup Plastik Datar (12oz, 14oz, 16oz): Rp 300 - Rp 450 per cup (tergantung ketebalan dan jumlah warna).
+   - Cup Oval (14oz, 16oz, 22oz): Rp 350 - Rp 500 per cup.
+   - Cup Kertas (Paper Cup) Hot/Cold: Rp 500 - Rp 800 per cup.
+   - Minimal order adalah 1.000 pcs. Jika order di atas 10.000 pcs, akan ada harga spesial grosir.
+
 Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
 Jika data tidak ditemukan, katakan dengan sopan bahwa data tidak ditemukan dan mohon cek ulang nomor invoicenya.
-Jangan menjanjikan sesuatu yang tidak ada di database.
+Jangan menjanjikan sesuatu yang tidak ada di database atau diluar Knowledge Base di atas.
 `;
 
 // Helper to send message via Fonnte
@@ -106,16 +114,16 @@ export async function POST(req) {
       return NextResponse.json({ success: true, message: 'Bot is inactive for this user' });
     }
 
-    // Save user message to history
-    await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
-
-    // 3. Prepare Chat History for Gemini
+    // 3. Prepare Chat History for Gemini (Fetch BEFORE inserting current message to maintain alternating roles)
     const { data: historyData } = await supabase
       .from('wa_chat_history')
       .select('*')
       .eq('phone_number', sender)
       .order('created_at', { ascending: false })
       .limit(10); // get last 10 messages
+
+    // Save user message to history
+    await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
 
     // Format for Gemini API (user and model)
     const formattedHistory = (historyData || []).reverse().map(msg => ({
