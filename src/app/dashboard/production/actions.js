@@ -61,19 +61,14 @@ export async function handleAutoStatusUpdate(itemId) {
   const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', itemId)
   const qtyProcessed = (logs || []).reduce((sum, log) => sum + (log.qty_processed || 0), 0)
   
-  // Fetch dynamic statuses from config
-  const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'dropdown_config').single()
-  const dropdownConfig = settingsData?.value || {}
-  const statuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
-  
-  const ST_BARU_MASUK = statuses[1] || 'BARU MASUK'
-  const ST_SIAP_PROSES = statuses[2] || 'SIAP PROSES'
-  const ST_PROSES = statuses[3] || 'PROSES'
-  const ST_SUDAH_JADI = statuses[4] || 'SUDAH JADI'
-  const ST_SIAP_KIRIM = statuses[5] || 'SIAP KIRIM'
-  const ST_DIKIRIM = statuses[6] || 'DIKIRIM'
-  const ST_SUDAH_DIAMBIL = statuses[7] || 'SUDAH DIAMBIL'
-  const ST_SELESAI = statuses[8] || 'SELESAI'
+  const ST_BARU_MASUK = 'BARU MASUK'
+  const ST_SIAP_PROSES = 'SIAP PROSES'
+  const ST_PROSES = 'PROSES'
+  const ST_SUDAH_JADI = 'SUDAH JADI'
+  const ST_SIAP_KIRIM = 'SIAP KIRIM'
+  const ST_DIKIRIM = 'DIKIRIM'
+  const ST_SUDAH_DIAMBIL = 'SUDAH DIAMBIL'
+  const ST_SELESAI = 'SELESAI'
 
   let newStatus = item.status || ST_BARU_MASUK;
   const oldStatus = newStatus;

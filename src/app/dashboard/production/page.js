@@ -1,6 +1,8 @@
 import { createClient } from '@/utils/supabase/server'
 import ProductionTable from '@/components/ProductionTable'
 
+export const dynamic = 'force-dynamic'
+
 export default async function ProductionPage() {
   const supabase = await createClient()
   const user = { email: 'admin@kingsablon.com' }
@@ -34,7 +36,7 @@ export default async function ProductionPage() {
       production_logs (qty_processed)
     `)
     .in('order_type', ['SABLON', 'PRINTING'])
-    .or('status.in.(PROSES,BARU MASUK,SUDAH JADI,DIKIRIM,TERKIRIM,Proses),status.is.null')
+    .or('status.in.(BARU MASUK,SIAP PROSES,PROSES,SUDAH JADI,SIAP KIRIM,DIKIRIM,SUDAH DIAMBIL,SELESAI,TERKIRIM,Proses),status.is.null')
     .order('id', { ascending: false })
     .limit(500)
 
