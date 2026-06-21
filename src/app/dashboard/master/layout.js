@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Box, Users, Package } from 'lucide-react'
+import { Box, Users, Package, FileText } from 'lucide-react'
 
 export default function MasterDataLayout({ children }) {
   const pathname = usePathname()
@@ -12,6 +12,7 @@ export default function MasterDataLayout({ children }) {
     { name: 'Pelanggan', path: '/dashboard/master/customers', icon: Users },
     { name: 'Supplier', path: '/dashboard/master/suppliers', icon: Package },
     { name: 'Karyawan', path: '/dashboard/master/employees', icon: Users },
+    { name: 'Public Pricelist', path: '/pricelist', icon: FileText, external: true },
   ]
 
   return (
@@ -25,6 +26,8 @@ export default function MasterDataLayout({ children }) {
             <Link
               key={tab.path}
               href={tab.path}
+              target={tab.external ? "_blank" : undefined}
+              rel={tab.external ? "noopener noreferrer" : undefined}
               className={`flex items-center gap-2 pb-2 px-4 text-sm font-bold transition-all border-b-2 ${
                 isActive 
                   ? 'text-primary border-primary' 
