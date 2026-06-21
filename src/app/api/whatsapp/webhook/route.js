@@ -165,7 +165,8 @@ export async function POST(req) {
       const searchQuery = functionCall.args.search_query;
       
       // Query Database
-      const { data: orders } = await supabase
+      // Query 1: Search by invoice
+      const { data: ordersByInvoice } = await supabase
         .from('sales_orders')
         .select(`
           invoice_number, 
@@ -174,8 +175,32 @@ export async function POST(req) {
           customers (name),
           sales_items (qty, products (name))
         `)
-        .or(`invoice_number.ilike.%${searchQuery}%,customers.name.ilike.%${searchQuery}%`)
+        .ilike('invoice_number', `%${searchQuery}%`)
         .limit(3);
+
+      // Query 2: Search by customer name
+      const { data: ordersByName } = await supabase
+        .from('sales_orders')
+        .select(`
+          invoice_number, 
+          status, 
+          date,
+          customers!inner (name),
+          sales_items (qty, products (name))
+        `)
+        .ilike('customers.name', `%${searchQuery}%`)
+        .order('date', { ascending: false })
+        .limit(3);
+
+      // Combine and deduplicate
+      let orders = [];
+      if (ordersByInvoice) orders.push(...ordersByInvoice);
+      if (ordersByName) orders.push(...ordersByName);
+      
+      // Remove duplicates by invoice_number
+      orders = orders.filter((o, index, self) => 
+        index === self.findIndex((t) => t.invoice_number === o.invoice_number)
+      ).slice(0, 3);
 
       let functionResponseData;
       if (orders && orders.length > 0) {
