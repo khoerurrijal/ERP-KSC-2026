@@ -71,16 +71,21 @@ export default function TrackClient({ order, logs, settings, employees }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#0f1115] text-white flex justify-center pb-20">
-      <div className="w-full max-w-md bg-[#13161c] min-h-screen shadow-2xl relative flex flex-col">
+    <div className="min-h-screen bg-transparent text-white flex justify-center pb-20">
+      <div className="w-full max-w-md bg-black/40 backdrop-blur-3xl min-h-screen shadow-2xl relative flex flex-col border-x border-white/10">
         
         {/* Header */}
-        <div className="p-6 bg-gradient-to-b from-primary/20 to-transparent flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 bg-primary/20 rounded-full flex items-center justify-center mb-4 ring-4 ring-primary/10">
-            <Printer className="w-8 h-8 text-primary" />
+        <div className="p-8 bg-gradient-to-b from-primary/10 to-transparent flex flex-col items-center justify-center text-center">
+          <div className="w-32 h-32 mb-2 flex items-center justify-center">
+            <img 
+              src="/logo.png" 
+              alt="Logo" 
+              className="max-w-full max-h-full object-contain filter drop-shadow-[0_0_15px_rgba(212,175,55,0.4)]" 
+            />
           </div>
-          <h1 className="text-xl font-bold tracking-tight">{storeName}</h1>
-          <p className="text-sm text-foreground/60 mt-1">Lacak Pesanan Anda</p>
+          {/* Sembunyikan text title karena logo sudah punya text King Sablon */}
+          <h1 className="text-lg font-bold tracking-tight sr-only">{storeName}</h1>
+          <p className="text-sm text-foreground/70 font-medium">Lacak Pesanan Anda</p>
         </div>
 
         <div className="px-6 -mt-4 relative z-10 space-y-4">
