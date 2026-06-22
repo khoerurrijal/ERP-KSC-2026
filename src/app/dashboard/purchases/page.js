@@ -22,6 +22,18 @@ export default async function PurchasesPage({ searchParams }) {
 
   const allPOs = purchaseOrders || []
 
+  // Ambil semua purchase items untuk tab "Purchase Items"
+  const { data: rawItems } = await supabase
+    .from('purchase_items')
+    .select(`
+      *,
+      purchase_orders!inner(po_number, date, status, supplier)
+    `)
+    .order('id', { ascending: false })
+    .limit(10000)
+
+  const purchaseItems = rawItems || [];
+
   // Hitung Laporan Ringkasan
   const summary = {
     beliGudang: 0,
@@ -57,5 +69,5 @@ export default async function PurchasesPage({ searchParams }) {
   const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
   const dropdownConfig = settings?.value || {}
 
-  return <PurchasesClient purchaseOrders={allPOs} summary={summary} selectedMonth={selectedMonth} dropdownConfig={dropdownConfig} />
+  return <PurchasesClient purchaseOrders={allPOs} purchaseItems={purchaseItems} summary={summary} selectedMonth={selectedMonth} dropdownConfig={dropdownConfig} />
 }

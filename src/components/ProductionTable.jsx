@@ -48,13 +48,57 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   // Mockup popup state
   const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
 
+  const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
+
+  const handleSort = (key) => {
+    let direction = 'asc'
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
+    setSortConfig({ key, direction })
+  }
+
+  const renderSortIcon = (key) => {
+    if (sortConfig.key !== key) return null
+    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
+  }
+
   // TAB 2: Tracking Produksi (Input Qty by Operator)
-  const filteredJobs = (productionJobs || []).filter(j => 
-    (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
-    ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-     (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-     (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const filteredAndSortedJobs = useMemo(() => {
+    let result = (productionJobs || []).filter(j => 
+      (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
+      ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+       (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+       (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+    )
+
+    result.sort((a, b) => {
+      let valA, valB
+      if (sortConfig.key === 'customer') {
+        valA = a.sales_order_items?.sales_orders?.customers?.name || ''
+        valB = b.sales_order_items?.sales_orders?.customers?.name || ''
+      } else if (sortConfig.key === 'product') {
+        valA = a.sales_order_items?.products?.name || ''
+        valB = b.sales_order_items?.products?.name || ''
+      } else if (sortConfig.key === 'target_date') {
+        valA = a.target_date || ''
+        valB = b.target_date || ''
+      } else if (sortConfig.key === 'item_status') {
+        valA = a.item_status || ''
+        valB = b.item_status || ''
+      } else if (sortConfig.key === 'qty_target') {
+        valA = a.qty_target || 0
+        valB = b.qty_target || 0
+      } else {
+        valA = a[sortConfig.key]
+        valB = b[sortConfig.key]
+      }
+
+      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
+      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return result
+  }, [productionJobs, searchQuery, sortConfig])
 
   // TAB 1: Tracking Sales Order (Visual Timeline)
   const trackingSoItems = (productionJobs || []).filter(j => 
@@ -265,23 +309,23 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-6 py-4 font-medium">Nama / Brand</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customer')}>Nama / Brand {renderSortIcon('customer')}</th>
                   <th className="px-6 py-4 font-medium">Mockup / Desain</th>
-                  <th className="px-6 py-4 font-medium">Produk & Qty Target</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('product')}>Produk & Qty Target {renderSortIcon('product')}</th>
                   <th className="px-6 py-4 font-medium">Progress (Selesai)</th>
-                  <th className="px-6 py-4 font-medium">Target Selesai</th>
-                  <th className="px-6 py-4 font-medium">Status Item</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Target Selesai {renderSortIcon('target_date')}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('item_status')}>Status Item {renderSortIcon('item_status')}</th>
                   <th className="px-6 py-4 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredJobs?.length === 0 ? (
+                {filteredAndSortedJobs?.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">
                       Belum ada antrean pekerjaan sablon saat ini.
                     </td>
                   </tr>
-                ) : filteredJobs?.map((item) => (
+                ) : filteredAndSortedJobs?.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-medium text-purple-400">
                       {item.sales_order_items?.sales_orders?.customers?.name || '-'}

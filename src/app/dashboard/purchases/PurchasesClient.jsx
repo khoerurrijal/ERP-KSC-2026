@@ -8,11 +8,14 @@ import { deletePurchaseOrder, payPurchaseOrder } from './new/actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function PurchasesClient({ purchaseOrders = [], summary = {}, selectedMonth = '', dropdownConfig = {} }) {
+export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', dropdownConfig = {} }) {
+  const [activeTab, setActiveTab] = useState('PO') // 'PO' | 'ITEMS'
   const [searchQuery, setSearchQuery] = useState('')
+  const [itemSearchQuery, setItemSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('BELUM LUNAS')
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
+  const [itemSortConfig, setItemSortConfig] = useState({ key: 'created_at', direction: 'desc' })
 
   // Modal State untuk Pelunasan
   const [payModalOpen, setPayModalOpen] = useState(false)
@@ -57,9 +60,16 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
     }
   }
 
-  const renderSortIcon = (key) => {
-    if (sortConfig.key !== key) return null
-    return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
+  const renderSortIcon = (key, isItem = false) => {
+    const config = isItem ? itemSortConfig : sortConfig
+    if (config.key !== key) return null
+    return config.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
+  }
+
+  const handleItemSort = (key) => {
+    let direction = 'asc'
+    if (itemSortConfig.key === key && itemSortConfig.direction === 'asc') direction = 'desc'
+    setItemSortConfig({ key, direction })
   }
 
   const filteredAndSorted = useMemo(() => {
@@ -104,6 +114,45 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
     return result
   }, [purchaseOrders, searchQuery, filterStatus, sortConfig, selectedMonth])
 
+  const filteredAndSortedItems = useMemo(() => {
+    let result = purchaseItems.filter(item => {
+      const matchSearch = ((item.item_name || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
+                          ((item.purchase_orders?.po_number || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
+                          ((item.purchase_orders?.supplier || '').toLowerCase().includes(itemSearchQuery.toLowerCase()))
+      
+      // Filter Bulan
+      let matchMonth = true
+      if (!itemSearchQuery) {
+        matchMonth = item.purchase_orders?.date && item.purchase_orders?.date.startsWith(selectedMonth)
+      }
+
+      return matchSearch && matchMonth
+    })
+
+    result.sort((a, b) => {
+      let valA, valB
+      if (itemSortConfig.key === 'date') {
+        valA = a.purchase_orders?.date || ''
+        valB = b.purchase_orders?.date || ''
+      } else if (itemSortConfig.key === 'po_number') {
+        valA = a.purchase_orders?.po_number || ''
+        valB = b.purchase_orders?.po_number || ''
+      } else if (itemSortConfig.key === 'supplier') {
+        valA = a.purchase_orders?.supplier || ''
+        valB = b.purchase_orders?.supplier || ''
+      } else {
+        valA = a[itemSortConfig.key]
+        valB = b[itemSortConfig.key]
+      }
+      
+      if (valA < valB) return itemSortConfig.direction === 'asc' ? -1 : 1
+      if (valA > valB) return itemSortConfig.direction === 'asc' ? 1 : -1
+      return 0
+    })
+
+    return result
+  }, [purchaseItems, itemSearchQuery, itemSortConfig, selectedMonth])
+
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -139,27 +188,45 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
         </div>
       </div>
 
+      {/* TABS */}
+      <div className="flex gap-4 border-b border-white/10 mb-6">
+        <button 
+          onClick={() => setActiveTab('PO')}
+          className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'PO' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+        >
+          Invoice PO
+        </button>
+        <button 
+          onClick={() => setActiveTab('ITEMS')}
+          className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ITEMS' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+        >
+          Purchase Items
+        </button>
+      </div>
+
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input 
               type="text" 
-              placeholder="Cari supplier..." 
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              placeholder={activeTab === 'PO' ? "Cari supplier atau PO..." : "Cari item, supplier, atau PO..."}
+              value={activeTab === 'PO' ? searchQuery : itemSearchQuery}
+              onChange={e => activeTab === 'PO' ? setSearchQuery(e.target.value) : setItemSearchQuery(e.target.value)}
               className="glass-input !pl-10 h-10 w-full text-sm"
             />
           </div>
-          <CustomSelect 
-            value={filterStatus} 
-            onChange={e => setFilterStatus(e.target.value)} 
-            options={[
-              { value: "", label: "Semua Status" },
-              { value: "LUNAS", label: "Lunas Saja" },
-              { value: "BELUM LUNAS", label: "Belum Lunas (Tempo)" }
-            ]}
-          />
+          {activeTab === 'PO' && (
+            <CustomSelect 
+              value={filterStatus} 
+              onChange={e => setFilterStatus(e.target.value)} 
+              options={[
+                { value: "", label: "Semua Status" },
+                { value: "LUNAS", label: "Lunas Saja" },
+                { value: "BELUM LUNAS", label: "Belum Lunas (Tempo)" }
+              ]}
+            />
+          )}
         </div>
         <Link href="/dashboard/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4" />
@@ -169,52 +236,87 @@ export default function PurchasesClient({ purchaseOrders = [], summary = {}, sel
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
-              <tr>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('supplier')}>Supplier {renderSortIcon('supplier')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('total_amount')}>Total Tagihan {renderSortIcon('total_amount')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('status')}>Status Bayar {renderSortIcon('status')}</th>
-                <th className="px-6 py-4 font-medium text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/5">
-              {filteredAndSorted.length === 0 ? (
+          {activeTab === 'PO' ? (
+            <table className="w-full text-sm text-left">
+              <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
-                    {filterStatus === 'LUNAS' ? 'Tidak ada riwayat Lunas di bulan ini.' : 'Belum ada riwayat Purchase Order.'}
-                  </td>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('supplier')}>Supplier {renderSortIcon('supplier')}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('total_amount')}>Total Tagihan {renderSortIcon('total_amount')}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('status')}>Status Bayar {renderSortIcon('status')}</th>
+                  <th className="px-6 py-4 font-medium text-right">Aksi</th>
                 </tr>
-              ) : filteredAndSorted.map((item) => {
-                const totalAmount = item.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
-                return (
-                <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
-                  <td className="px-6 py-4 text-foreground/90 font-medium">{item.supplier || '-'}</td>
-                  <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID')}</td>
-                  <td className="px-6 py-4">
-                    <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${item.status === 'LUNAS' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
-                      {item.status || 'BELUM LUNAS'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
-                    {item.status !== 'LUNAS' && (
-                      <button onClick={() => openPayModal(item.id)} className="text-green-400 hover:text-green-300 font-medium text-xs">
-                        Pelunasan
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredAndSorted.length === 0 ? (
+                  <tr>
+                    <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
+                      {filterStatus === 'LUNAS' ? 'Tidak ada riwayat Lunas di bulan ini.' : 'Belum ada riwayat Purchase Order.'}
+                    </td>
+                  </tr>
+                ) : filteredAndSorted.map((item) => {
+                  const totalAmount = item.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
+                  return (
+                  <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                    <td className="px-6 py-4 text-foreground/90 font-medium">{item.supplier || '-'}</td>
+                    <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4">
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${item.status === 'LUNAS' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                        {item.status || 'BELUM LUNAS'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                      {item.status !== 'LUNAS' && (
+                        <button onClick={() => openPayModal(item.id)} className="text-green-400 hover:text-green-300 font-medium text-xs">
+                          Pelunasan
+                        </button>
+                      )}
+                      <Link href={`/dashboard/purchases/${item.id}/edit`} className="text-accent hover:text-accent/80 font-medium text-xs">
+                        Edit
+                      </Link>
+                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">
+                        Hapus
                       </button>
-                    )}
-                    <Link href={`/dashboard/purchases/${item.id}/edit`} className="text-accent hover:text-accent/80 font-medium text-xs">
-                      Edit
-                    </Link>
-                    <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">
-                      Hapus
-                    </button>
-                  </td>
+                    </td>
+                  </tr>
+                )})}
+              </tbody>
+            </table>
+          ) : (
+            <table className="w-full text-sm text-left">
+              <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
+                <tr>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('date')}>Tanggal {renderSortIcon('date', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('po_number')}>No PO {renderSortIcon('po_number', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('supplier')}>Supplier {renderSortIcon('supplier', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('item_name')}>Nama Item {renderSortIcon('item_name', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('qty')}>Qty {renderSortIcon('qty', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('unit_price')}>Harga Satuan {renderSortIcon('unit_price', true)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('total_price')}>Total {renderSortIcon('total_price', true)}</th>
                 </tr>
-              )})}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {filteredAndSortedItems.length === 0 ? (
+                  <tr>
+                    <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">
+                      Tidak ada purchase items.
+                    </td>
+                  </tr>
+                ) : filteredAndSortedItems.map((item) => (
+                  <tr key={item.id} className="hover:bg-white/5 transition-colors">
+                    <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.date ? new Date(item.purchase_orders.date).toLocaleDateString('id-ID') : '-'}</td>
+                    <td className="px-6 py-4 text-foreground/90 font-medium">{item.purchase_orders?.po_number || '-'}</td>
+                    <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.supplier || '-'}</td>
+                    <td className="px-6 py-4 font-medium">{item.item_name}</td>
+                    <td className="px-6 py-4">{item.qty} {item.unit}</td>
+                    <td className="px-6 py-4">Rp {Number(item.unit_price || 0).toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
 

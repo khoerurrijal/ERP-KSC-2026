@@ -87,6 +87,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
             bawahan_bonus,
             other_bonuses: totalBonusHarian,
             kasbon_amount: autoDeduction,
+            late_deduction: 0,
             total
           }
         })
@@ -124,9 +125,25 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
       const newItems = prev.items.map(item => {
         if (item.employee_id === employee_id) {
           const numValue = Number(value.replace(/[^0-9]/g, '')) || 0
-          // Hitung ulang total (kasbon dikurangi dari total_sebelum_kasbon)
-          const total_sebelum_kasbon = item.base_salary + item.meal_allowance + item.weekly_bonus + item.borongan_amount + item.bawahan_bonus + item.other_bonuses
-          return { ...item, kasbon_amount: numValue, total: total_sebelum_kasbon - numValue }
+          // Hitung ulang total (kasbon dikurangi dari total_sebelum_deduction)
+          const total_sebelum_deduction = item.base_salary + item.meal_allowance + item.weekly_bonus + item.borongan_amount + item.bawahan_bonus + item.other_bonuses
+          return { ...item, kasbon_amount: numValue, total: total_sebelum_deduction - numValue - (item.late_deduction || 0) }
+        }
+        return item
+      })
+      const grandTotal = newItems.reduce((acc, curr) => acc + curr.total, 0)
+      return { ...prev, items: newItems, grandTotal }
+    })
+  }
+
+  const handleLateDeductionChange = (employee_id, value) => {
+    setPayrollData(prev => {
+      const newItems = prev.items.map(item => {
+        if (item.employee_id === employee_id) {
+          const numValue = Number(value.replace(/[^0-9]/g, '')) || 0
+          // Hitung ulang total
+          const total_sebelum_deduction = item.base_salary + item.meal_allowance + item.weekly_bonus + item.borongan_amount + item.bawahan_bonus + item.other_bonuses
+          return { ...item, late_deduction: numValue, total: total_sebelum_deduction - (item.kasbon_amount || 0) - numValue }
         }
         return item
       })
@@ -227,6 +244,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                   <th className="px-6 py-4 font-medium">Hasil Borongan</th>
                   <th className="px-6 py-4 font-medium">Bonus (Mingguan+Bawahan+Lain)</th>
                   <th className="px-6 py-4 font-medium text-red-400">Potong Kasbon/Bon</th>
+                  <th className="px-6 py-4 font-medium text-orange-400">Potong Telat</th>
                   <th className="px-6 py-4 font-medium text-right text-green-400">Total Take Home Pay</th>
                 </tr>
               </thead>
@@ -261,6 +279,15 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                         onChange={(e) => handleKasbonChange(item.employee_id, e.target.value)}
                         placeholder="Rp 0"
                         className="glass-input w-24 text-sm text-red-400 font-bold text-right"
+                      />
+                    </td>
+                    <td className="px-6 py-4">
+                      <input 
+                        type="text" 
+                        value={item.late_deduction === 0 ? '' : item.late_deduction?.toLocaleString('id-ID')}
+                        onChange={(e) => handleLateDeductionChange(item.employee_id, e.target.value)}
+                        placeholder="Rp 0"
+                        className="glass-input w-24 text-sm text-orange-400 font-bold text-right border-orange-500/30 focus:border-orange-400"
                       />
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-green-400 text-lg">
