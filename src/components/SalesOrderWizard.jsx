@@ -113,6 +113,10 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const getCategoriesForItem = (orderType) => {
     if (!orderType) return []
     const mapping = dropdownConfig.category_mapping || {}
+    const orderTypeUpper = orderType.toUpperCase()
+    if (mapping[orderTypeUpper] && mapping[orderTypeUpper].length > 0) {
+      return mapping[orderTypeUpper]
+    }
     if (mapping[orderType] && mapping[orderType].length > 0) {
       return mapping[orderType]
     }

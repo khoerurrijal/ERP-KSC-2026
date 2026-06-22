@@ -33,13 +33,36 @@ export default async function DashboardLayout({ children }) {
 
   const allowedMenus = rolePermissions[userRole] || []
 
+  const isOperator = userRole === 'Operator'
+
   return (
-    <div className="min-h-screen bg-transparent text-foreground flex">
-      {/* Sidebar */}
-      <Sidebar allowedMenus={allowedMenus} userRole={userRole} />
+    <div className="min-h-screen bg-transparent text-foreground flex flex-col md:flex-row">
+      {/* Sidebar - Hidden for Operators on all screens, responsive for others */}
+      {!isOperator && (
+        <>
+          <div className="hidden md:block">
+            <Sidebar allowedMenus={allowedMenus} userRole={userRole} />
+          </div>
+          {/* Mobile Topbar for non-operators could go here, or we let Sidebar handle mobile if we upgrade Sidebar */}
+          <div className="md:hidden">
+            <Sidebar allowedMenus={allowedMenus} userRole={userRole} isMobile={true} />
+          </div>
+        </>
+      )}
+
+      {/* Operator Mobile Header */}
+      {isOperator && (
+        <div className="w-full bg-background/80 backdrop-blur-md border-b border-white/10 p-4 sticky top-0 z-50 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Logo" className="h-8 object-contain drop-shadow-md" />
+            <span className="font-bold text-primary">Operator Panel</span>
+          </div>
+          <Sidebar allowedMenus={allowedMenus} userRole={userRole} isOperatorOnly={true} />
+        </div>
+      )}
 
       {/* Main Content Area */}
-      <main className="flex-1 ml-64 p-8 relative min-h-screen overflow-x-hidden">
+      <main className={`flex-1 relative min-h-screen overflow-x-hidden ${isOperator ? 'p-4' : 'p-4 md:p-8 md:ml-64 pt-20 md:pt-8'}`}>
         {/* Background decorations for main area */}
         <div className="fixed top-[-5%] left-[20%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[150px] pointer-events-none" />
         <div className="fixed bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />

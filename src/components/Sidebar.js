@@ -59,32 +59,88 @@ const MENU_GROUPS = [
   }
 ]
 
-export default function Sidebar({ allowedMenus = [], userRole = '' }) {
+export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false }) {
   const pathname = usePathname()
+  const [isOpen, setIsOpen] = useState(false)
   
   // Filter menu based on allowedMenus
   const filteredMenus = MENU_GROUPS.map(group => {
-    // If it's a direct menu with a key, check if key is allowed
     if (!group.subItems) {
       if (group.key && !allowedMenus.includes(group.key)) return null
       return group
     }
-    
-    // If the whole group has a key (like gudang, keuangan)
     if (group.key && !allowedMenus.includes(group.key)) {
       return null
     }
-
-    // Otherwise, check subitems
     const filteredSubItems = group.subItems.filter(sub => {
       if (sub.key && !allowedMenus.includes(sub.key)) return false
       return true
     })
-
     if (filteredSubItems.length === 0) return null
-
     return { ...group, subItems: filteredSubItems }
   }).filter(Boolean)
+
+  if (isOperatorOnly) {
+    return (
+      <div className="relative">
+        <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-primary transition-colors flex items-center gap-2">
+           <Users className="w-5 h-5" />
+        </button>
+        {isOpen && (
+          <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 p-2 flex flex-col gap-2">
+            <div className="px-3 py-2 border-b border-white/10 mb-2">
+              <span className="text-xs text-foreground/60 block">Login sebagai:</span>
+              <span className="text-sm font-bold text-primary">{userRole}</span>
+            </div>
+            <ThemeToggle />
+            <form action="/auth/signout" method="post">
+              <button type="submit" className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-red-400 hover:bg-red-400/10 transition-all font-medium">
+                <LogOut className="w-4 h-4" />
+                <span>Sign Out</span>
+              </button>
+            </form>
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  if (isMobile) {
+    return (
+      <div className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
+        <div className="flex items-center justify-between p-4">
+          <img src="/logo.png" alt="Logo" className="h-8 object-contain drop-shadow-md" />
+          <button onClick={() => setIsOpen(!isOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
+            <div className="w-5 h-0.5 bg-current mb-1" />
+            <div className="w-5 h-0.5 bg-current mb-1" />
+            <div className="w-5 h-0.5 bg-current" />
+          </button>
+        </div>
+        {isOpen && (
+          <div className="absolute top-full left-0 w-full h-[calc(100vh-64px)] bg-background/95 backdrop-blur-2xl flex flex-col overflow-y-auto border-t border-white/10 animate-in slide-in-from-top-4 p-4">
+            <div className="flex-1 space-y-2">
+              {filteredMenus.map((group, idx) => (
+                <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => setIsOpen(false)} />
+              ))}
+            </div>
+            <div className="mt-8 pt-4 border-t border-white/10 pb-10">
+               <div className="mb-4 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20 text-center">
+                 <span className="text-xs text-foreground/60 block mb-1">Login sebagai:</span>
+                 <span className="text-sm font-bold text-primary">{userRole}</span>
+               </div>
+               <ThemeToggle />
+               <form action="/auth/signout" method="post" className="mt-2">
+                 <button type="submit" className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-400/10 transition-all font-medium justify-center">
+                   <LogOut className="w-5 h-5" />
+                   <span>Sign Out</span>
+                 </button>
+               </form>
+            </div>
+          </div>
+        )}
+      </div>
+    )
+  }
 
   return (
     <aside className="w-64 h-screen fixed left-0 top-0 glass-panel flex flex-col z-50">
@@ -145,7 +201,7 @@ function ThemeToggle() {
   )
 }
 
-function MenuGroup({ group, pathname }) {
+function MenuGroup({ group, pathname, onClick }) {
   const hasSubItems = !!group.subItems
   
   // Check if any subitem is active
@@ -161,6 +217,7 @@ function MenuGroup({ group, pathname }) {
       <Link
         href={group.path}
         prefetch={false}
+        onClick={onClick}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
           isDirectActive
             ? 'bg-primary/20 text-primary font-medium'
@@ -200,6 +257,7 @@ function MenuGroup({ group, pathname }) {
                 key={idx}
                 href={sub.path}
                 prefetch={false}
+                onClick={onClick}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
                   isSubActive
                     ? 'bg-primary/20 text-primary font-medium'
