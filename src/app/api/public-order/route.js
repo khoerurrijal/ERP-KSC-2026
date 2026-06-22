@@ -28,7 +28,11 @@ export async function POST(req) {
     } else {
       const { data: newCustomer, error: custError } = await supabase
         .from('customers')
-        .insert([{ name: brandName, phone: whatsappNumber }])
+        .insert([{ 
+          name: brandName, 
+          phone: whatsappNumber,
+          customer_code: 'CUST-WEB-' + Math.floor(Math.random() * 100000)
+        }])
         .select()
         .single();
       
