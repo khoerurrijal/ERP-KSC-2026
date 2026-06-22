@@ -101,13 +101,13 @@ export default function OrderClient({ products, matrix }) {
 
   // --- VIEW: SUCCESS SCREEN ---
   if (invoiceData) {
-    const waText = \`Halo kak Ina, saya sudah order via Website.
-Invoice: *\${invoiceData.invoice}*
-Nama Brand: *\${brandName}*
-Total Tagihan: *\${formatRp(invoiceData.grandTotal)}*
+    const waText = `Halo kak Ina, saya sudah order via Website.
+Invoice: *${invoiceData.invoice}*
+Nama Brand: *${brandName}*
+Total Tagihan: *${formatRp(invoiceData.grandTotal)}*
 
-Berikut saya lampirkan bukti transfernya. 🙏\`;
-    const waLink = \`https://wa.me/6282121316926?text=\${encodeURIComponent(waText)}\`;
+Berikut saya lampirkan bukti transfernya. 🙏`;
+    const waLink = `https://wa.me/6282121316926?text=${encodeURIComponent(waText)}`;
 
     return (
       <div className="bg-card p-6 rounded-2xl shadow-xl border border-border/50 text-center animate-in fade-in zoom-in duration-300">

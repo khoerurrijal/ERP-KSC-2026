@@ -70,7 +70,7 @@ async function searchOrdersInDB(searchQuery) {
   const { data: ordersByInvoice } = await supabase
     .from('sales_orders')
     .select('invoice_number, status, date, customers (name), sales_items (qty, products (name))')
-    .ilike('invoice_number', \`%\${searchQuery}%\`)
+    .ilike('invoice_number', `%${searchQuery}%`)
     .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING']) // Only active orders
     .limit(3);
 
@@ -78,7 +78,7 @@ async function searchOrdersInDB(searchQuery) {
   const { data: ordersByName } = await supabase
     .from('sales_orders')
     .select('invoice_number, status, date, customers!inner (name), sales_items (qty, products (name))')
-    .ilike('customers.name', \`%\${searchQuery}%\`)
+    .ilike('customers.name', `%${searchQuery}%`)
     .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING']) // Only active orders
     .order('date', { ascending: false })
     .limit(3);
@@ -179,10 +179,10 @@ export async function POST(req) {
       
       if (orders && orders.length > 0) {
         const orderSummary = orders.map(o => 
-          \`📌 *Invoice:* \${o.invoice_number}\\n*Status:* \${o.status}\\n*Item:* \${o.sales_items?.map(i => \`\${i.qty} pcs \${i.products?.name}\`).join(', ')}\\n*Tracking:* https://erpkscv1.vercel.app/track/\${o.invoice_number}\`
+          `📌 *Invoice:* ${o.invoice_number}\n*Status:* ${o.status}\n*Item:* ${o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', ')}\n*Tracking:* https://erpkscv1.vercel.app/track/${o.invoice_number}`
         ).join('\\n\\n');
         
-        const reply = \`Ina sudah cek! Berikut detail pesanan atas nama kakak:\\n\\n\${orderSummary}\`;
+        const reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
         await sendFonnteMessage(sender, reply);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
@@ -276,8 +276,8 @@ export async function POST(req) {
             customer: o?.customers?.name,
             status: o.status,
             date: o.date,
-            items: o.sales_items?.map(i => \`\${i.qty} pcs \${i.products?.name}\`).join(', '),
-            tracking_link: \`https://erpkscv1.vercel.app/track/\${o.invoice_number}\`
+            items: o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', '),
+            tracking_link: `https://erpkscv1.vercel.app/track/${o.invoice_number}`
           }))
         };
       } else {
