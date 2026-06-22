@@ -5,7 +5,26 @@ export const dynamic = 'force-dynamic'
 
 export default async function ProductionPage() {
   const supabase = await createClient()
-  const user = { email: 'admin@kingsablon.com' }
+  
+  const { data: { user } } = await supabase.auth.getUser()
+  const userEmail = user?.email?.toLowerCase() || ''
+
+  // Determine user role and name
+  const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+  const userRoles = settingsData?.value || []
+  
+  let userRole = 'Operator'
+  let currentUserName = ''
+  
+  const matchedUser = userRoles.find(u => {
+    const inputEmail = (u.email || '').trim().toLowerCase()
+    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+  })
+  
+  if (matchedUser) {
+    userRole = matchedUser.role
+    // Assuming we don't have full name in user_roles, we will try to match with operators list later
+  }
 
   // Fetch employees who are operators
   const { data: operatorsData } = await supabase
@@ -62,8 +81,14 @@ export default async function ProductionPage() {
     mockup_url: item.mockup_url, // Added mockup_url
     qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
   }))
+  
+  // Try to match currentUserName if they are an operator
+  const matchedOperator = operators.find(o => o.full_name?.toLowerCase().includes(userEmail.split('@')[0].toLowerCase()))
+  if (matchedOperator) {
+    currentUserName = matchedOperator.full_name
+  } else if (matchedUser && matchedUser.email) {
+    currentUserName = matchedUser.email
+  }
 
-  return (
-    <ProductionTable productionJobs={productionJobs} operators={operators} currentUser={user.email} />
-  )
+  return <ProductionTable productionJobs={productionJobs} operators={operators} currentUser={userEmail} userRole={userRole} currentUserName={currentUserName} />
 }

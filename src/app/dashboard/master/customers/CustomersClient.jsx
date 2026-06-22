@@ -5,7 +5,7 @@ import { Search, Plus, Users, CheckCircle2, Trash2, Loader2 } from 'lucide-react
 import { addCustomer, deleteCustomer } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function CustomersClient({ initialCustomers = [], error }) {
+export default function CustomersClient({ initialCustomers = [], error, dropdownConfig = {} }) {
   const [customers, setCustomers] = useState(initialCustomers)
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -14,7 +14,7 @@ export default function CustomersClient({ initialCustomers = [], error }) {
   // Form State
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [type, setType] = useState('Reguler')
+  const [type, setType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler")
   const [city, setCity] = useState('')
   const [isPending, setIsPending] = useState(false)
 
@@ -54,7 +54,7 @@ export default function CustomersClient({ initialCustomers = [], error }) {
     setEditingId(null)
     setName('')
     setPhone('')
-    setType('Reguler')
+    setType((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler")
     setCity('')
   }
 
@@ -62,7 +62,7 @@ export default function CustomersClient({ initialCustomers = [], error }) {
     setEditingId(customer.id)
     setName(customer.name)
     setPhone(customer.phone || '')
-    setType(customer.type || 'Reguler')
+    setType(customer.type || ((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler"))
     setCity(customer.city || '')
     setShowModal(true)
   }
@@ -193,10 +193,7 @@ export default function CustomersClient({ initialCustomers = [], error }) {
                     value={type} 
                     onChange={e => setType(e.target.value)} 
                     options={[
-                      { value: "Reguler", label: "Reguler" },
-                      { value: "Reseller", label: "Reseller" },
-                      { value: "Shopee", label: "Shopee" },
-                      { value: "Tokopedia", label: "Tokopedia" }
+                      ...(dropdownConfig.customer_type || ["Reguler", "Reseller", "Shopee", "Tokopedia"]).map(t => ({ value: t, label: t }))
                     ]}
                   />
                 </div>

@@ -6,6 +6,7 @@ import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
+import { addCustomer } from '@/app/dashboard/master/customers/actions'
 
 export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, pricelistConfig = {} }) {
   const router = useRouter()
@@ -14,7 +15,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [showAddCustomer, setShowAddCustomer] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState("")
   const [newCustomerPhone, setNewCustomerPhone] = useState("")
-  const [newCustomerType, setNewCustomerType] = useState("Umum")
+  const [newCustomerType, setNewCustomerType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Umum")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -47,16 +48,30 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     }
   }
 
-  const handleAddCustomer = () => {
+  const handleAddCustomer = async () => {
+    if (!newCustomerName) {
+      alert("Nama Pelanggan wajib diisi!");
+      return;
+    }
+    setLoading(true);
+    
     const newCust = {
-      id: Date.now().toString(),
       customer_code: 'CUST-' + Math.floor(Math.random() * 10000),
       name: newCustomerName,
       phone: newCustomerPhone,
       type: newCustomerType
     }
-    setLocalCustomers([...localCustomers, newCust])
-    setCustomerId(newCust.customer_code)
+    
+    const res = await addCustomer(newCust);
+    setLoading(false);
+    
+    if (res.error) {
+      alert("Gagal menambahkan pelanggan: " + res.error);
+      return;
+    }
+    
+    setLocalCustomers([...localCustomers, res.customer])
+    setCustomerId(res.customer.customer_code)
     setShowAddCustomer(false)
     setNewCustomerName('')
     setCurrentTab(2)

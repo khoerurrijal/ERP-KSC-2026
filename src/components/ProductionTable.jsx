@@ -25,8 +25,8 @@ const getStatusColor = (st) => {
   return 'bg-white/10 text-foreground border-white/20'
 }
 
-export default function ProductionTable({ productionJobs, operators = [], currentUser = '' }) {
-  const [activeTab, setActiveTab] = useState('SO') // 'SO' | 'PRODUKSI'
+export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '' }) {
+  const [activeTab, setActiveTab] = useState(userRole === 'Operator' ? 'PRODUKSI' : 'SO') // 'SO' | 'PRODUKSI'
   
   const [selectedJob, setSelectedJob] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -66,7 +66,15 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   const handleOpenModal = (job) => {
     setSelectedJob(job)
-    setEmployeeId('')
+    
+    // Automatically set operator if role is Operator
+    if (userRole === 'Operator' && currentUserName) {
+      const op = operators.find(o => o.full_name?.toLowerCase().includes(currentUserName.toLowerCase()))
+      if (op) setEmployeeId(op.id.toString())
+    } else {
+      setEmployeeId('')
+    }
+    
     setIsModalOpen(true)
   }
 
@@ -81,7 +89,15 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const handleOpenCorrection = (job) => {
     setSelectedJob(job)
     setCorrectionQty(job.qty_processed || 0)
-    setEmployeeId('')
+    
+    // Automatically set operator if role is Operator
+    if (userRole === 'Operator' && currentUserName) {
+      const op = operators.find(o => o.full_name?.toLowerCase().includes(currentUserName.toLowerCase()))
+      if (op) setEmployeeId(op.id.toString())
+    } else {
+      setEmployeeId('')
+    }
+    
     setIsCorrectionModalOpen(true)
   }
 
@@ -335,6 +351,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     { value: "", label: "- Pilih Karyawan (Operator) -" },
                     ...operators.map(op => ({ value: op.id, label: `${op.full_name} (${op.role_name})` }))
                   ]}
+                  disabled={userRole === 'Operator'}
                 />
               </div>
 

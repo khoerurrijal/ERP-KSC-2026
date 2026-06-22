@@ -25,6 +25,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
   const [searchQuery, setSearchQuery] = useState('')
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') 
+  const [filterCustomerType, setFilterCustomerType] = useState('ALL')
   const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
   
   // Correction popup state
@@ -207,7 +208,12 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
         matchStatus = order.payment_status === 'LUNAS'
       }
 
-      return matchSearch && matchMonth && matchStatus
+      let matchCustomerType = true
+      if (filterCustomerType !== 'ALL') {
+        matchCustomerType = (order.customers?.type || 'REGULER').toUpperCase() === filterCustomerType.toUpperCase()
+      }
+
+      return matchSearch && matchMonth && matchStatus && matchCustomerType
     })
 
     return filtered.sort((a, b) => {
@@ -223,7 +229,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [salesOrders, searchQuery, filterMonth, filterStatus, sortConfig])
+  }, [salesOrders, searchQuery, filterMonth, filterStatus, filterCustomerType, sortConfig])
 
   // Memoized Item Data
   const filteredAndSortedItems = useMemo(() => {
@@ -359,18 +365,31 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
           </div>
           
           {activeTab === 'INVOICE' ? (
-            <div className="space-y-1">
-              <label className="text-xs text-foreground/60">Status Pembayaran</label>
-              <CustomSelect 
-                value={filterStatus} 
-                onChange={e => setFilterStatus(e.target.value)} 
-                options={[
-                  { value: "ALL", label: "Semua Pembayaran" },
-                  { value: "BELUM_LUNAS", label: "Belum Lunas / DP" },
-                  { value: "LUNAS", label: "Lunas" }
-                ]}
-              />
-            </div>
+            <>
+              <div className="space-y-1">
+                <label className="text-xs text-foreground/60">Status Pembayaran</label>
+                <CustomSelect 
+                  value={filterStatus} 
+                  onChange={e => setFilterStatus(e.target.value)} 
+                  options={[
+                    { value: "ALL", label: "Semua Pembayaran" },
+                    { value: "BELUM_LUNAS", label: "Belum Lunas / DP" },
+                    { value: "LUNAS", label: "Lunas" }
+                  ]}
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-foreground/60">Tipe Pelanggan</label>
+                <CustomSelect 
+                  value={filterCustomerType} 
+                  onChange={e => setFilterCustomerType(e.target.value)} 
+                  options={[
+                    { value: "ALL", label: "Semua Tipe" },
+                    ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
+                  ]}
+                />
+              </div>
+            </>
           ) : (
             <div className="space-y-1">
               <label className="text-xs text-foreground/60">Status Barang (Item)</label>

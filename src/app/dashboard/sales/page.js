@@ -11,7 +11,7 @@ export default async function SalesPage() {
     .from('sales_orders')
     .select(`
       *,
-      customers (name),
+      customers (name, type),
       sales_items (qty, unit_price)
     `)
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
