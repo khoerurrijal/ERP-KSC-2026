@@ -14,8 +14,9 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
   const [modalType, setModalType] = useState('SABLON') // SABLON | TUTUP
   const [modalCategory, setModalCategory] = useState('')
   const [modalProduct, setModalProduct] = useState('')
-  const [modalQty, setModalQty] = useState(1000)
+  const [modalQty, setModalQty] = useState(500)
   const [modalIsTwoColor, setModalIsTwoColor] = useState(false)
+  const [isRecommendationMode, setIsRecommendationMode] = useState(false)
 
   // Checkout Modal
   const [showCheckoutModal, setShowCheckoutModal] = useState(false)
@@ -135,6 +136,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     setModalCategory(product.category)
     setModalProduct('') // reset product
     setModalQty(parentItem.qty) // sync qty
+    setIsRecommendationMode(true)
     setShowProductModal(true)
   }
 
@@ -174,8 +176,8 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
 
       const data = await res.json()
       if (data.success) {
-        setInvoiceData(data)
-        setShowCheckoutModal(false)
+        // Redirect to Public Digital Invoice page
+        window.location.href = `/invoice/${data.invoice}`
       } else {
         alert("Gagal membuat pesanan: " + data.error)
       }
@@ -191,63 +193,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     alert('Disalin: ' + text)
   }
 
-  // --- VIEW: SUCCESS SCREEN ---
-  if (invoiceData) {
-    const waText = `Halo kak Ina, saya sudah order via Website.\nInvoice: *${invoiceData.invoice}*\nNama Brand: *${brandName}*\nTotal Tagihan: *${formatRp(invoiceData.grandTotal)}*\n\nBerikut saya lampirkan bukti transfernya. 🙏`;
-    const waLink = `https://wa.me/6282121316926?text=${encodeURIComponent(waText)}`;
 
-    return (
-      <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/10 text-center animate-in fade-in zoom-in duration-300">
-        <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
-        </div>
-        <h2 className="text-2xl font-bold mb-1">Pesanan Berhasil!</h2>
-        <p className="text-foreground/60 mb-6">Selesaikan pembayaran agar pesanan segera diproses.</p>
-        
-        <div className="bg-primary/5 rounded-xl p-4 mb-6 text-left border border-primary/10">
-          <p className="text-sm text-foreground/60">Nomor Invoice</p>
-          <p className="text-xl font-mono font-bold text-primary mb-3">{invoiceData.invoice}</p>
-          
-          <p className="text-sm text-foreground/60">Total Tagihan (Termasuk Kode Unik)</p>
-          <p className="text-3xl font-black text-primary mb-1">{formatRp(invoiceData.grandTotal)}</p>
-          <p className="text-xs text-foreground/50 mb-4">* Terdapat angka acak unik di belakang untuk verifikasi otomatis.</p>
-        </div>
-
-        <div className="bg-primary/5 rounded-xl p-4 mb-6 text-left border border-primary/10">
-          <p className="text-sm text-foreground/60 mb-2">Simpan Link Pelacakan Pesanan Anda:</p>
-          <div className="flex gap-2">
-            <input type="text" readOnly value={`https://erpkscv1.vercel.app/track/${invoiceData.invoice}`} className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono" />
-            <button onClick={() => copyToClipboard(`https://erpkscv1.vercel.app/track/${invoiceData.invoice}`)} className="px-3 py-2 bg-secondary rounded-lg text-xs font-bold">Copy</button>
-          </div>
-        </div>
-
-        <div className="space-y-4 mb-6 text-left">
-          <h3 className="font-semibold">Transfer ke Rekening Berikut:</h3>
-          <div className="bg-background rounded-lg p-3 flex justify-between items-center border border-border">
-            <div>
-              <p className="font-bold text-blue-600">BCA</p>
-              <p className="font-mono">6930 2401 07</p>
-              <p className="text-xs text-foreground/60">a/n Khoerur Rijal</p>
-            </div>
-            <button onClick={() => copyToClipboard('6930240107')} className="px-4 py-2 bg-secondary rounded-lg text-sm font-semibold hover:bg-secondary/80">Copy</button>
-          </div>
-          <div className="bg-background rounded-lg p-3 flex justify-between items-center border border-border">
-            <div>
-              <p className="font-bold text-blue-800">MANDIRI</p>
-              <p className="font-mono">900 0020 3650 95</p>
-              <p className="text-xs text-foreground/60">a/n Khoerur Rijal</p>
-            </div>
-            <button onClick={() => copyToClipboard('9000020365095')} className="px-4 py-2 bg-secondary rounded-lg text-sm font-semibold hover:bg-secondary/80">Copy</button>
-          </div>
-        </div>
-
-        <a href={waLink} target="_blank" rel="noreferrer" className="w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#20bd5a] text-white py-4 rounded-xl font-bold text-lg transition-colors">
-          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.582 2.128 2.182-.573c.978.58 1.911.928 3.145.929 3.178 0 5.767-2.587 5.768-5.766.001-3.187-2.575-5.77-5.764-5.771zm3.392 8.244c-.144.405-.837.774-1.17.824-.299.045-.677.063-1.092-.069-.252-.08-.575-.187-.988-.365-1.739-.751-2.874-2.502-2.961-2.617-.087-.116-.708-.94-.708-1.793s.448-1.273.607-1.446c.159-.173.346-.217.462-.217l.332.006c.106.005.249-.04.39.298.144.347.491 1.2.534 1.287.043.087.072.188.014.304-.058.116-.087.188-.173.289l-.26.304c-.087.086-.177.18-.076.354.101.174.449.741.964 1.201.662.591 1.221.774 1.394.86s.274.072.376-.043c.101-.116.433-.506.549-.68.116-.173.231-.145.39-.087s1.011.477 1.184.564c.173.087.289.129.332.202.043.073.043.423-.101.827z"/></svg>
-          Konfirmasi via WhatsApp
-        </a>
-      </div>
-    )
-  }
 
   // --- VIEW: MAIN CART ---
   return (
@@ -265,6 +211,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                 setModalType(''); 
                 setModalCategory(''); 
                 setModalProduct(''); 
+                setIsRecommendationMode(false);
                 setShowProductModal(true);
               }}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-bold hover:bg-primary/90 transition-transform active:scale-95"
@@ -312,6 +259,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                 setModalType(''); 
                 setModalCategory(''); 
                 setModalProduct(''); 
+                setIsRecommendationMode(false);
                 setShowProductModal(true);
               }}
               className="w-full py-3 border border-dashed border-primary/50 text-primary rounded-xl text-sm font-bold hover:bg-primary/5 transition-colors"
@@ -378,32 +326,43 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
-              <div>
-                <label className="block text-sm font-bold mb-2">Jenis Pesanan</label>
-                <CustomSelect 
-                  value={modalType}
-                  onChange={(e) => { setModalType(e.target.value); setModalCategory(''); setModalProduct(''); }}
-                  options={[
-                    { value: 'SABLON', label: 'Cetak Sablon' },
-                    { value: 'TUTUP', label: 'Tutup / Cup Polos / Lainnya' }
-                  ]}
-                  placeholder="-- Pilih Jenis Pesanan --"
-                  className="w-full"
-                  menuPosition="static"
-                />
-              </div>
+              {!isRecommendationMode && (
+                <>
+                  <div>
+                    <label className="block text-sm font-bold mb-2">Jenis Pesanan</label>
+                    <CustomSelect 
+                      value={modalType}
+                      onChange={(e) => { setModalType(e.target.value); setModalCategory(''); setModalProduct(''); }}
+                      options={[
+                        { value: 'SABLON', label: 'Cetak Sablon' },
+                        { value: 'TUTUP', label: 'Tutup / Cup Polos / Lainnya' }
+                      ]}
+                      placeholder="-- Pilih Jenis Pesanan --"
+                      className="w-full"
+                      menuPosition="static"
+                    />
+                  </div>
 
-              {modalType && (
-                <div className="animate-in slide-in-from-top-2">
-                  <label className="block text-sm font-bold mb-2">Kategori</label>
-                  <CustomSelect 
-                    value={modalCategory}
-                    onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
-                    options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
-                    placeholder="-- Pilih Kategori --"
-                    className="w-full"
-                    menuPosition="static"
-                  />
+                  {modalType && (
+                    <div className="animate-in slide-in-from-top-2">
+                      <label className="block text-sm font-bold mb-2">Kategori</label>
+                      <CustomSelect 
+                        value={modalCategory}
+                        onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
+                        options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
+                        placeholder="-- Pilih Kategori --"
+                        className="w-full"
+                        menuPosition="static"
+                      />
+                    </div>
+                  )}
+                </>
+              )}
+
+              {isRecommendationMode && (
+                <div className="bg-primary/10 text-primary border border-primary/20 p-4 rounded-xl mb-4">
+                  <p className="text-sm font-bold">Rekomendasi Pasangan</p>
+                  <p className="text-xs mt-1">Anda sedang memilih varian tutup untuk <strong>{modalCategory}</strong>.</p>
                 </div>
               )}
 
@@ -413,7 +372,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                   <CustomSelect 
                     value={modalProduct}
                     onChange={(e) => setModalProduct(e.target.value)}
-                    options={modalProducts.map(p => ({ value: p.id, label: `${p.name} (${formatRp(p.base_price)}/pcs)` }))}
+                    options={modalProducts.map(p => ({ value: p.id, label: `${p.name} (${formatRp(p.price_polos || p.base_price)}/pcs)` }))}
                     placeholder="-- Pilih Varian --"
                     className="w-full"
                     menuPosition="static"
