@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function OrderClient({ products, matrix, dropdownConfig }) {
+export default function OrderClient({ products, matrix, dropdownConfig, pricelistConfig = {} }) {
   // --- STATE ---
   const [cart, setCart] = useState([])
   const [isFastTrack, setIsFastTrack] = useState(false)
@@ -63,30 +63,48 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     const product = products.find(p => p.id === item.productId)
     if (!product) return 0
 
-    let sablonCost = 0
-    if (item.type === 'SABLON') {
-      const tierMatrix = matrix[product.category]
-      const qty = parseInt(item.qty, 10) || 0
-      if (tierMatrix) {
-        if (qty >= 10000 && tierMatrix.min_10000 > 0) sablonCost = tierMatrix.min_10000
-        else if (qty >= 5000 && tierMatrix.min_5000 > 0) sablonCost = tierMatrix.min_5000
-        else if (qty >= 2000 && tierMatrix.min_2000 > 0) sablonCost = tierMatrix.min_2000
-        else if (qty >= 1000 && tierMatrix.min_1000 > 0) sablonCost = tierMatrix.min_1000
-        else if (qty >= 500 && tierMatrix.min_500 > 0) sablonCost = tierMatrix.min_500
-        else if (qty >= 100 && tierMatrix.min_100 > 0) sablonCost = tierMatrix.min_100
-        else if (qty >= 10 && tierMatrix.min_10 > 0) sablonCost = tierMatrix.min_10
-        else if (tierMatrix.min_1 > 0) sablonCost = tierMatrix.min_1
-        else sablonCost = tierMatrix.min_1000 || 250 // fallback sama seperti PriceCalculator
+    const baseHpp = Number(product.base_price || 0)
+    
+    let hargaBeliKing = baseHpp
+    if (product.workshop_code === 'GUDANG') {
+      const profitGudang = Number(pricelistConfig.profit_gudang_nominal || 50)
+      hargaBeliKing = baseHpp + profitGudang
+    } else if (product.workshop_code === 'GLOBAL') {
+      const profitGlobal = Number(pricelistConfig.profit_global_percent || 10)
+      hargaBeliKing = baseHpp * (1 + (profitGlobal / 100))
+    }
+    
+    let basePrice = hargaBeliKing
+    
+    if (item.type === 'SABLON' || item.type === 'Sablon') {
+      let currentSablonFee = 0
+      const qty = parseInt(item.qty, 10) || 1
+      const cat = product.category
+      const sablonMatrix = pricelistConfig.sablon_matrix || {}
+      if (cat && sablonMatrix[cat]) {
+        const tierMatrix = sablonMatrix[cat]
+        if (qty >= 10000 && tierMatrix["10000"] > 0) currentSablonFee = tierMatrix["10000"]
+        else if (qty >= 5000 && tierMatrix["5000"] > 0) currentSablonFee = tierMatrix["5000"]
+        else if (qty >= 1000 && tierMatrix["1000"] > 0) currentSablonFee = tierMatrix["1000"]
+        else if (qty >= 500 && tierMatrix["500"] > 0) currentSablonFee = tierMatrix["500"]
+        else if (qty >= 100 && tierMatrix["100"] > 0) currentSablonFee = tierMatrix["100"]
+        else if (qty >= 10 && tierMatrix["10"] > 0) currentSablonFee = tierMatrix["10"]
+        else if (tierMatrix["1"] > 0) currentSablonFee = tierMatrix["1"]
+        else currentSablonFee = tierMatrix["1000"] || 250
+      } else {
+        currentSablonFee = 250
       }
+      basePrice += currentSablonFee
+      if (item.isTwoColor) basePrice += 250
+    } else {
+      const marginPolos = Number(pricelistConfig.margin_jual_polos_percent || 15)
+      basePrice = basePrice * (1 + (marginPolos / 100))
     }
-
-    let unitPrice = product.price_polos || 0
-    if (item.type === 'SABLON') {
-      unitPrice += sablonCost
-      if (item.isTwoColor) unitPrice += 250
-    }
-
-    return unitPrice
+    
+    const saveProfitPct = Number(pricelistConfig.save_profit_percent || 30)
+    basePrice = basePrice * (1 + (saveProfitPct / 100))
+    
+    return Math.ceil(basePrice)
   }
 
   const totals = useMemo(() => {

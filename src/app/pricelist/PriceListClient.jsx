@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Coffee, Box } from 'lucide-react'
 
-export default function PriceListClient({ products, matrix }) {
+export default function PriceListClient({ products, matrix, pricelistConfig = {} }) {
   const [mainTab, setMainTab] = useState('KING CUP')
   const [activeCategory, setActiveCategory] = useState('ALL')
 
@@ -208,14 +208,55 @@ export default function PriceListClient({ products, matrix }) {
                   </thead>
                   <tbody className="divide-y divide-border/30">
                     {catProducts.map(product => {
-                      // Tutup tidak pakai tiering sablon, hanya dikali kuantitas atau pakai base price ecer
-                      // Di PDF, Tutup itu /pcs. Jadi kita tampilkan price_polos saja, tanpa sablon matrix, kecuali Addon jasa.
                       const isTutupOrPolos = product.isTutup || product.category === 'ADDON'
                       
-                      const p = product.price_polos
-                      const p500 = isTutupOrPolos ? p : p + (catMatrix.min_500 || 0)
-                      const p1000 = isTutupOrPolos ? p : p + (catMatrix.min_1000 || 0)
-                      const p5000 = isTutupOrPolos ? p : p + (catMatrix.min_5000 || 0)
+                      const calculateFinalPrice = (qty, orderType) => {
+                        const baseHpp = Number(product.base_price || 0)
+                        
+                        let hargaBeliKing = baseHpp
+                        if (product.workshop_code === 'GUDANG') {
+                          const profitGudang = Number(pricelistConfig.profit_gudang_nominal || 50)
+                          hargaBeliKing = baseHpp + profitGudang
+                        } else if (product.workshop_code === 'GLOBAL') {
+                          const profitGlobal = Number(pricelistConfig.profit_global_percent || 10)
+                          hargaBeliKing = baseHpp * (1 + (profitGlobal / 100))
+                        }
+                        
+                        let basePrice = hargaBeliKing
+                        
+                        if (orderType === 'SABLON') {
+                           let currentSablonFee = 0
+                           const sablonMatrix = pricelistConfig.sablon_matrix || {}
+                           const cat = product.category
+                           if (cat && sablonMatrix[cat]) {
+                             const tierMatrix = sablonMatrix[cat]
+                             if (qty >= 10000 && tierMatrix["10000"] > 0) currentSablonFee = tierMatrix["10000"]
+                             else if (qty >= 5000 && tierMatrix["5000"] > 0) currentSablonFee = tierMatrix["5000"]
+                             else if (qty >= 1000 && tierMatrix["1000"] > 0) currentSablonFee = tierMatrix["1000"]
+                             else if (qty >= 500 && tierMatrix["500"] > 0) currentSablonFee = tierMatrix["500"]
+                             else if (qty >= 100 && tierMatrix["100"] > 0) currentSablonFee = tierMatrix["100"]
+                             else if (qty >= 10 && tierMatrix["10"] > 0) currentSablonFee = tierMatrix["10"]
+                             else if (tierMatrix["1"] > 0) currentSablonFee = tierMatrix["1"]
+                             else currentSablonFee = tierMatrix["1000"] || 250
+                           } else {
+                             currentSablonFee = 250
+                           }
+                           basePrice += currentSablonFee
+                        } else {
+                           const marginPolos = Number(pricelistConfig.margin_jual_polos_percent || 15)
+                           basePrice = basePrice * (1 + (marginPolos / 100))
+                        }
+                        
+                        const saveProfitPct = Number(pricelistConfig.save_profit_percent || 30)
+                        basePrice = basePrice * (1 + (saveProfitPct / 100))
+                        
+                        return Math.ceil(basePrice)
+                      }
+                      
+                      const p = calculateFinalPrice(1, isTutupOrPolos ? 'POLOS' : 'SABLON')
+                      const p500 = calculateFinalPrice(500, isTutupOrPolos ? 'POLOS' : 'SABLON')
+                      const p1000 = calculateFinalPrice(1000, isTutupOrPolos ? 'POLOS' : 'SABLON')
+                      const p5000 = calculateFinalPrice(5000, isTutupOrPolos ? 'POLOS' : 'SABLON')
 
                       return (
                         <tr key={product.product_code} className={`transition-colors group ${product.isTutup ? 'bg-foreground/[0.02] hover:bg-foreground/[0.04]' : 'hover:bg-foreground/5'}`}>
@@ -226,13 +267,13 @@ export default function PriceListClient({ products, matrix }) {
                             <span className="text-[9px] text-foreground/40 font-mono opacity-0 group-hover:opacity-100 transition-opacity">{product.product_code}</span>
                           </td>
                           <td className="py-2.5 px-3 text-center text-foreground/80 text-xs">
-                            {(!isTutupOrPolos && !catMatrix.min_500) ? '-' : formatRp(p500)}
+                            {(!isTutupOrPolos && !(catMatrix.min_500 || (pricelistConfig.sablon_matrix && pricelistConfig.sablon_matrix[product.category] && pricelistConfig.sablon_matrix[product.category]["500"]))) ? '-' : formatRp(p500)}
                           </td>
                           <td className="py-2.5 px-3 text-center font-bold text-primary text-sm">
-                            {(!isTutupOrPolos && !catMatrix.min_1000) ? formatRp(p) : formatRp(p1000)}
+                            {formatRp(p1000)}
                           </td>
                           <td className="py-2.5 px-3 text-center text-foreground/80 text-xs">
-                            {(!isTutupOrPolos && !catMatrix.min_5000) ? '-' : formatRp(p5000)}
+                            {(!isTutupOrPolos && !(catMatrix.min_5000 || (pricelistConfig.sablon_matrix && pricelistConfig.sablon_matrix[product.category] && pricelistConfig.sablon_matrix[product.category]["5000"]))) ? '-' : formatRp(p5000)}
                           </td>
                         </tr>
                       )

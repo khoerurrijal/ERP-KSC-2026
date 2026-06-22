@@ -12,7 +12,7 @@ export default async function OrderPage() {
   // Ambil data produk
   const { data: products } = await supabase
     .from('products')
-    .select('id, product_code, name, category, base_price, price_polos')
+    .select('id, product_code, name, category, base_price, price_polos, workshop_code')
     .eq('is_active', true)
     .order('name')
 
@@ -28,13 +28,13 @@ export default async function OrderPage() {
     })
   }
 
-  // Ambil dropdown config
+  // Ambil dropdown config dan pricelist config
   const { data: settings } = await supabase
     .from('system_settings')
-    .select('value')
-    .eq('key', 'dropdown_config')
-    .single()
-  const dropdownConfig = settings?.value || {}
+    .select('key, value')
+    .in('key', ['dropdown_config', 'pricelist_config'])
+  const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
+  const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">

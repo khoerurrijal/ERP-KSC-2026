@@ -12,7 +12,7 @@ export default async function PriceListPage() {
   // Ambil data produk
   const { data: products } = await supabase
     .from('products')
-    .select('product_code, name, category, workshop_code, base_price, price_polos')
+    .select('id, product_code, name, category, base_price, price_polos, workshop_code')
     .eq('is_active', true)
     .order('name')
 
@@ -27,6 +27,13 @@ export default async function PriceListPage() {
       matrix[row.category] = row
     })
   }
+
+  const { data: settings } = await supabase
+    .from('system_settings')
+    .select('key, value')
+    .in('key', ['pricelist_config'])
+  
+  const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
