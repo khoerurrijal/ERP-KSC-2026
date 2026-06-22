@@ -109,13 +109,79 @@ export default function TrackClient({ order, logs, settings, employees }) {
                   {order.customers?.name || 'Pelanggan'}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-right flex flex-col items-end">
                 <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-1">Pembayaran</p>
                 <span className={`text-[10px] uppercase font-bold tracking-wider px-2 py-1 rounded-full ${paymentStatus === 'LUNAS' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                   {paymentStatus}
                 </span>
               </div>
             </div>
+            {paymentStatus !== 'LUNAS' && order.payment_url && (
+              <div className="pt-4 mt-4 border-t border-white/10">
+                <a href={order.payment_url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20">
+                  <CreditCard className="w-5 h-5" />
+                  Bayar Sekarang via DOKU
+                </a>
+              </div>
+            )}
+            {paymentStatus !== 'LUNAS' && !order.payment_url && (
+              <div className="pt-4 mt-4 border-t border-white/10">
+                <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-3 text-center">Pilih Nominal Pembayaran</p>
+                <div className="flex gap-2">
+                  {amountPaid === 0 && (
+                    <button 
+                      onClick={async (e) => {
+                        const btn = e.currentTarget;
+                        btn.disabled = true;
+                        btn.innerHTML = 'Memproses...';
+                        try {
+                          const res = await fetch('/api/doku/checkout', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ orderId: order.id, amount: totalAmount / 2 })
+                          });
+                          const data = await res.json();
+                          if (data.success) window.location.href = data.payment_url;
+                          else alert('Gagal memproses pembayaran: ' + data.error);
+                        } catch(err) {
+                          alert('Terjadi kesalahan sistem.');
+                        }
+                        btn.disabled = false;
+                        btn.innerHTML = 'Bayar DP 50%';
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 bg-white/10 hover:bg-white/20 text-white py-3 rounded-xl font-bold transition-all text-xs"
+                    >
+                      Bayar DP 50%
+                    </button>
+                  )}
+                  <button 
+                    onClick={async (e) => {
+                      const btn = e.currentTarget;
+                      btn.disabled = true;
+                      btn.innerHTML = 'Memproses...';
+                      try {
+                        const res = await fetch('/api/doku/checkout', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ orderId: order.id, amount: sisa })
+                        });
+                        const data = await res.json();
+                        if (data.success) window.location.href = data.payment_url;
+                        else alert('Gagal memproses pembayaran: ' + data.error);
+                      } catch(err) {
+                        alert('Terjadi kesalahan sistem.');
+                      }
+                      btn.disabled = false;
+                      btn.innerHTML = 'Bayar Lunas';
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-xs"
+                  >
+                    <CreditCard className="w-4 h-4" />
+                    Bayar Lunas
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           <h2 className="font-bold text-foreground mt-8 mb-2">Status Produk ({items.length} Item)</h2>

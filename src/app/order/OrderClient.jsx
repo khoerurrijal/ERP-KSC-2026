@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import CustomSelect from '@/components/CustomSelect'
 
-export default function OrderClient({ products, matrix }) {
+export default function OrderClient({ products, matrix, dropdownConfig }) {
   // --- STATE ---
   const [cart, setCart] = useState([])
   const [isFastTrack, setIsFastTrack] = useState(false)
@@ -23,14 +24,34 @@ export default function OrderClient({ products, matrix }) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
 
+  const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num)
+
   // --- DERIVED DATA ---
   const allCategories = useMemo(() => {
     const cats = [...new Set(products.map(p => p.category))].filter(Boolean)
-    return {
-      sablon: cats.filter(c => !c.toLowerCase().includes('tutup')),
-      tutup: cats.filter(c => c.toLowerCase().includes('tutup'))
+    
+    // Check mapping
+    const mapping = dropdownConfig?.category_mapping || {}
+    // We treat SABLON as 'Sablon' orderType and TUTUP as 'Polos'
+    const getCats = (typeKey) => {
+      // typeKey is either 'SABLON' or 'POLOS' (case insensitive mapping in dashboard was used)
+      // the key in DB is usually 'Sablon' and 'Polos'
+      const key = Object.keys(mapping).find(k => k.toUpperCase() === typeKey)
+      if (key && mapping[key] && mapping[key].length > 0) {
+        // Only return categories that actually have products
+        return mapping[key].filter(c => cats.includes(c))
+      }
+      return []
     }
-  }, [products])
+
+    const sablonCats = getCats('SABLON')
+    const tutupCats = getCats('POLOS')
+
+    return {
+      sablon: sablonCats.length > 0 ? sablonCats : cats.filter(c => !c.toLowerCase().includes('tutup')),
+      tutup: tutupCats.length > 0 ? tutupCats : cats.filter(c => c.toLowerCase().includes('tutup'))
+    }
+  }, [products, dropdownConfig])
 
   const modalProducts = useMemo(() => {
     return products.filter(p => p.category === modalCategory)
@@ -80,9 +101,6 @@ export default function OrderClient({ products, matrix }) {
 
     return { subtotal, grandTotal }
   }, [cart, isFastTrack, isDesignService, products, matrix])
-
-  const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num)
-
   // --- HANDLERS ---
   const handleAddToCart = () => {
     if (!modalProduct || !isModalQtyValid) return
@@ -182,7 +200,7 @@ export default function OrderClient({ products, matrix }) {
     const waLink = `https://wa.me/6282121316926?text=${encodeURIComponent(waText)}`;
 
     return (
-      <div className="bg-card p-6 rounded-2xl shadow-xl border border-border/50 text-center animate-in fade-in zoom-in duration-300">
+      <div className="bg-white/5 backdrop-blur-md p-6 rounded-2xl shadow-xl border border-white/10 text-center animate-in fade-in zoom-in duration-300">
         <div className="w-16 h-16 bg-green-500/20 text-green-500 rounded-full flex items-center justify-center mx-auto mb-4">
           <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
         </div>
@@ -237,13 +255,13 @@ export default function OrderClient({ products, matrix }) {
   // --- VIEW: MAIN CART ---
   return (
     <>
-      <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-xl border border-border/50 mb-6">
+      <div className="bg-white/5 backdrop-blur-md p-4 sm:p-6 rounded-2xl shadow-xl border border-white/10 mb-6">
         <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
           Keranjang Belanja
         </h2>
         
         {cart.length === 0 ? (
-          <div className="py-8 text-center bg-background rounded-xl border border-dashed border-border mb-4">
+          <div className="py-8 text-center bg-black/20 rounded-xl border border-dashed border-white/10 mb-4">
             <p className="text-foreground/50 mb-4">Belum ada produk di pesanan Anda.</p>
             <button 
               onClick={() => {
@@ -263,7 +281,7 @@ export default function OrderClient({ products, matrix }) {
               const product = products.find(p => p.id === item.productId)
               const price = calculateItemPrice(item)
               return (
-                <div key={item.id} className="bg-background border border-border p-4 rounded-xl relative group">
+                <div key={item.id} className="bg-black/20 border border-white/10 p-4 rounded-xl relative group">
                   <button onClick={() => handleRemoveItem(item.id)} className="absolute top-3 right-3 w-8 h-8 bg-red-500/10 text-red-500 rounded-full flex items-center justify-center opacity-70 hover:opacity-100 transition-opacity">✕</button>
                   <div className="flex gap-4">
                     <div className="w-12 h-12 bg-secondary/50 rounded-lg flex items-center justify-center font-bold text-lg text-primary">
@@ -320,9 +338,9 @@ export default function OrderClient({ products, matrix }) {
 
       {/* GLOBAL ADD-ONS */}
       {cart.length > 0 && (
-        <div className="bg-card p-4 sm:p-6 rounded-2xl shadow-xl border border-border/50 mb-28">
+        <div className="bg-white/5 backdrop-blur-md p-4 sm:p-6 rounded-2xl shadow-xl border border-white/10 mb-28">
           <h2 className="text-base font-bold mb-4">Layanan Tambahan (Opsional)</h2>
-          <div className="space-y-3 bg-secondary/30 p-4 rounded-xl border border-border">
+          <div className="space-y-3 bg-black/20 p-4 rounded-xl border border-white/10">
             <label className="flex items-start gap-3 cursor-pointer group">
               <div className="relative flex items-center mt-1">
                 <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" checked={isFastTrack} onChange={(e) => setIsFastTrack(e.target.checked)} />
@@ -348,7 +366,7 @@ export default function OrderClient({ products, matrix }) {
 
       {/* STICKY BOTTOM BAR */}
       {cart.length > 0 && (
-        <div className="fixed bottom-0 left-0 w-full bg-card border-t border-border shadow-[0_-10px_30px_rgba(0,0,0,0.1)] p-4 z-40 animate-in slide-in-from-bottom-10">
+        <div className="fixed bottom-0 left-0 w-full bg-black/80 backdrop-blur-2xl border-t border-white/10 shadow-[0_-10px_30px_rgba(0,0,0,0.5)] p-4 z-40 animate-in slide-in-from-bottom-10">
           <div className="max-w-xl mx-auto flex items-center justify-between gap-4">
             <div>
               <p className="text-xs text-foreground/60 font-medium">Grand Total</p>
@@ -367,52 +385,37 @@ export default function OrderClient({ products, matrix }) {
       {/* MODAL: PILIH PRODUK */}
       {showProductModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
-            <div className="p-4 border-b border-border flex justify-between items-center bg-secondary/20">
+          <div className="bg-black/80 backdrop-blur-2xl border border-white/10 w-full max-w-lg rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
               <h3 className="font-black text-lg">Tambah {modalType === 'SABLON' ? 'Sablon Cup' : 'Tutup / Polos'}</h3>
-              <button onClick={() => setShowProductModal(false)} className="w-8 h-8 bg-background rounded-full flex items-center justify-center font-bold">✕</button>
+              <button onClick={() => setShowProductModal(false)} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center font-bold">✕</button>
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
               {/* Jenis Selector (Hanya muncul jika bukan via tombol Rekomendasi Tutup yang maksa modalType TUTUP) */}
-              <div className="flex bg-secondary/30 p-1 rounded-xl">
-                <button 
-                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${modalType === 'SABLON' ? 'bg-primary text-primary-foreground shadow' : 'text-foreground/60 hover:text-foreground'}`}
-                  onClick={() => { setModalType('SABLON'); setModalCategory(''); setModalProduct(''); }}
-                >SABLON</button>
-                <button 
-                  className={`flex-1 py-2 rounded-lg text-sm font-bold transition-all ${modalType === 'TUTUP' ? 'bg-primary text-primary-foreground shadow' : 'text-foreground/60 hover:text-foreground'}`}
-                  onClick={() => { setModalType('TUTUP'); setModalCategory(allCategories.tutup[0] || ''); setModalProduct(''); }}
-                >TUTUP / POLOS</button>
-              </div>
+              {/* Jenis Selector dihilangkan sesuai permintaan user karena sudah ada tombol tambah khusus */}
 
               <div>
                 <label className="block text-sm font-bold mb-2">Kategori</label>
-                <select 
-                  className="w-full p-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
+                <CustomSelect 
                   value={modalCategory}
                   onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
-                >
-                  <option value="">-- Pilih Kategori --</option>
-                  {(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => (
-                    <option key={c} value={c}>{c}</option>
-                  ))}
-                </select>
+                  options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
+                  placeholder="-- Pilih Kategori --"
+                  className="w-full"
+                />
               </div>
 
               {modalCategory && (
-                <div>
+                <div className="animate-in slide-in-from-top-2">
                   <label className="block text-sm font-bold mb-2">Varian Produk</label>
-                  <select 
-                    className="w-full p-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
+                  <CustomSelect 
                     value={modalProduct}
                     onChange={(e) => setModalProduct(e.target.value)}
-                  >
-                    <option value="">-- Pilih Varian --</option>
-                    {modalProducts.map(p => (
-                      <option key={p.id} value={p.id}>{p.name} ({formatRp(p.base_price)}/pcs)</option>
-                    ))}
-                  </select>
+                    options={modalProducts.map(p => ({ value: p.id, label: `${p.name} (${formatRp(p.base_price)}/pcs)` }))}
+                    placeholder="-- Pilih Varian --"
+                    className="w-full"
+                  />
                 </div>
               )}
 
@@ -421,7 +424,7 @@ export default function OrderClient({ products, matrix }) {
                   <label className="block text-sm font-bold mb-2">Jumlah Pemesanan</label>
                   <input 
                     type="number" 
-                    className="w-full p-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none text-lg font-bold"
+                    className="w-full p-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary/50 outline-none text-lg font-bold"
                     value={modalQty}
                     onChange={(e) => setModalQty(Number(e.target.value))}
                     min="0"
@@ -432,7 +435,7 @@ export default function OrderClient({ products, matrix }) {
                   )}
 
                   {modalType === 'SABLON' && (
-                    <label className="flex items-center gap-3 cursor-pointer group mt-4 bg-secondary/30 p-3 rounded-xl border border-border">
+                    <label className="flex items-center gap-3 cursor-pointer group mt-4 bg-white/5 p-3 rounded-xl border border-white/10">
                       <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-primary" checked={modalIsTwoColor} onChange={(e) => setModalIsTwoColor(e.target.checked)} />
                       <div>
                         <p className="font-bold text-sm">Cetak Sablon 2 Warna</p>
@@ -444,7 +447,7 @@ export default function OrderClient({ products, matrix }) {
               )}
             </div>
 
-            <div className="p-4 border-t border-border bg-card">
+            <div className="p-4 border-t border-white/10 bg-black/40">
               <button 
                 onClick={handleAddToCart}
                 disabled={!modalProduct || !isModalQtyValid}
@@ -460,8 +463,8 @@ export default function OrderClient({ products, matrix }) {
       {/* MODAL: CHECKOUT */}
       {showCheckoutModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[100] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-card w-full max-w-md rounded-2xl shadow-2xl p-6 relative animate-in zoom-in-95 duration-200">
-            <button onClick={() => setShowCheckoutModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-secondary text-foreground/60 hover:text-foreground">✕</button>
+          <div className="bg-black/80 backdrop-blur-2xl border border-white/10 w-full max-w-md rounded-2xl shadow-2xl p-6 relative animate-in zoom-in-95 duration-200">
+            <button onClick={() => setShowCheckoutModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20 text-foreground/60 hover:text-foreground">✕</button>
             
             <h2 className="text-xl font-black mb-1">Data Pemesan</h2>
             <p className="text-sm text-foreground/60 mb-6">Isi data di bawah ini untuk menerbitkan Invoice.</p>
@@ -474,7 +477,7 @@ export default function OrderClient({ products, matrix }) {
                     type="text" 
                     required 
                     placeholder="Contoh: Kopi Nangkring"
-                    className="w-full p-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
+                    className="w-full p-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                     value={brandName}
                     onChange={e => setBrandName(e.target.value)}
                   />
@@ -485,7 +488,7 @@ export default function OrderClient({ products, matrix }) {
                     type="tel" 
                     required 
                     placeholder="08xxxx"
-                    className="w-full p-3 bg-background border border-input rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
+                    className="w-full p-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary/50 outline-none"
                     value={waNumber}
                     onChange={e => setWaNumber(e.target.value)}
                   />

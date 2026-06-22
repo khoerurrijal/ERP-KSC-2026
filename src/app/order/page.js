@@ -28,6 +28,14 @@ export default async function OrderPage() {
     })
   }
 
+  // Ambil dropdown config
+  const { data: settings } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'dropdown_config')
+    .single()
+  const dropdownConfig = settings?.value || {}
+
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
       <div className="relative pt-12 pb-8 px-4 text-center">
@@ -40,7 +48,7 @@ export default async function OrderPage() {
       </div>
 
       <div className="max-w-xl mx-auto px-4 relative z-10">
-        <OrderClient products={products || []} matrix={matrix} />
+        <OrderClient products={products || []} matrix={matrix} dropdownConfig={dropdownConfig} />
       </div>
     </div>
   )
