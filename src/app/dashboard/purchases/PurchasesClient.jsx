@@ -116,7 +116,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
 
   const filteredAndSortedItems = useMemo(() => {
     let result = purchaseItems.filter(item => {
-      const matchSearch = ((item.item_name || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
+      const matchSearch = ((item.products?.name || item.item_name || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
                           ((item.purchase_orders?.po_number || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
                           ((item.purchase_orders?.supplier || '').toLowerCase().includes(itemSearchQuery.toLowerCase()))
       
@@ -308,7 +308,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                     <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.date ? new Date(item.purchase_orders.date).toLocaleDateString('id-ID') : '-'}</td>
                     <td className="px-6 py-4 text-foreground/90 font-medium">{item.purchase_orders?.po_number || '-'}</td>
                     <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.supplier || '-'}</td>
-                    <td className="px-6 py-4 font-medium">{item.item_name}</td>
+                    <td className="px-6 py-4 font-medium">{item.products?.name || item.item_name || '-'}</td>
                     <td className="px-6 py-4">{item.qty} {item.unit}</td>
                     <td className="px-6 py-4">Rp {Number(item.unit_price || 0).toLocaleString('id-ID')}</td>
                     <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID')}</td>

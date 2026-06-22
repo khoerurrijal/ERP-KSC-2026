@@ -27,7 +27,8 @@ export default async function PurchasesPage({ searchParams }) {
     .from('purchase_items')
     .select(`
       *,
-      purchase_orders!inner(po_number, date, status, supplier)
+      purchase_orders!inner(po_number, date, status, supplier),
+      products(name)
     `)
     .order('id', { ascending: false })
     .limit(10000)

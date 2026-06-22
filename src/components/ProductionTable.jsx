@@ -313,7 +313,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                   <th className="px-6 py-4 font-medium">Mockup / Desain</th>
                   <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('product')}>Produk & Qty Target {renderSortIcon('product')}</th>
                   <th className="px-6 py-4 font-medium">Progress (Selesai)</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Target Selesai {renderSortIcon('target_date')}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Tgl Order & Target {renderSortIcon('target_date')}</th>
                   <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('item_status')}>Status Item {renderSortIcon('item_status')}</th>
                   <th className="px-6 py-4 font-medium text-right">Aksi</th>
                 </tr>
@@ -348,8 +348,22 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                       <p className="font-bold text-green-400">{item.qty_processed} pcs</p>
                       <p className="text-xs text-orange-400">Kurang: {Math.max(0, item.qty_target - item.qty_processed)} pcs</p>
                     </td>
-                    <td className="px-6 py-4 text-foreground/90">
-                      {item.target_date ? new Date(item.target_date).toLocaleDateString('id-ID') : '-'}
+                    <td className="px-6 py-4">
+                      <div className="flex flex-col gap-1">
+                        <div className="text-xs text-foreground/60 flex items-center gap-1">
+                          <span className="font-medium text-foreground/80">Order:</span> 
+                          {item.order_date ? new Date(item.order_date).toLocaleDateString('id-ID') : '-'}
+                        </div>
+                        <div className="text-sm font-semibold flex items-center gap-1">
+                          <span className="text-foreground/80 font-medium text-xs">Target:</span> 
+                          <span className={item.is_fast_track ? "text-red-400" : "text-blue-400"}>
+                            {item.target_date ? new Date(item.target_date).toLocaleDateString('id-ID') : '-'}
+                          </span>
+                        </div>
+                        {item.is_fast_track && (
+                          <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full w-fit">FAST TRACK</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(item.item_status)}`}>
