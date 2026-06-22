@@ -1,24 +1,20 @@
 import crypto from 'crypto';
 
-const DOKU_CLIENT_ID = process.env.DOKU_CLIENT_ID;
-const DOKU_SECRET_KEY = process.env.DOKU_SECRET_KEY;
-// Gunakan https://api.doku.com untuk production, https://api-sandbox.doku.com untuk sandbox
-const DOKU_BASE_URL = process.env.DOKU_ENV === 'production' 
-  ? 'https://api.doku.com' 
-  : 'https://api-sandbox.doku.com';
-
 /**
  * Generate DOKU HMAC Signature
  */
 export function generateDokuSignature(requestId, timestamp, requestTarget, body) {
+  const dokuClientId = process.env.DOKU_CLIENT_ID;
+  const dokuSecretKey = process.env.DOKU_SECRET_KEY;
+  
   const digest = crypto
     .createHash('sha256')
     .update(JSON.stringify(body))
     .digest('base64');
 
-  const componentSignature = `Client-Id:${DOKU_CLIENT_ID}\nRequest-Id:${requestId}\nRequest-Timestamp:${timestamp}\nRequest-Target:${requestTarget}\nDigest:${digest}`;
+  const componentSignature = `Client-Id:${dokuClientId}\nRequest-Id:${requestId}\nRequest-Timestamp:${timestamp}\nRequest-Target:${requestTarget}\nDigest:${digest}`;
 
-  const hmac = crypto.createHmac('sha256', DOKU_SECRET_KEY);
+  const hmac = crypto.createHmac('sha256', dokuSecretKey);
   hmac.update(componentSignature);
   return 'HMACSHA256=' + hmac.digest('base64');
 }
@@ -27,7 +23,13 @@ export function generateDokuSignature(requestId, timestamp, requestTarget, body)
  * Generate Payment Link (Checkout)
  */
 export async function createDokuCheckoutUrl(order, specificAmount = null) {
-  if (!DOKU_CLIENT_ID || !DOKU_SECRET_KEY) {
+  const dokuClientId = process.env.DOKU_CLIENT_ID;
+  const dokuSecretKey = process.env.DOKU_SECRET_KEY;
+  const dokuBaseUrl = process.env.DOKU_ENV === 'production' 
+    ? 'https://api.doku.com' 
+    : 'https://api-sandbox.doku.com';
+
+  if (!dokuClientId || !dokuSecretKey) {
     throw new Error('DOKU credentials are not set in environment variables.');
   }
 
@@ -64,10 +66,10 @@ export async function createDokuCheckoutUrl(order, specificAmount = null) {
 
   const signature = generateDokuSignature(requestId, timestamp, targetPath, payload);
 
-  const response = await fetch(`${DOKU_BASE_URL}${targetPath}`, {
+  const response = await fetch(`${dokuBaseUrl}${targetPath}`, {
     method: 'POST',
     headers: {
-      'Client-Id': DOKU_CLIENT_ID,
+      'Client-Id': dokuClientId,
       'Request-Id': requestId,
       'Request-Timestamp': timestamp,
       'Signature': signature,

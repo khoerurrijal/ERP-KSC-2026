@@ -80,7 +80,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
       }
     }
 
-    let unitPrice = product.price_polos || product.base_price
+    let unitPrice = product.price_polos || 0
     if (item.type === 'SABLON') {
       unitPrice += sablonCost
       if (item.isTwoColor) unitPrice += 250
@@ -330,18 +330,19 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
               {!isRecommendationMode && (
                 <>
-                  <div>
-                    <label className="block text-sm font-bold mb-2">Jenis Pesanan</label>
-                    <CustomSelect 
-                      value={modalType}
-                      onChange={(e) => { setModalType(e.target.value); setModalCategory(''); setModalProduct(''); }}
-                      options={[
-                        { value: "", label: "- Pilih -" },
-                        ...orderTypeOptions.map(v => ({ value: v, label: v }))
-                      ]}
-                      className="w-full"
-                      menuPosition="static"
-                    />
+                  <div className="space-y-2">
+                    <label className="text-sm font-bold text-foreground/80">Jenis Pesanan</label>
+                    <div className="flex gap-2">
+                      {orderTypeOptions.map(v => (
+                        <button 
+                          key={v}
+                          onClick={() => { setModalType(v); setModalCategory(''); setModalProduct(''); }}
+                          className={`flex-1 py-3 rounded-xl font-bold text-sm transition-all border ${modalType === v ? 'bg-primary text-primary-foreground border-primary shadow-lg shadow-primary/20' : 'bg-black/40 text-foreground/70 border-white/10 hover:bg-white/5 hover:border-white/20'}`}
+                        >
+                          {v}
+                        </button>
+                      ))}
+                    </div>
                   </div>
 
                   {modalType && (

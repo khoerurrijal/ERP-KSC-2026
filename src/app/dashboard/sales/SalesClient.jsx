@@ -443,8 +443,8 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                         </span>
                       </td>
                       <td className="px-6 py-4 text-right flex flex-wrap items-center justify-end gap-3">
-                        <a href={`/track/${item.id}`} target="_blank" className="text-white/40 hover:text-white font-medium text-xs flex items-center gap-1 transition-colors">
-                          <ExternalLink className="w-3 h-3" /> Track
+                        <a href={`/track/${item.invoice_number || item.id}`} target="_blank" className="text-white/40 hover:text-white font-medium text-xs flex items-center gap-1 transition-colors">
+                          <Navigation className="w-3 h-3" /> Track
                         </a>
                         {item.payment_status !== 'BATAL' && (
                           <>
