@@ -8,9 +8,9 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { brandName, whatsappNumber, productId, productName, qty, fastTrack, designService, twoColor, pricePerItem, subtotal, grandTotal } = body;
+    const { brandName, whatsappNumber, items, fastTrack, designService, subtotal, grandTotal } = body;
 
-    if (!brandName || !whatsappNumber || !productId || !qty) {
+    if (!brandName || !whatsappNumber || !items || items.length === 0) {
       return NextResponse.json({ success: false, error: 'Incomplete data' }, { status: 400 });
     }
 
@@ -18,26 +18,27 @@ export async function POST(req) {
     let customerId;
     const { data: existingCustomer } = await supabase
       .from('customers')
-      .select('id')
+      .select('customer_code')
       .eq('name', brandName)
       .limit(1)
       .single();
 
-    if (existingCustomer) {
-      customerId = existingCustomer.id;
+    if (existingCustomer && existingCustomer.customer_code) {
+      customerId = existingCustomer.customer_code;
     } else {
+      const newCustomerCode = 'CUST-WEB-' + Math.floor(Math.random() * 100000);
       const { data: newCustomer, error: custError } = await supabase
         .from('customers')
         .insert([{ 
           name: brandName, 
           phone: whatsappNumber,
-          customer_code: 'CUST-WEB-' + Math.floor(Math.random() * 100000)
+          customer_code: newCustomerCode
         }])
         .select()
         .single();
       
       if (custError) throw custError;
-      customerId = newCustomer.id;
+      customerId = newCustomerCode;
     }
 
     // 2. Generate Invoice Number & Unique Code
@@ -51,15 +52,14 @@ export async function POST(req) {
     let notes = `Order via Web Calculator.\nUnik: Rp ${uniqueCode}\nSubtotal: Rp ${subtotal}\n`;
     if (fastTrack) notes += `- Fast Track (+Rp 100.000)\n`;
     if (designService) notes += `- Jasa Desain (+Rp 50.000)\n`;
-    if (twoColor) notes += `- Sablon 2 Warna\n`;
 
     const { data: order, error: orderError } = await supabase
       .from('sales_orders')
       .insert([{
         invoice_number: invoiceNumber,
-        customer_code: customerId, // The ERP uses the UUID as customer_code reference
+        customer_code: customerId, // The ERP uses the customer_code as string reference
         date: new Date().toISOString().split('T')[0],
-        status: 'DRAFT',
+        status: 'PROSES',
         payment_status: 'BELUM LUNAS',
         payment_method: 'TRANSFER',
         dp_amount: 0,
@@ -72,18 +72,20 @@ export async function POST(req) {
     if (orderError) throw orderError;
 
     // 4. Create Sales Items
+    const soItems = items.map(item => ({
+      so_id: order.id,
+      order_type: item.orderType,
+      product_code: item.productId,
+      qty: parseInt(item.qty),
+      unit: 'PCS',
+      unit_multiplier: 1,
+      unit_price: parseFloat(item.unitPrice),
+      total_price: parseFloat(item.unitPrice) * parseInt(item.qty)
+    }));
+
     const { error: itemError } = await supabase
       .from('sales_items')
-      .insert([{
-        so_id: order.id,
-        order_type: 'Sablon',
-        product_code: productId,
-        qty: parseInt(qty),
-        unit: 'PCS',
-        unit_multiplier: 1,
-        unit_price: parseFloat(pricePerItem),
-        total_price: finalGrandTotal
-      }]);
+      .insert(soItems);
 
     if (itemError) throw itemError;
 
