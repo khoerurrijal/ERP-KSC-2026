@@ -141,6 +141,24 @@ export async function POST(req) {
       return NextResponse.json({ success: true, message: 'Global bot is inactive' });
     }
 
+    // --- IDEMPOTENCY CHECK (ANTI-RETRY LOOP) ---
+    // Fetch the very last message to see if this is a Fonnte webhook retry
+    const { data: lastMsgData } = await supabase
+      .from('wa_chat_history')
+      .select('*')
+      .eq('phone_number', sender)
+      .order('created_at', { ascending: false })
+      .limit(1);
+      
+    if (lastMsgData && lastMsgData.length > 0) {
+      const lastMsg = lastMsgData[0];
+      const timeDiff = new Date() - new Date(lastMsg.created_at);
+      if (lastMsg.role === 'user' && lastMsg.content === message && timeDiff < 15000) {
+        console.log(`[Webhook] Ignored duplicate message from ${sender} (Fonnte retry loop protection)`);
+        return NextResponse.json({ success: true, message: 'Duplicate ignored' });
+      }
+    }
+
     // --- 2. FAST-TRACK AUTO REPLY (TEMPLATES) ---
     const msgLower = message.toLowerCase().trim();
     let templateReply = null;
