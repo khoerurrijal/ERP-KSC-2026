@@ -233,7 +233,8 @@ export async function createSalesOrder(payload) {
   }
 }
 
-export async function addSalesPayment(soId, paymentAmount, paymentMethod, paymentDate) {
+export async function addSalesPayment(soId, paymentData) {
+  const { amount: paymentAmount, method: paymentMethod, date: paymentDate } = paymentData;
   const supabase = await createClient()
   try {
     const { data: so, error: soError } = await supabase.from('sales_orders').select('*, customers(name)').eq('id', soId).single()
