@@ -30,29 +30,22 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
   // --- DERIVED DATA ---
   const allCategories = useMemo(() => {
     const cats = [...new Set(products.map(p => p.category))].filter(Boolean)
-    
-    // Check mapping
     const mapping = dropdownConfig?.category_mapping || {}
-    // We treat SABLON as 'Sablon' orderType and TUTUP as 'Polos'
-    const getCats = (typeKey) => {
-      // typeKey is either 'SABLON' or 'POLOS' (case insensitive mapping in dashboard was used)
-      // the key in DB is usually 'Sablon' and 'Polos'
-      const key = Object.keys(mapping).find(k => k.toUpperCase() === typeKey)
-      if (key && mapping[key] && mapping[key].length > 0) {
-        // Only return categories that actually have products
-        return mapping[key].filter(c => cats.includes(c))
-      }
-      return []
-    }
-
-    const sablonCats = getCats('SABLON')
-    const tutupCats = getCats('POLOS')
-
+    
     return {
-      sablon: sablonCats.length > 0 ? sablonCats : cats.filter(c => !c.toLowerCase().includes('tutup')),
-      tutup: tutupCats.length > 0 ? tutupCats : cats.filter(c => c.toLowerCase().includes('tutup'))
+      get: (oType) => {
+        if (!oType) return []
+        if (mapping[oType] && mapping[oType].length > 0) {
+          return mapping[oType].filter(c => cats.includes(c))
+        }
+        return cats
+      }
     }
   }, [products, dropdownConfig])
+
+  const orderTypeOptions = useMemo(() => {
+    return Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])]))
+  }, [dropdownConfig])
 
   const modalProducts = useMemo(() => {
     return products.filter(p => p.category === modalCategory)
@@ -62,8 +55,8 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     return products.find(p => p.id === modalProduct)
   }, [modalProduct, products])
 
-  const modalMinQty = modalType === 'SABLON' && modalCategory === 'CUP PET' ? 1000 : 500
-  const isModalQtyValid = modalQty >= modalMinQty
+  const modalMinQty = modalType?.toUpperCase() === 'SABLON' && modalCategory === 'CUP PET' ? 1000 : 500
+  const isModalQtyValid = parseInt(modalQty, 10) >= modalMinQty
 
   // --- PRICING LOGIC ---
   const calculateItemPrice = (item) => {
@@ -116,7 +109,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
       id: Date.now().toString(),
       productId: modalProduct,
       type: modalType,
-      qty: modalQty,
+      qty: parseInt(modalQty, 10) || 0,
       isTwoColor: modalType === 'SABLON' ? modalIsTwoColor : false
     }])
     
@@ -140,7 +133,8 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     else if (product.category.includes('PAPERCUP')) lidCategory = 'TUTUP PAPERCUP'
     else if (product.category.includes('GOCUP')) lidCategory = 'TUTUP GOCUP'
 
-    setModalType('TUTUP')
+    const targetType = orderTypeOptions.includes('POLOS') ? 'POLOS' : orderTypeOptions[0]
+    setModalType(targetType)
     setModalCategory(lidCategory || product.category)
     setModalProduct('') // reset product
     setModalQty(parentItem.qty) // sync qty
@@ -160,7 +154,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
       return {
         productId: product.product_code, // Must use product_code for DB
         productName: product.name,
-        orderType: item.type === 'SABLON' ? 'Sablon' : 'Polos',
+        orderType: item.type,
         qty: item.qty,
         unitPrice: calculateItemPrice(item),
         isTwoColor: item.isTwoColor
@@ -248,7 +242,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                       </div>
                       <p className="font-bold text-primary">{formatRp(price * item.qty)} <span className="text-xs text-foreground/50 font-normal">({formatRp(price)}/pcs)</span></p>
                       
-                      {item.type === 'SABLON' && (
+                      {item.type?.toUpperCase() === 'SABLON' && (
                         <button 
                           onClick={() => handleRecommendTutup(item)}
                           className="mt-3 text-xs text-blue-500 font-bold hover:underline"
@@ -342,10 +336,9 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                       value={modalType}
                       onChange={(e) => { setModalType(e.target.value); setModalCategory(''); setModalProduct(''); }}
                       options={[
-                        { value: 'SABLON', label: 'Cetak Sablon' },
-                        { value: 'TUTUP', label: 'Tutup / Cup Polos / Lainnya' }
+                        { value: "", label: "- Pilih -" },
+                        ...orderTypeOptions.map(v => ({ value: v, label: v }))
                       ]}
-                      placeholder="-- Pilih Jenis Pesanan --"
                       className="w-full"
                       menuPosition="static"
                     />
@@ -357,10 +350,14 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                       <CustomSelect 
                         value={modalCategory}
                         onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
-                        options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
+                        options={[
+                          { value: "", label: "- Pilih -" },
+                          ...allCategories.get(modalType).map(c => ({ value: c, label: c }))
+                        ]}
                         placeholder="-- Pilih Kategori --"
                         className="w-full"
                         menuPosition="static"
+                        disabled={!modalType}
                       />
                     </div>
                   )}
@@ -393,17 +390,17 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                   <label className="block text-sm font-bold mb-2">Jumlah Pemesanan</label>
                   <input 
                     type="number" 
-                    className="w-full p-3 bg-black/40 border border-white/10 rounded-xl focus:ring-2 focus:ring-primary/50 outline-none text-lg font-bold"
-                    value={modalQty}
-                    onChange={(e) => setModalQty(Number(e.target.value))}
-                    min="0"
+                    value={modalQty === 0 ? '' : modalQty}
+                    onChange={(e) => setModalQty(e.target.value === '' ? 0 : parseInt(e.target.value, 10))}
+                    className={`w-full p-3 bg-black/40 border rounded-xl outline-none focus:ring-2 transition-all ${isModalQtyValid ? 'border-white/10 focus:ring-primary/50' : 'border-red-500/50 focus:ring-red-500/50'}`}
+                    min={modalMinQty}
                     step="500"
                   />
                   {!isModalQtyValid && (
                     <p className="text-red-500 text-xs mt-1 font-semibold">Minimal pemesanan {modalCategory} adalah {modalMinQty} pcs.</p>
                   )}
 
-                  {modalType === 'SABLON' && (
+                  {modalType?.toUpperCase() === 'SABLON' && (
                     <label className="flex items-center gap-3 cursor-pointer group mt-4 bg-white/5 p-3 rounded-xl border border-white/10">
                       <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-primary" checked={modalIsTwoColor} onChange={(e) => setModalIsTwoColor(e.target.checked)} />
                       <div>
