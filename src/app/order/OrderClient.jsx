@@ -127,22 +127,14 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     setCart(prev => prev.filter(item => item.id !== id))
   }
 
-  const handleRecommendTutup = (sablonItem) => {
-    const product = products.find(p => p.id === sablonItem.productId)
+  const handleRecommendTutup = (parentItem) => {
+    const product = products.find(p => p.id === parentItem.productId)
     if (!product) return
 
-    // Guess matching lid category
-    let lidCategory = ''
-    if (product.category.includes('PET')) lidCategory = 'TUTUP CUP PET'
-    else if (product.category.includes('PP')) lidCategory = 'TUTUP CUP PP'
-    else if (product.category.includes('INJECT')) lidCategory = 'TUTUP CUP INJECT'
-    else if (product.category.includes('PAPERCUP')) lidCategory = 'TUTUP PAPERCUP'
-    else if (product.category.includes('GOCUP')) lidCategory = 'TUTUP GOCUP'
-
     setModalType('TUTUP')
-    setModalCategory(lidCategory || allCategories.tutup[0] || '')
+    setModalCategory(product.category)
     setModalProduct('') // reset product
-    setModalQty(sablonItem.qty) // sync qty
+    setModalQty(parentItem.qty) // sync qty
     setShowProductModal(true)
   }
 
@@ -270,14 +262,14 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
             <p className="text-foreground/50 mb-4">Belum ada produk di pesanan Anda.</p>
             <button 
               onClick={() => {
-                setModalType('SABLON'); 
+                setModalType(''); 
                 setModalCategory(''); 
                 setModalProduct(''); 
                 setShowProductModal(true);
               }}
               className="px-6 py-2 bg-primary text-primary-foreground rounded-full font-bold hover:bg-primary/90 transition-transform active:scale-95"
             >
-              + Tambah Cup Sablon
+              + Tambah Produk
             </button>
           </div>
         ) : (
@@ -317,25 +309,14 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
             
             <button 
               onClick={() => {
-                setModalType('TUTUP'); 
-                setModalCategory(allCategories.tutup[0] || ''); 
-                setModalProduct(''); 
-                setShowProductModal(true);
-              }}
-              className="w-full py-3 border border-dashed border-border rounded-xl text-sm font-bold text-foreground/60 hover:text-foreground hover:bg-secondary/30 transition-colors"
-            >
-              + Tambah Tutup / Polos Lainnya
-            </button>
-            <button 
-              onClick={() => {
-                setModalType('SABLON'); 
+                setModalType(''); 
                 setModalCategory(''); 
                 setModalProduct(''); 
                 setShowProductModal(true);
               }}
               className="w-full py-3 border border-dashed border-primary/50 text-primary rounded-xl text-sm font-bold hover:bg-primary/5 transition-colors"
             >
-              + Tambah Cup Sablon Lain
+              + Tambah Produk Lainnya
             </button>
           </div>
         )}
@@ -397,20 +378,34 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
             </div>
             
             <div className="p-6 overflow-y-auto flex-1 space-y-5">
-              {/* Jenis Selector (Hanya muncul jika bukan via tombol Rekomendasi Tutup yang maksa modalType TUTUP) */}
-              {/* Jenis Selector dihilangkan sesuai permintaan user karena sudah ada tombol tambah khusus */}
-
               <div>
-                <label className="block text-sm font-bold mb-2">Kategori</label>
+                <label className="block text-sm font-bold mb-2">Jenis Pesanan</label>
                 <CustomSelect 
-                  value={modalCategory}
-                  onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
-                  options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
-                  placeholder="-- Pilih Kategori --"
+                  value={modalType}
+                  onChange={(e) => { setModalType(e.target.value); setModalCategory(''); setModalProduct(''); }}
+                  options={[
+                    { value: 'SABLON', label: 'Cetak Sablon' },
+                    { value: 'TUTUP', label: 'Tutup / Cup Polos / Lainnya' }
+                  ]}
+                  placeholder="-- Pilih Jenis Pesanan --"
                   className="w-full"
                   menuPosition="static"
                 />
               </div>
+
+              {modalType && (
+                <div className="animate-in slide-in-from-top-2">
+                  <label className="block text-sm font-bold mb-2">Kategori</label>
+                  <CustomSelect 
+                    value={modalCategory}
+                    onChange={(e) => { setModalCategory(e.target.value); setModalProduct(''); }}
+                    options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
+                    placeholder="-- Pilih Kategori --"
+                    className="w-full"
+                    menuPosition="static"
+                  />
+                </div>
+              )}
 
               {modalCategory && (
                 <div className="animate-in slide-in-from-top-2">
