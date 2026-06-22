@@ -40,7 +40,7 @@ export async function POST(req) {
 
     if (updateError) {
       console.error('Error updating order with DOKU info:', updateError);
-      return NextResponse.json({ success: false, error: 'Failed to save payment URL' }, { status: 500 });
+      return NextResponse.json({ success: false, error: 'Failed to save payment URL: ' + updateError.message }, { status: 500 });
     }
 
     return NextResponse.json({
