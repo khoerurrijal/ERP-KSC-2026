@@ -59,7 +59,6 @@ export async function POST(req) {
         invoice_number: invoiceNumber,
         customer_code: customerId, // The ERP uses the UUID as customer_code reference
         date: new Date().toISOString().split('T')[0],
-        due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
         status: 'DRAFT',
         payment_status: 'BELUM LUNAS',
         payment_method: 'TRANSFER',
