@@ -30,7 +30,7 @@ export async function createDokuCheckoutUrl(order, specificAmount = null) {
     : 'https://api-sandbox.doku.com';
 
   if (!dokuClientId || !dokuSecretKey) {
-    throw new Error('DOKU credentials are not set in environment variables.');
+    throw new Error(`DOKU credentials missing. DOKU_CLIENT_ID: ${!!dokuClientId}, DOKU_SECRET_KEY: ${!!dokuSecretKey}, DOKU_ENV: ${process.env.DOKU_ENV || 'undefined'}`);
   }
 
   const requestId = crypto.randomUUID();
