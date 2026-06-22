@@ -20,10 +20,7 @@ export default function InvoiceClient({ order, storeConfig }) {
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
 
-  const orderTypeOptions = useMemo(() => {
-    const fromConfig = Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])]));
-    return fromConfig.filter(v => ['SABLON', 'POLOS'].includes(v.toUpperCase()));
-  }, [dropdownConfig])
+
 
   const handlePrint = () => {
     window.print()
