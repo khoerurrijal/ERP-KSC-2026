@@ -30,9 +30,9 @@ PENTING - KNOWLEDGE BASE KING SABLON CUP:
    - Biaya Tambahan: Rp 100.000 per 1.000 pcs.
    - Batas Maksimal Fast Track: Hanya melayani maksimal 1.000 pcs per pesanan. Jika pesanan lebih dari 1.000 pcs (misal pesanan 3.000 pcs), maka 1.000 pcs pertama akan diproses Fast Track, sisanya (2.000 pcs) ikut antrean Reguler.
    - Ongkir: Biaya Fast Track BELUM termasuk ongkir (ongkir tidak ditanggung).
-3. Pricelist Sablon:
-   - Jika pelanggan menanyakan daftar harga, pricelist, atau produk, **berikan link Kalkulator Order ini**: https://erpkscv1.vercel.app/order
-   - Jangan menjabarkan harga satu per satu secara manual. Cukup arahkan pelanggan untuk klik link tersebut.
+3. Order & Pricelist Sablon:
+   - Jika pelanggan mengatakan ingin order, pesan, menanyakan daftar harga, pricelist, atau produk, **JANGAN MENGARANG JAWABAN**. Langsung berikan respon persis seperti ini:
+   "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon."
 
 Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
@@ -157,8 +157,8 @@ export async function POST(req) {
       templateReply = "Sablon cup maksimal 2 warna dengan biaya jasa sablon 2 warna Rp 250/pcs.\nUntuk cup kertas, kami juga menyediakan Paper Cup dan Paper Bowl kak!";
     } else if (msgLower.match(/(minimal order|min order|moq|bisa pesan \d+|minimal pesan)/)) {
       templateReply = "Minimal order tergantung jenis cup kak. Kalau cup PET minimal order 1.000 pcs (sudah ada di matrix sablon).";
-    } else if (msgLower.match(/(harga|pricelist|katalog|produk|price list)/)) {
-      templateReply = "Untuk pricelist lengkap dan Kalkulator Harga Otomatis King Sablon Cup bisa dicek langsung di sini ya kak: https://erpkscv1.vercel.app/order";
+    } else if (msgLower.match(/(harga|pricelist|katalog|produk|price list|mau order|pesan cup|order cup|bikin sablon|mau pesan|pesen)/)) {
+      templateReply = "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon.";
     } else if (msgLower.match(/(berapa lama|lama proses|proses sablon|lama pengerjaan)/)) {
       templateReply = "Waktu proses sablon Reguler 3-5 hari kerja. Kami juga ada jalur Fast Track 1-3 hari kerja (+Rp 100rb per 1000 pcs).\n*(1 hari kerja = kemungkinan selesai besok sore, bukan hari H ya kak).*";
     }
