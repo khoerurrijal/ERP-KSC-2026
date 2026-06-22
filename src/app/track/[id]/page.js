@@ -7,6 +7,10 @@ export default async function PublicTrackingPage({ params }) {
   const { id } = await params
   const supabase = await createClient()
 
+  // Determine if ID is UUID or invoice_number
+  const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
+  const column = isUuid ? 'id' : 'invoice_number';
+
   // Find sales order by ID
   const { data: order, error } = await supabase
     .from('sales_orders')
@@ -25,7 +29,7 @@ export default async function PublicTrackingPage({ params }) {
         products (name)
       )
     `)
-    .eq('id', id)
+    .eq(column, id)
     .single()
 
   if (error || !order) {

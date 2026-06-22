@@ -73,14 +73,15 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     let sablonCost = 0
     if (item.type === 'SABLON') {
       const tierMatrix = matrix[product.category]
+      const qty = parseInt(item.qty, 10) || 0
       if (tierMatrix) {
-        if (item.qty >= 10000 && tierMatrix.min_10000 > 0) sablonCost = tierMatrix.min_10000
-        else if (item.qty >= 5000 && tierMatrix.min_5000 > 0) sablonCost = tierMatrix.min_5000
-        else if (item.qty >= 2000 && tierMatrix.min_2000 > 0) sablonCost = tierMatrix.min_2000
-        else if (item.qty >= 1000 && tierMatrix.min_1000 > 0) sablonCost = tierMatrix.min_1000
-        else if (item.qty >= 500 && tierMatrix.min_500 > 0) sablonCost = tierMatrix.min_500
-        else if (item.qty >= 100 && tierMatrix.min_100 > 0) sablonCost = tierMatrix.min_100
-        else if (item.qty >= 10 && tierMatrix.min_10 > 0) sablonCost = tierMatrix.min_10
+        if (qty >= 10000 && tierMatrix.min_10000 > 0) sablonCost = tierMatrix.min_10000
+        else if (qty >= 5000 && tierMatrix.min_5000 > 0) sablonCost = tierMatrix.min_5000
+        else if (qty >= 2000 && tierMatrix.min_2000 > 0) sablonCost = tierMatrix.min_2000
+        else if (qty >= 1000 && tierMatrix.min_1000 > 0) sablonCost = tierMatrix.min_1000
+        else if (qty >= 500 && tierMatrix.min_500 > 0) sablonCost = tierMatrix.min_500
+        else if (qty >= 100 && tierMatrix.min_100 > 0) sablonCost = tierMatrix.min_100
+        else if (qty >= 10 && tierMatrix.min_10 > 0) sablonCost = tierMatrix.min_10
         else if (tierMatrix.min_1 > 0) sablonCost = tierMatrix.min_1
         else sablonCost = tierMatrix.min_1000 || 250 // fallback sama seperti PriceCalculator
       }
@@ -132,8 +133,15 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
     const product = products.find(p => p.id === parentItem.productId)
     if (!product) return
 
+    let lidCategory = ''
+    if (product.category.includes('PET')) lidCategory = 'TUTUP CUP PET'
+    else if (product.category.includes('PP')) lidCategory = 'TUTUP CUP PP'
+    else if (product.category.includes('INJECT')) lidCategory = 'TUTUP CUP INJECT'
+    else if (product.category.includes('PAPERCUP')) lidCategory = 'TUTUP PAPERCUP'
+    else if (product.category.includes('GOCUP')) lidCategory = 'TUTUP GOCUP'
+
     setModalType('TUTUP')
-    setModalCategory(product.category)
+    setModalCategory(lidCategory || product.category)
     setModalProduct('') // reset product
     setModalQty(parentItem.qty) // sync qty
     setIsRecommendationMode(true)
@@ -372,7 +380,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                   <CustomSelect 
                     value={modalProduct}
                     onChange={(e) => setModalProduct(e.target.value)}
-                    options={modalProducts.map(p => ({ value: p.id, label: `${p.name} (${formatRp(p.price_polos || p.base_price)}/pcs)` }))}
+                    options={modalProducts.map(p => ({ value: p.id, label: p.name }))}
                     placeholder="-- Pilih Varian --"
                     className="w-full"
                     menuPosition="static"
