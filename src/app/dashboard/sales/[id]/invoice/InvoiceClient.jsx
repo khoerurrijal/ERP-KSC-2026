@@ -1,10 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail } from 'lucide-react'
+import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail, CreditCard } from 'lucide-react'
+import { useState, useMemo } from 'react'
 
 export default function InvoiceClient({ order, storeConfig }) {
   const router = useRouter()
+  const [isProcessing, setIsProcessing] = useState(false)
 
   if (!order) {
     return (
@@ -18,8 +20,38 @@ export default function InvoiceClient({ order, storeConfig }) {
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
 
+  const orderTypeOptions = useMemo(() => {
+    const fromConfig = Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])]));
+    return fromConfig.filter(v => ['SABLON', 'POLOS'].includes(v.toUpperCase()));
+  }, [dropdownConfig])
+
   const handlePrint = () => {
     window.print()
+  }
+
+  const handleDokuPayment = async (amount) => {
+    setIsProcessing(true)
+    try {
+      const response = await fetch('/api/payments/doku', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          order_id: order.id, 
+          amount: amount,
+          invoice_number: invoiceId 
+        }),
+      })
+      const data = await response.json()
+      if (data.url) {
+        window.location.href = data.url
+      } else {
+        alert('Gagal membuat pembayaran')
+      }
+    } catch (error) {
+      alert('Terjadi kesalahan')
+    } finally {
+      setIsProcessing(false)
+    }
   }
 
   const store = storeConfig || {
@@ -64,22 +96,22 @@ export default function InvoiceClient({ order, storeConfig }) {
         }
       `}} />
 
-      <div className="flex items-center justify-between mb-8 no-print">
-        <button onClick={() => router.back()} className="flex items-center gap-2 text-foreground/60 hover:text-primary transition-colors text-sm">
-          <ArrowLeft className="w-4 h-4" /> Kembali ke Sales
+      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 no-print gap-4 px-4 sm:px-0">
+        <button onClick={() => router.back()} className="flex items-center gap-2 text-foreground/60 hover:text-primary transition-colors text-sm font-bold">
+          <ArrowLeft className="w-4 h-4" /> Kembali
         </button>
-        <div className="flex items-center gap-3">
-          <a href={waUrl} target="_blank" rel="noopener noreferrer" className="btn-secondary bg-green-500/10 text-green-400 border-green-500/20 hover:bg-green-500/20 h-10 px-4 text-sm flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <a href={waUrl} target="_blank" rel="noopener noreferrer" className="bg-green-500/10 text-green-500 border border-green-500/20 hover:bg-green-500/20 h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors">
             <Phone className="w-4 h-4" /> Share WA
           </a>
-          <button onClick={handlePrint} className="btn-primary h-10 px-4 text-sm flex items-center gap-2">
-            <Printer className="w-4 h-4" /> Print Invoice
+          <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
+            <Printer className="w-4 h-4" /> Cetak Invoice
           </button>
         </div>
       </div>
 
       {/* KERTAS INVOICE */}
-      <div className="glass-card bg-white text-black p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
+      <div className="glass-card bg-white text-black p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none rounded-3xl shadow-2xl mx-4 sm:mx-0" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
 
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
@@ -128,8 +160,8 @@ export default function InvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8">
-          <table className="w-full text-left border-collapse">
+        <div className="mt-8 overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[500px]">
             <thead>
               <tr className="border-b-2 border-gray-900">
                 <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
@@ -144,7 +176,7 @@ export default function InvoiceClient({ order, storeConfig }) {
                 <tr key={idx}>
                   <td className="py-4">
                     <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
-                    <p className="text-xs text-gray-500 mt-1">Order: {item.order_type} {item.mockup_url ? `(Mockup Tersedia)` : ''}</p>
+                    <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
                   </td>
                   <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID')}</td>
                   <td className="py-4 text-center text-gray-600">Pcs</td>
@@ -157,14 +189,58 @@ export default function InvoiceClient({ order, storeConfig }) {
         </div>
 
         <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row print:gap-4">
-          <div className="w-full md:w-1/2 p-4 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
-            <h4 className="font-bold text-gray-900 mb-2 text-sm uppercase tracking-wider">Metode Pembayaran / Transfer</h4>
-            <div className="space-y-3">
+          <div className="w-full md:w-1/2 p-5 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
+            <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Metode Pembayaran</h4>
+            
+            {order.payment_status !== 'LUNAS' && order.payment_url && (
+              <div className="mb-6 pb-6 border-b border-gray-200 no-print">
+                <p className="text-xs text-gray-500 mb-2 font-bold">Lanjutkan Pembayaran Anda:</p>
+                <a href={order.payment_url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20">
+                  <CreditCard className="w-5 h-5" /> Bayar Sekarang via DOKU
+                </a>
+              </div>
+            )}
+
+            {order.payment_status !== 'LUNAS' && !order.payment_url && (
+              <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-3">
+                <p className="text-xs text-gray-500 mb-2 font-bold">Pembayaran Digital Instan (QRIS/VA):</p>
+                <div className="flex flex-col sm:flex-row gap-2">
+                  <button 
+                    disabled={isProcessing || Number(order.dp_amount) > 0}
+                    onClick={() => handleDokuPayment(Number(order.total_amount) / 2)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
+                  >
+                    Bayar DP 50%
+                  </button>
+                  <button 
+                    disabled={isProcessing}
+                    onClick={() => handleDokuPayment(sisaBayar)}
+                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-sm disabled:opacity-50"
+                  >
+                    <CreditCard className="w-4 h-4" /> Bayar Lunas
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <p className="text-xs text-gray-500 font-bold mb-1">Atau Transfer Manual Rekening:</p>
               {(store.banks || []).map((bank, idx) => (
-                <div key={idx} className={idx > 0 ? "pt-2 border-t border-gray-200" : ""}>
-                  <p className="text-xs text-gray-500 font-bold">{bank.bank_name}</p>
-                  <p className="font-medium text-gray-900 text-lg tracking-wider">{bank.account_number}</p>
-                  <p className="text-xs text-gray-500">A/N: {bank.account_name}</p>
+                <div key={idx} className="flex items-center justify-between bg-white p-3 rounded-lg border border-gray-100 shadow-sm">
+                  <div>
+                    <p className="text-xs text-blue-600 font-bold">{bank.bank_name}</p>
+                    <p className="font-bold text-gray-900 text-lg tracking-widest my-0.5">{bank.account_number}</p>
+                    <p className="text-xs text-gray-500">A/N: {bank.account_name}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      navigator.clipboard.writeText(bank.account_number);
+                      alert('Disalin: ' + bank.account_number);
+                    }}
+                    className="text-xs font-bold bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded-md transition-colors no-print"
+                  >
+                    Salin
+                  </button>
                 </div>
               ))}
             </div>
