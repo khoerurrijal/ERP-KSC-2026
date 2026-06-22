@@ -71,16 +71,21 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
 
     let sablonCost = 0
     if (item.type === 'SABLON') {
-      const catMatrix = matrix[product.category]
-      if (catMatrix) {
-        if (item.qty >= 10000) sablonCost = catMatrix.qty_10000 || catMatrix.qty_5000 || 0
-        else if (item.qty >= 5000) sablonCost = catMatrix.qty_5000 || catMatrix.qty_2000 || 0
-        else if (item.qty >= 2000) sablonCost = catMatrix.qty_2000 || catMatrix.qty_1000 || 0
-        else sablonCost = catMatrix.qty_1000 || catMatrix.qty_500 || 0
+      const tierMatrix = matrix[product.category]
+      if (tierMatrix) {
+        if (item.qty >= 10000 && tierMatrix.min_10000 > 0) sablonCost = tierMatrix.min_10000
+        else if (item.qty >= 5000 && tierMatrix.min_5000 > 0) sablonCost = tierMatrix.min_5000
+        else if (item.qty >= 2000 && tierMatrix.min_2000 > 0) sablonCost = tierMatrix.min_2000
+        else if (item.qty >= 1000 && tierMatrix.min_1000 > 0) sablonCost = tierMatrix.min_1000
+        else if (item.qty >= 500 && tierMatrix.min_500 > 0) sablonCost = tierMatrix.min_500
+        else if (item.qty >= 100 && tierMatrix.min_100 > 0) sablonCost = tierMatrix.min_100
+        else if (item.qty >= 10 && tierMatrix.min_10 > 0) sablonCost = tierMatrix.min_10
+        else if (tierMatrix.min_1 > 0) sablonCost = tierMatrix.min_1
+        else sablonCost = tierMatrix.min_1000 || 250 // fallback sama seperti PriceCalculator
       }
     }
 
-    let unitPrice = product.base_price
+    let unitPrice = product.price_polos || product.base_price
     if (item.type === 'SABLON') {
       unitPrice += sablonCost
       if (item.isTwoColor) unitPrice += 250
@@ -403,6 +408,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                   options={(modalType === 'SABLON' ? allCategories.sablon : allCategories.tutup).map(c => ({ value: c, label: c }))}
                   placeholder="-- Pilih Kategori --"
                   className="w-full"
+                  menuPosition="static"
                 />
               </div>
 
@@ -415,6 +421,7 @@ export default function OrderClient({ products, matrix, dropdownConfig }) {
                     options={modalProducts.map(p => ({ value: p.id, label: `${p.name} (${formatRp(p.base_price)}/pcs)` }))}
                     placeholder="-- Pilih Varian --"
                     className="w-full"
+                    menuPosition="static"
                   />
                 </div>
               )}

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
 import { ChevronDown, Check, Search } from 'lucide-react'
 
-export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false }) {
+export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false, menuPosition = "absolute" }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const popoverRef = useRef(null)
@@ -55,7 +55,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 left-0 mt-2 p-2 min-w-[200px] bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-card-border z-[9999] animate-in fade-in zoom-in-95 duration-200 max-h-60 flex flex-col">
+        <div className={`${menuPosition === 'absolute' ? 'absolute right-0 left-0 z-[9999]' : 'relative w-full'} mt-2 p-2 min-w-[200px] bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-card-border animate-in fade-in zoom-in-95 duration-200 max-h-60 flex flex-col`}>
           {searchable && (
             <div className="p-2 border-b border-card-border mb-2 shrink-0 relative">
               <Search className="w-3.5 h-3.5 text-foreground/50 absolute left-4 top-1/2 -translate-y-1/2" />
