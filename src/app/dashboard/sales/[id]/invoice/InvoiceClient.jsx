@@ -29,20 +29,19 @@ export default function InvoiceClient({ order, storeConfig }) {
   const handleDokuPayment = async (amount) => {
     setIsProcessing(true)
     try {
-      const response = await fetch('/api/payments/doku', {
+      const response = await fetch('/api/doku/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          order_id: order.id, 
-          amount: amount,
-          invoice_number: invoiceId 
+          orderId: order.id, 
+          amount: amount
         }),
       })
       const data = await response.json()
-      if (data.url) {
-        window.location.href = data.url
+      if (data.success && data.payment_url) {
+        window.location.href = data.payment_url
       } else {
-        alert('Gagal membuat pembayaran')
+        alert('Gagal membuat pembayaran: ' + (data.error || 'Terjadi kesalahan'))
       }
     } catch (error) {
       alert('Terjadi kesalahan')

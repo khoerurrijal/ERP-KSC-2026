@@ -44,7 +44,8 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
   }, [products, dropdownConfig])
 
   const orderTypeOptions = useMemo(() => {
-    return Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])]))
+    const fromConfig = Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])]));
+    return fromConfig.filter(v => ['SABLON', 'POLOS'].includes(v.toUpperCase()));
   }, [dropdownConfig])
 
   const modalProducts = useMemo(() => {
