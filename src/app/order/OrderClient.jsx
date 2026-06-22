@@ -126,6 +126,14 @@ Berikut saya lampirkan bukti transfernya. 🙏\`;
           <p className="text-xs text-foreground/50 mb-4">* Terdapat 3 angka acak di belakang untuk verifikasi otomatis.</p>
         </div>
 
+        <div className="bg-primary/5 rounded-xl p-4 mb-6 text-left border border-primary/10">
+          <p className="text-sm text-foreground/60 mb-2">Simpan Link Pelacakan Pesanan Anda:</p>
+          <div className="flex gap-2">
+            <input type="text" readOnly value={`https://erpkscv1.vercel.app/track/${invoiceData.invoice}`} className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-xs font-mono" />
+            <button onClick={() => copyToClipboard(`https://erpkscv1.vercel.app/track/${invoiceData.invoice}`)} className="px-3 py-2 bg-secondary rounded-lg text-xs font-bold">Copy</button>
+          </div>
+        </div>
+
         <div className="space-y-4 mb-6 text-left">
           <h3 className="font-semibold">Transfer ke Rekening Berikut:</h3>
           

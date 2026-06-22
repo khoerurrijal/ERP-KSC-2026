@@ -33,7 +33,7 @@ export async function updateSession(request) {
   } = await supabase.auth.getUser()
 
   // Define public routes
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/api/whatsapp/webhook') || request.nextUrl.pathname.startsWith('/pricelist') || request.nextUrl.pathname.startsWith('/order') || request.nextUrl.pathname.startsWith('/api/public-order');
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/api/whatsapp/webhook') || request.nextUrl.pathname.startsWith('/pricelist') || request.nextUrl.pathname.startsWith('/order') || request.nextUrl.pathname.startsWith('/api/public-order') || request.nextUrl.pathname.startsWith('/track');
 
   // Protect all non-public routes
   if (!user && !isPublicRoute) {
