@@ -48,7 +48,7 @@ export async function POST(req) {
     const finalGrandTotal = parseInt(grandTotal) + uniqueCode;
 
     // 3. Create Sales Order
-    let notes = `Order via Web Calculator.\n`;
+    let notes = `Order via Web Calculator.\nUnik: Rp ${uniqueCode}\nSubtotal: Rp ${subtotal}\n`;
     if (fastTrack) notes += `- Fast Track (+Rp 100.000)\n`;
     if (designService) notes += `- Jasa Desain (+Rp 50.000)\n`;
     if (twoColor) notes += `- Sablon 2 Warna\n`;
@@ -57,14 +57,14 @@ export async function POST(req) {
       .from('sales_orders')
       .insert([{
         invoice_number: invoiceNumber,
-        customer_id: customerId,
+        customer_code: customerId, // The ERP uses the UUID as customer_code reference
         date: new Date().toISOString().split('T')[0],
         due_date: new Date(Date.now() + 86400000).toISOString().split('T')[0],
-        status: 'UNPAID',
-        subtotal: subtotal,
-        tax: 0,
-        shipping: uniqueCode, // Use shipping field for unique code logic
-        grand_total: finalGrandTotal,
+        status: 'DRAFT',
+        payment_status: 'BELUM LUNAS',
+        payment_method: 'TRANSFER',
+        dp_amount: 0,
+        total_amount: finalGrandTotal,
         notes: notes
       }])
       .select()
@@ -76,11 +76,14 @@ export async function POST(req) {
     const { error: itemError } = await supabase
       .from('sales_items')
       .insert([{
-        sales_order_id: order.id,
-        product_id: productId,
+        so_id: order.id,
+        order_type: 'Sablon',
+        product_code: productId,
         qty: parseInt(qty),
-        price: parseFloat(pricePerItem),
-        total: subtotal
+        unit: 'PCS',
+        unit_multiplier: 1,
+        unit_price: parseFloat(pricePerItem),
+        total_price: finalGrandTotal
       }]);
 
     if (itemError) throw itemError;
