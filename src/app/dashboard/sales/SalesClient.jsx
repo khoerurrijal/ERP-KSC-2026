@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera, Navigation } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
