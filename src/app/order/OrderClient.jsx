@@ -68,10 +68,10 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
     
     let hargaBeliKing = baseHpp
     if (product.workshop_code === 'GUDANG') {
-      const profitGudang = Number(pricelistConfig.profit_gudang_nominal || 50)
+      const profitGudang = pricelistConfig.profit_gudang_nominal !== undefined && pricelistConfig.profit_gudang_nominal !== '' ? Number(pricelistConfig.profit_gudang_nominal) : 50
       hargaBeliKing = baseHpp + profitGudang
     } else if (product.workshop_code === 'GLOBAL') {
-      const profitGlobal = Number(pricelistConfig.profit_global_percent || 10)
+      const profitGlobal = pricelistConfig.profit_global_percent !== undefined && pricelistConfig.profit_global_percent !== '' ? Number(pricelistConfig.profit_global_percent) : 10
       hargaBeliKing = baseHpp * (1 + (profitGlobal / 100))
     }
     
@@ -98,11 +98,11 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
       basePrice += currentSablonFee
       if (item.isTwoColor) basePrice += 250
     } else {
-      const marginPolos = Number(pricelistConfig.margin_jual_polos_percent || 15)
+      const marginPolos = pricelistConfig.margin_jual_polos_percent !== undefined && pricelistConfig.margin_jual_polos_percent !== '' ? Number(pricelistConfig.margin_jual_polos_percent) : 15
       basePrice = basePrice * (1 + (marginPolos / 100))
     }
     
-    const saveProfitPct = Number(pricelistConfig.save_profit_percent || 30)
+    const saveProfitPct = pricelistConfig.save_profit_percent !== undefined && pricelistConfig.save_profit_percent !== '' ? Number(pricelistConfig.save_profit_percent) : 30
     basePrice = basePrice * (1 + (saveProfitPct / 100))
     
     return Math.ceil(basePrice)
