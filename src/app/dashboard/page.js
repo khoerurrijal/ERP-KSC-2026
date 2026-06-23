@@ -20,7 +20,7 @@ export default async function DashboardPage({ searchParams }) {
   const user = { email: 'admin@kingsablon.com', role: 'Owner' }
 
   // Fetch products for Kalkulator
-  const { data: products } = await supabase.from('products').select('*').eq('is_active', true).limit(100000).order('name')
+  const { data: products } = await supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name')
   const { data: settings } = await supabase.from('system_settings').select('*')
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
   const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}

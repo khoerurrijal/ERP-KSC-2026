@@ -99,28 +99,28 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
       </div>
 
       {/* KERTAS INVOICE */}
-      <div className="glass-card bg-white text-black p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none rounded-3xl shadow-2xl mx-4 sm:mx-0" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
+      <div className="glass-card bg-white text-black p-5 sm:p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none rounded-3xl shadow-2xl mx-4 sm:mx-0" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
 
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
 
-        <div className="flex flex-col md:flex-row justify-between items-start gap-8 border-b border-gray-200 pb-8 print:flex-row">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-6 md:gap-8 border-b border-gray-200 pb-6 md:pb-8 print:flex-row">
           <div>
             <div className="mb-2">
-              <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-16 md:h-20 w-auto object-contain bg-transparent" />
+              <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-12 sm:h-16 md:h-20 w-auto object-contain bg-transparent" />
             </div>
-            <p className="text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
+            <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
 
             <div className="mt-4 space-y-1 text-xs text-gray-600">
-              <p className="flex items-center gap-2"><MapPin className="w-3 h-3" /> {store.address}</p>
-              <p className="flex items-center gap-2"><Phone className="w-3 h-3" /> {store.phone}</p>
-              <p className="flex items-center gap-2"><Mail className="w-3 h-3" /> {store.email}</p>
+              <p className="flex items-center gap-2"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
+              <p className="flex items-center gap-2"><Phone className="w-3 h-3 shrink-0" /> {store.phone}</p>
+              <p className="flex items-center gap-2"><Mail className="w-3 h-3 shrink-0" /> {store.email}</p>
             </div>
           </div>
 
-          <div className="text-right">
-            <h2 className="text-4xl font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
-            <div className="mt-4 space-y-1 text-sm">
+          <div className="text-left md:text-right w-full md:w-auto mt-4 md:mt-0">
+            <h2 className="text-3xl md:text-4xl font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
+            <div className="mt-2 md:mt-4 space-y-1 text-sm">
               <p className="text-gray-500">Nomor Faktur</p>
               <p className="font-bold text-gray-900">{invoiceId}</p>
             </div>
@@ -191,21 +191,28 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
 
             {order.payment_status !== 'LUNAS' && !order.payment_url && (
               <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-3">
-                <p className="text-xs text-gray-500 mb-2 font-bold">Pembayaran Digital Instan (QRIS/VA):</p>
-                <div className="flex flex-col sm:flex-row gap-2">
+                <p className="text-xs text-gray-500 mb-2 font-bold">Pembayaran Digital Instan (QRIS):</p>
+                
+                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center shadow-sm">
+                  <p className="text-sm font-bold text-gray-900 mb-3">Scan QRIS untuk Membayar</p>
+                  <img src="/qris.png" alt="QRIS BCA" className="w-48 h-48 mx-auto object-contain border border-gray-100 rounded-lg p-2" />
+                  <p className="text-xs text-gray-500 mt-3 font-semibold">BCA Digital / Semua E-Wallet</p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2 mt-4">
                   <button 
                     disabled={isProcessing || Number(order.dp_amount) > 0}
                     onClick={() => handleDokuPayment(Number(order.total_amount) / 2)}
                     className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
                   >
-                    Bayar DP 50%
+                    Bayar DP 50% (VA/Link)
                   </button>
                   <button 
                     disabled={isProcessing}
                     onClick={() => handleDokuPayment(sisaBayar)}
                     className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-sm disabled:opacity-50"
                   >
-                    <CreditCard className="w-4 h-4" /> Bayar Lunas
+                    <CreditCard className="w-4 h-4" /> Bayar Lunas (VA/Link)
                   </button>
                 </div>
               </div>

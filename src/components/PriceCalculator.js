@@ -164,7 +164,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                     searchable={true}
                     options={[
                       { value: "", label: "- Pilih Add-on -" },
-                      ...products.map(p => ({ value: p.id, label: `${p.name} (Stok: ${p.stock_qty || 0})` }))
+                      ...products.map(p => ({ value: p.id, label: p.name }))
                     ]} 
                   />
                 </div>
