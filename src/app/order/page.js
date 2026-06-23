@@ -48,7 +48,7 @@ export default async function OrderPage() {
       </div>
 
       <div className="max-w-xl mx-auto px-4 relative z-10">
-        <OrderClient products={products || []} matrix={matrix} dropdownConfig={dropdownConfig} />
+        <OrderClient products={products || []} matrix={matrix} dropdownConfig={dropdownConfig} pricelistConfig={pricelistConfig} />
       </div>
     </div>
   )

@@ -7,6 +7,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
+import { calculateItemPrice as calculateItemPriceUtil } from '@/utils/pricing'
 
 export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, pricelistConfig = {} }) {
   const router = useRouter()
@@ -187,50 +188,13 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         if (['qty', 'product_search', 'order_type', 'category', 'unit'].includes(field)) {
           const selectedProduct = products.find(p => p.name === updated.product_search)
           if (selectedProduct) {
-            // Checkpoint 1: HPP Dasar
-            const baseHpp = Number(selectedProduct.base_price || 0)
-            
-            // Checkpoint 2: Harga Beli King
-            let hargaBeliKing = baseHpp
-            if (selectedProduct.workshop_code === 'GUDANG') {
-              const profitGudang = pricelistConfig.profit_gudang_nominal !== undefined && pricelistConfig.profit_gudang_nominal !== '' ? Number(pricelistConfig.profit_gudang_nominal) : 50
-              hargaBeliKing = baseHpp + profitGudang
-            } else if (selectedProduct.workshop_code === 'GLOBAL') {
-              const profitGlobal = pricelistConfig.profit_global_percent !== undefined && pricelistConfig.profit_global_percent !== '' ? Number(pricelistConfig.profit_global_percent) : 10
-              hargaBeliKing = baseHpp * (1 + (profitGlobal / 100))
-            }
-            
-            let basePrice = hargaBeliKing
-            
-            if (updated.order_type === 'SABLON' || updated.order_type === 'Sablon') {
-               // Checkpoint 4: Sablon
-               let currentSablonFee = 0
-               const qty = updated.qty || 1
-               const cat = updated.category
-               const sablonMatrix = pricelistConfig.sablon_matrix || {}
-               if (cat && sablonMatrix[cat]) {
-                 const tierMatrix = sablonMatrix[cat]
-                 if (qty >= 10000 && tierMatrix["10000"] > 0) currentSablonFee = tierMatrix["10000"]
-                 else if (qty >= 5000 && tierMatrix["5000"] > 0) currentSablonFee = tierMatrix["5000"]
-                 else if (qty >= 1000 && tierMatrix["1000"] > 0) currentSablonFee = tierMatrix["1000"]
-                 else if (qty >= 500 && tierMatrix["500"] > 0) currentSablonFee = tierMatrix["500"]
-                 else if (qty >= 100 && tierMatrix["100"] > 0) currentSablonFee = tierMatrix["100"]
-                 else if (qty >= 10 && tierMatrix["10"] > 0) currentSablonFee = tierMatrix["10"]
-                 else if (tierMatrix["1"] > 0) currentSablonFee = tierMatrix["1"]
-                 else currentSablonFee = tierMatrix["1000"] || 250
-               } else {
-                 currentSablonFee = 250 // fallback
-               }
-               basePrice += currentSablonFee
-            } else {
-               // Checkpoint 3: Polos
-               const marginPolos = pricelistConfig.margin_jual_polos_percent !== undefined && pricelistConfig.margin_jual_polos_percent !== '' ? Number(pricelistConfig.margin_jual_polos_percent) : 15
-               basePrice = basePrice * (1 + (marginPolos / 100))
-            }
-            
-            // Checkpoint 5: Save Profit Buffer
-            const saveProfitPct = pricelistConfig.save_profit_percent !== undefined && pricelistConfig.save_profit_percent !== '' ? Number(pricelistConfig.save_profit_percent) : 30
-            basePrice = basePrice * (1 + (saveProfitPct / 100))
+            const basePrice = calculateItemPriceUtil({
+              product: selectedProduct,
+              qty: updated.qty,
+              orderType: updated.order_type,
+              isTwoColor: false,
+              pricelistConfig
+            })
             
             updated.price = Math.ceil(basePrice * updated.unit_multiplier)
           }
