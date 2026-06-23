@@ -148,50 +148,61 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8 overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[500px]">
-            <thead>
-              <tr className="border-b-2 border-gray-900">
-                <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
-                <th className="py-3 font-bold text-gray-900 text-sm text-center">Qty</th>
-                <th className="py-3 font-bold text-gray-900 text-sm text-center">Satuan</th>
-                <th className="py-3 font-bold text-gray-900 text-sm text-right">Harga (Rp)</th>
-                <th className="py-3 font-bold text-gray-900 text-sm text-right">Subtotal (Rp)</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {(order.sales_items || []).map((item, idx) => (
-                <tr key={idx}>
-                  <td className="py-4">
-                    <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
-                    <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
-                  </td>
-                  <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID')}</td>
-                  <td className="py-4 text-center text-gray-600">Pcs</td>
-                  <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
-                  <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+        <div className="mt-8">
+          {/* Mobile View */}
+          <div className="md:hidden space-y-4">
+            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-900 pb-2 mb-4">Detail Pesanan</h3>
+            {(order.sales_items || []).map((item, idx) => (
+              <div key={idx} className="flex justify-between items-start pb-4 border-b border-gray-100 last:border-0">
+                <div className="pr-4">
+                  <p className="font-bold text-gray-900 text-sm leading-tight">{item.products?.name || item.product_code}</p>
+                  <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
+                  <p className="text-xs text-gray-400 mt-1">{Number(item.qty).toLocaleString('id-ID')} Pcs x Rp {Number(item.unit_price).toLocaleString('id-ID')}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="font-bold text-gray-900 text-sm">Rp {Number(item.total_price).toLocaleString('id-ID')}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop View */}
+          <div className="hidden md:block overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[500px]">
+              <thead>
+                <tr className="border-b-2 border-gray-900">
+                  <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
+                  <th className="py-3 font-bold text-gray-900 text-sm text-center">Qty</th>
+                  <th className="py-3 font-bold text-gray-900 text-sm text-center">Satuan</th>
+                  <th className="py-3 font-bold text-gray-900 text-sm text-right">Harga (Rp)</th>
+                  <th className="py-3 font-bold text-gray-900 text-sm text-right">Subtotal (Rp)</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {(order.sales_items || []).map((item, idx) => (
+                  <tr key={idx}>
+                    <td className="py-4">
+                      <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
+                      <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
+                    </td>
+                    <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID')}</td>
+                    <td className="py-4 text-center text-gray-600">Pcs</td>
+                    <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
+                    <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row print:gap-4">
           <div className="w-full md:w-1/2 p-5 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
             <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Metode Pembayaran</h4>
             
-            {order.payment_status !== 'LUNAS' && order.payment_url && (
-              <div className="mb-6 pb-6 border-b border-gray-200 no-print">
-                <p className="text-xs text-gray-500 mb-2 font-bold">Lanjutkan Pembayaran Anda:</p>
-                <a href={order.payment_url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20">
-                  <CreditCard className="w-5 h-5" /> Bayar Sekarang via DOKU
-                </a>
-              </div>
-            )}
-
-            {order.payment_status !== 'LUNAS' && !order.payment_url && (
-              <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-3">
-                <p className="text-xs text-gray-500 mb-2 font-bold">Pembayaran Digital Instan (QRIS):</p>
+            {order.payment_status !== 'LUNAS' && (
+              <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-4">
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pembayaran Digital Instan (QRIS):</p>
                 
                 <div className="bg-white p-4 rounded-xl border border-gray-200 text-center shadow-sm">
                   <p className="text-sm font-bold text-gray-900 mb-3">Scan QRIS untuk Membayar</p>
@@ -199,22 +210,29 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
                   <p className="text-xs text-gray-500 mt-3 font-semibold">BCA Digital / Semua E-Wallet</p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-2 mt-4">
-                  <button 
-                    disabled={isProcessing || Number(order.dp_amount) > 0}
-                    onClick={() => handleDokuPayment(Number(order.total_amount) / 2)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
-                  >
-                    Bayar DP 50% (VA/Link)
-                  </button>
-                  <button 
-                    disabled={isProcessing}
-                    onClick={() => handleDokuPayment(sisaBayar)}
-                    className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-sm disabled:opacity-50"
-                  >
-                    <CreditCard className="w-4 h-4" /> Bayar Lunas (VA/Link)
-                  </button>
-                </div>
+                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest pt-2">Atau Bayar via Virtual Account / Link:</p>
+                {order.payment_url ? (
+                  <a href={order.payment_url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20">
+                    <CreditCard className="w-5 h-5" /> Lanjutkan Pembayaran (DOKU)
+                  </a>
+                ) : (
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <button 
+                      disabled={isProcessing || Number(order.dp_amount) > 0}
+                      onClick={() => handleDokuPayment(Number(order.total_amount) / 2)}
+                      className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
+                    >
+                      Bayar DP 50% (DOKU)
+                    </button>
+                    <button 
+                      disabled={isProcessing}
+                      onClick={() => handleDokuPayment(sisaBayar)}
+                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-sm disabled:opacity-50"
+                    >
+                      <CreditCard className="w-4 h-4" /> Bayar Lunas (DOKU)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
