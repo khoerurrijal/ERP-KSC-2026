@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X } from 'lucide-react'
-import { addProduct, deleteProduct, updateProduct } from './actions'
+import { useState, useRef } from 'react'
+import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X, Upload } from 'lucide-react'
+import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
 export default function ProductsClient({ products: initialProducts = [], error = null }) {
@@ -21,6 +21,50 @@ export default function ProductsClient({ products: initialProducts = [], error =
   const [isActive, setIsActive] = useState(true)
   const [units, setUnits] = useState([]) // Array of { unit_name, multiplier }
   const [isPending, setIsPending] = useState(false)
+  const fileInputRef = useRef(null)
+
+  const handleFileUpload = async (e) => {
+    const file = e.target.files[0]
+    if (!file) return
+    
+    setIsPending(true)
+    const reader = new FileReader()
+    reader.onload = async (event) => {
+      const text = event.target.result
+      const rows = text.split('\n').map(row => row.split(','))
+      const headers = rows[0].map(h => h.trim().toLowerCase().replace(/"/g, ''))
+      
+      const parsedData = []
+      for (let i = 1; i < rows.length; i++) {
+        if (!rows[i] || rows[i].length < headers.length) continue
+        const obj = {}
+        headers.forEach((header, index) => {
+          let val = rows[i][index]?.trim()?.replace(/"/g, '')
+          if (val === '') return
+          if (header === 'is_active') val = val.toUpperCase() === 'TRUE'
+          obj[header] = val
+        })
+        if (obj.product_code) parsedData.push(obj)
+      }
+      
+      if (parsedData.length === 0) {
+        alert('File kosong atau format salah.')
+        setIsPending(false)
+        return
+      }
+
+      const res = await upsertProductsBulk(parsedData)
+      setIsPending(false)
+      if (res.error) {
+        alert('Error import: ' + res.error)
+      } else {
+        alert('Berhasil mengupdate ' + parsedData.length + ' produk!')
+        window.location.reload()
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = null
+  }
 
   const handleSubmit = async () => {
     if (!name) return alert('Nama produk wajib diisi.')
@@ -106,6 +150,13 @@ export default function ProductsClient({ products: initialProducts = [], error =
               className="glass-input !pl-10 h-10 w-64 text-sm"
             />
           </div>
+            
+          <input type="file" accept=".csv" className="hidden" ref={fileInputRef} onChange={handleFileUpload} />
+          <button disabled={isPending} onClick={() => fileInputRef.current?.click()} className="btn-secondary h-10 px-4 flex items-center gap-2 text-sm bg-white/5 border border-white/10 hover:bg-white/10 rounded-xl transition-all">
+            {isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+            Import CSV
+          </button>
+
           <button onClick={() => { closeModal(); setShowModal(true); }} className="btn-primary h-10 px-4 flex items-center gap-2 text-sm">
             <Plus className="w-4 h-4" />
             Tambah Produk
