@@ -16,7 +16,7 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 const ADMIN_NUMBER = '6282121316926';
 
 const SYSTEM_PROMPT = (pushname) => `
-Kamu adalah Customer Service King Sablon Cup. Namamu adalah Ina.
+Kamu adalah Admin King Sablon Cup. Namamu adalah Ina.
 Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
 King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
 Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
@@ -33,6 +33,12 @@ PENTING - KNOWLEDGE BASE KING SABLON CUP:
 3. Order & Pricelist Sablon:
    - Jika pelanggan mengatakan ingin order, pesan, menanyakan daftar harga, pricelist, atau produk, **JANGAN MENGARANG JAWABAN**. Langsung berikan respon persis seperti ini:
    "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon."
+4. Pertanyaan Umum / Edukasi Cup & Sablon:
+   - Jika pelanggan bertanya hal umum seperti perbedaan cup PP dan PET, perbedaan cup flat dan oval, ukuran 12 oz, 14 oz, 22 oz, atau pengetahuan produk cup lainnya, **GUNAKAN PENGETAHUAN AI-MU SENDIRI** untuk menjawab dengan cerdas dan detail layaknya seorang ahli.
+   - **TIDAK PERLU** mencari di database untuk pertanyaan umum tersebut! Cukup baca database jika ada sangkut pautnya dengan pesanan, invoice, ERP, atau data pelanggan.
+5. Jam Operasional Admin:
+   - Jam operasional admin manusia (toko buka): Senin s/d Sabtu pukul 09.00-17.00 WIB.
+   - Di luar jam operasional tersebut (toko tutup), kamu sebagai AI akan sepenuhnya membantu menjawab pertanyaan pelanggan.
 
 Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
@@ -44,6 +50,15 @@ PENTING - HUMAN HANDOVER:
 Jika pelanggan bertanya hal yang terlalu rumit, custom (seperti komplain, desain yang rumit, dll), atau jika pesanan tidak ada di database, kamu TIDAK BOLEH mengarang jawaban.
 Kirimkan pesan penutup ini: "Untuk detail lebih lanjut, nanti dilanjut dengan rekan saya ketika sedang online ya kak. Terima kasih! 🙏"
 `;
+
+// Helper to run promises with timeout
+function runWithTimeout(promise, ms) {
+  let timeoutId;
+  const timeoutPromise = new Promise((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error('TIMEOUT')), ms);
+  });
+  return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
+}
 
 // Helper to send message via Fonnte
 async function sendFonnteMessage(target, message) {
@@ -63,6 +78,7 @@ async function sendFonnteMessage(target, message) {
     console.error('Error sending message via Fonnte:', error);
   }
 }
+
 
 // Helper to query database for orders
 async function searchOrdersInDB(searchQuery) {
@@ -164,7 +180,7 @@ export async function POST(req) {
     let templateReply = null;
 
     if (msgLower.match(/^(halo|pagi|siang|sore|malam|assalamualaikum|ping|hi|hey|p)$/)) {
-      templateReply = "Halo kak! Ada yang bisa Ina bantu? (Pricelist / Cek Pesanan / Tanya Lainnya)";
+      templateReply = "Halo kak! Saya Ina, Admin King Sablon Cup. Ada yang bisa dibantu? (Pricelist / Cek Pesanan / Tanya Lainnya)";
     } else if (msgLower.match(/(alamat|dimana|lokasi|toko|tempat)/)) {
       templateReply = "Alamat kami di:\nJl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).\nBisa dicari di Google Maps: *KING SABLON CUP* 📍";
     } else if (msgLower.match(/(pembayaran|rekening|bayar|cod)/)) {
@@ -277,7 +293,19 @@ export async function POST(req) {
     });
 
     const chat = model.startChat({ history: formattedHistory });
-    let result = await chat.sendMessage(message);
+    let result;
+    
+    try {
+      // Cutoff at 9 seconds to fit within ~10s webhook constraints
+      result = await runWithTimeout(chat.sendMessage(message), 9000);
+    } catch (error) {
+      if (error.message === 'TIMEOUT') {
+        const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya karena banyak antrian. Tunggu sebentar ya, Ina coba proses ulang... 🙏";
+        await sendFonnteMessage(sender, fallbackMsg);
+        return NextResponse.json({ success: true, reply: fallbackMsg });
+      }
+      throw error;
+    }
 
     const functionCall = result.response.functionCalls()?.[0];
     
@@ -305,12 +333,21 @@ export async function POST(req) {
         };
       }
 
-      result = await chat.sendMessage([{
-        functionResponse: {
-          name: "cek_pesanan",
-          response: functionResponseData
+      try {
+        result = await runWithTimeout(chat.sendMessage([{
+          functionResponse: {
+            name: "cek_pesanan",
+            response: functionResponseData
+          }
+        }]), 9000);
+      } catch (error) {
+        if (error.message === 'TIMEOUT') {
+          const fallbackMsg = "Wah maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
+          await sendFonnteMessage(sender, fallbackMsg);
+          return NextResponse.json({ success: true, reply: fallbackMsg });
         }
-      }]);
+        throw error;
+      }
     }
 
     const aiResponseText = result.response.text();

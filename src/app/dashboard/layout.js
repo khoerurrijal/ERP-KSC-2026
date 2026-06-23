@@ -36,7 +36,7 @@ export default async function DashboardLayout({ children }) {
   const isOperator = userRole === 'Operator'
 
   return (
-    <div className="min-h-screen bg-transparent text-foreground flex flex-col md:flex-row">
+    <div className={`min-h-screen bg-transparent text-foreground flex flex-col ${!isOperator ? 'md:flex-row' : ''}`}>
       {/* Sidebar - Hidden for Operators on all screens, responsive for others */}
       {!isOperator && (
         <>
