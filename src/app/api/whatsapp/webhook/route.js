@@ -275,10 +275,28 @@ export async function POST(req) {
 
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
 
-        const formattedHistory = (historyData || []).reverse().map(msg => ({
-          role: msg.role === 'user' ? 'user' : 'model',
-          parts: [{ text: msg.content }],
-        }));
+        let rawHistory = (historyData || []).reverse();
+        let formattedHistory = [];
+        
+        for (let msg of rawHistory) {
+          const role = msg.role === 'user' ? 'user' : 'model';
+          const content = msg.content || ' ';
+          
+          if (formattedHistory.length === 0) {
+            // First message in history must be 'user'
+            if (role === 'user') {
+              formattedHistory.push({ role, parts: [{ text: content }] });
+            }
+          } else {
+            const lastMsg = formattedHistory[formattedHistory.length - 1];
+            if (lastMsg.role === role) {
+              // Merge consecutive messages of the same role
+              lastMsg.parts[0].text += '\n' + content;
+            } else {
+              formattedHistory.push({ role, parts: [{ text: content }] });
+            }
+          }
+        }
 
         const model = genAI.getGenerativeModel({
           model: "gemini-2.5-flash",
