@@ -66,7 +66,7 @@ export async function updateDropdownConfig(newConfig) {
   })
   
   if (error) return { success: false, error: error.message }
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -79,7 +79,7 @@ export async function updateCashflowConfig(newConfig) {
   })
   
   if (error) return { success: false, error: error.message }
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -92,7 +92,7 @@ export async function updateStoreConfig(newConfig) {
   })
   
   if (error) return { success: false, error: error.message }
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -105,7 +105,7 @@ export async function updateRolePermissions(newPermissions) {
   })
   
   if (error) return { success: false, error: error.message }
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -118,7 +118,7 @@ export async function updateUserRoles(newRoles) {
   })
   
   if (error) return { success: false, error: error.message }
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   return { success: true }
 }
 
@@ -161,7 +161,8 @@ export async function updatePricelistConfig(newConfig) {
     }
   }
 
-  revalidatePath('/dashboard')
+  revalidatePath('/', 'layout')
   revalidatePath('/pricelist')
+  revalidatePath('/order')
   return { success: true }
 }
