@@ -23,16 +23,7 @@ export default async function DashboardPage({ searchParams }) {
   const { data: products } = await supabase.from('products').select('*').eq('is_active', true).limit(100000).order('name')
   const { data: settings } = await supabase.from('system_settings').select('*')
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
-  const jasaSablonStr = settings?.find(s => s.key === 'jasa_sablon_price')?.value || "250"
-  const jasaSablon = parseFloat(jasaSablonStr)
-
-  const { data: matrixData } = await supabase.from('sablon_matrix').select('*')
-  const matrix = {}
-  if (matrixData) {
-    matrixData.forEach(row => {
-      matrix[row.category] = row
-    })
-  }
+  const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   // Fetch orders for metrics
   const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
@@ -109,7 +100,7 @@ export default async function DashboardPage({ searchParams }) {
         
         {/* KALKULATOR HARGA */}
         <div className="lg:col-span-1">
-          <PriceCalculator products={products || []} dropdownConfig={dropdownConfig} jasaSablon={jasaSablon} matrix={matrix} />
+          <PriceCalculator products={products || []} dropdownConfig={dropdownConfig} pricelistConfig={pricelistConfig} />
         </div>
 
         {/* TENGAH: Antrean & Stok */}

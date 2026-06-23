@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
+import { calculateItemPrice } from '@/utils/pricing'
 
-export default function PriceCalculator({ products = [], dropdownConfig = {}, matrix = {} }) {
+export default function PriceCalculator({ products = [], dropdownConfig = {}, pricelistConfig = {} }) {
   const [orderType, setOrderType] = useState('')
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
@@ -26,23 +27,17 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
   const filteredProducts = products.filter(p => p.category === category)
   const selectedProduct = products.find(p => p.id?.toString() === productId?.toString())
 
-  // Harga Dasar (price_polos) -> For Sablon, we add jasaSablon
-  const basePrice = selectedProduct?.price_polos || 0
-  
-  // Custom logic for Sablon fee
+  // Calculate Main Item Price
   const isSablon = orderType?.toUpperCase() === 'SABLON'
-  
-  let currentSablonFee = 0
-  if (isSablon && category && matrix[category]) {
-    const tierMatrix = matrix[category]
-    if (qty >= 10000 && tierMatrix.min_10000 > 0) currentSablonFee = tierMatrix.min_10000
-    else if (qty >= 5000 && tierMatrix.min_5000 > 0) currentSablonFee = tierMatrix.min_5000
-    else if (qty >= 1000 && tierMatrix.min_1000 > 0) currentSablonFee = tierMatrix.min_1000
-    else if (qty >= 500 && tierMatrix.min_500 > 0) currentSablonFee = tierMatrix.min_500
-    else if (qty >= 100 && tierMatrix.min_100 > 0) currentSablonFee = tierMatrix.min_100
-    else if (qty >= 10 && tierMatrix.min_10 > 0) currentSablonFee = tierMatrix.min_10
-    else if (tierMatrix.min_1 > 0) currentSablonFee = tierMatrix.min_1
-    else currentSablonFee = tierMatrix.min_1000 || 250 // fallback
+  let basePricePerPcs = 0;
+  if (selectedProduct) {
+    basePricePerPcs = calculateItemPrice({
+      product: selectedProduct,
+      qty: qty,
+      orderType: orderType,
+      isTwoColor: false,
+      pricelistConfig
+    });
   }
 
   // Get Unit Multiplier
@@ -58,12 +53,19 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, ma
     if (addon.productId) {
       const p = products.find(prod => prod.id?.toString() === addon.productId?.toString())
       if (p) {
-        addonsTotal += (p.price_polos || 0) * (addon.qty || 0)
+        const addonPrice = calculateItemPrice({
+          product: p,
+          qty: addon.qty || 1,
+          orderType: 'POLOS',
+          isTwoColor: false,
+          pricelistConfig
+        });
+        addonsTotal += addonPrice * (addon.qty || 0)
       }
     }
   })
 
-  const finalPricePerPcs = isSablon ? ((basePrice + currentSablonFee) * unitMultiplier) : (basePrice * unitMultiplier)
+  const finalPricePerPcs = basePricePerPcs * unitMultiplier;
   const totalPrice = (finalPricePerPcs * qty) + addonsTotal
 
   const handleAddAddon = () => {

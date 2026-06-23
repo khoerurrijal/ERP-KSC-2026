@@ -125,10 +125,9 @@ export async function updateUserRoles(newRoles) {
 export async function updatePricelistConfig(newConfig) {
   const supabase = await createClient()
   
-  // Extract matrix and remove from JSON to avoid duplication
+  // Keep sablon_matrix in system_settings
   const matrixObj = newConfig.sablon_matrix
   const configToSave = { ...newConfig }
-  delete configToSave.sablon_matrix
 
   const { error } = await supabase.from('system_settings').upsert({
     key: 'pricelist_config',
