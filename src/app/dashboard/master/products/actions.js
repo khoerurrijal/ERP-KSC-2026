@@ -103,8 +103,18 @@ export async function updateStock(product_code, new_stock) {
 
 export async function upsertProductsBulk(products) {
   const supabase = await createClient();
-  const { error } = await supabase.from('products').upsert(products, { onConflict: 'product_code' });
-  if (error) return { error: error.message };
+  
+  const updatePromises = products.map(async (prod) => {
+    const { product_code, ...updateData } = prod;
+    if (!product_code) return { error: 'Missing product_code' };
+    return supabase.from('products').update(updateData).eq('product_code', product_code);
+  });
+
+  const results = await Promise.all(updatePromises);
+  
+  const firstError = results.find(res => res.error);
+  if (firstError) return { error: firstError.error.message };
+
   revalidatePath('/dashboard/master/products');
   return { success: true };
 }
