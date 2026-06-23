@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
+import { waitUntil } from '@vercel/functions';
 
 export const maxDuration = 60; // Allow API route to run for up to 60 seconds on Vercel
 
@@ -20,6 +21,7 @@ const ADMIN_NUMBER = '6282121316926';
 const SYSTEM_PROMPT = (pushname) => `
 Kamu adalah Admin King Sablon Cup. Namamu adalah Ina.
 Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
+PENTING: Jawablah dengan SANGAT SINGKAT, PADAT, dan langsung ke intinya. JANGAN membalas dengan paragraf panjang yang bertele-tele. Maksimal 2-3 kalimat pendek saja.
 King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
 Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
 
@@ -261,103 +263,110 @@ export async function POST(req) {
 
     if (!session?.is_bot_active) return NextResponse.json({ success: true, message: 'Local bot inactive' });
 
-    // Fetch history
-    const { data: historyData } = await supabase
-      .from('wa_chat_history')
-      .select('*')
-      .eq('phone_number', sender)
-      .order('created_at', { ascending: false })
-      .limit(10); 
-
-    await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
-
-    const formattedHistory = (historyData || []).reverse().map(msg => ({
-      role: msg.role === 'user' ? 'user' : 'model',
-      parts: [{ text: msg.content }],
-    }));
-
-    const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
-      systemInstruction: SYSTEM_PROMPT(pushname),
-      tools: [{
-        functionDeclarations: [{
-          name: "cek_pesanan",
-          description: "Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.",
-          parameters: {
-            type: "object",
-            properties: {
-              search_query: { type: "string" }
-            },
-            required: ["search_query"]
-          }
-        }]
-      }]
-    });
-
-    const chat = model.startChat({ history: formattedHistory });
-    let result;
-    
-    try {
-      // Allow up to 55 seconds for Gemini since Vercel maxDuration is 60s
-      result = await runWithTimeout(chat.sendMessage(message), 55000);
-    } catch (error) {
-      if (error.message === 'TIMEOUT') {
-        const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya karena banyak antrian. Tunggu sebentar ya, Ina coba proses ulang... 🙏";
-        await sendFonnteMessage(sender, fallbackMsg);
-        return NextResponse.json({ success: true, reply: fallbackMsg });
-      }
-      throw error;
-    }
-
-    const functionCall = result.response.functionCalls()?.[0];
-    
-    if (functionCall && functionCall.name === "cek_pesanan") {
-      await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
-      const orders = await searchOrdersInDB(functionCall.args.search_query);
-
-      let functionResponseData;
-      if (orders && orders.length > 0) {
-        functionResponseData = {
-          status: "success",
-          orders: orders.map(o => ({
-            invoice: o.invoice_number,
-            customer: o?.customers?.name,
-            status: o.status,
-            date: o.date,
-            items: o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', '),
-            tracking_link: `https://erpkscv1.vercel.app/track/${o.invoice_number}`
-          }))
-        };
-      } else {
-        functionResponseData = {
-          status: "not_found",
-          message: "Tidak ditemukan pesanan aktif dengan nama atau invoice tersebut."
-        };
-      }
-
+    waitUntil((async () => {
       try {
-        result = await runWithTimeout(chat.sendMessage([{
-          functionResponse: {
-            name: "cek_pesanan",
-            response: functionResponseData
+        // Fetch history
+        const { data: historyData } = await supabase
+          .from('wa_chat_history')
+          .select('*')
+          .eq('phone_number', sender)
+          .order('created_at', { ascending: false })
+          .limit(10); 
+
+        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+
+        const formattedHistory = (historyData || []).reverse().map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'model',
+          parts: [{ text: msg.content }],
+        }));
+
+        const model = genAI.getGenerativeModel({
+          model: "gemini-2.5-flash",
+          systemInstruction: SYSTEM_PROMPT(pushname),
+          tools: [{
+            functionDeclarations: [{
+              name: "cek_pesanan",
+              description: "Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.",
+              parameters: {
+                type: "object",
+                properties: {
+                  search_query: { type: "string" }
+                },
+                required: ["search_query"]
+              }
+            }]
+          }]
+        });
+
+        const chat = model.startChat({ history: formattedHistory });
+        let result;
+        
+        try {
+          // Allow up to 55 seconds for Gemini
+          result = await runWithTimeout(chat.sendMessage(message), 55000);
+        } catch (error) {
+          if (error.message === 'TIMEOUT') {
+            const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya. Tunggu sebentar ya... 🙏";
+            await sendFonnteMessage(sender, fallbackMsg);
+            return;
           }
-        }]), 55000);
-      } catch (error) {
-        if (error.message === 'TIMEOUT') {
-          const fallbackMsg = "Wah maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
-          await sendFonnteMessage(sender, fallbackMsg);
-          return NextResponse.json({ success: true, reply: fallbackMsg });
+          throw error;
         }
-        throw error;
+
+        const functionCall = result.response.functionCalls()?.[0];
+        
+        if (functionCall && functionCall.name === "cek_pesanan") {
+          await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
+          const orders = await searchOrdersInDB(functionCall.args.search_query);
+
+          let functionResponseData;
+          if (orders && orders.length > 0) {
+            functionResponseData = {
+              status: "success",
+              orders: orders.map(o => ({
+                invoice: o.invoice_number,
+                customer: o?.customers?.name,
+                status: o.status,
+                date: o.date,
+                items: o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', '),
+                tracking_link: `https://erpkscv1.vercel.app/track/${o.invoice_number}`
+              }))
+            };
+          } else {
+            functionResponseData = {
+              status: "not_found",
+              message: "Tidak ditemukan pesanan aktif dengan nama atau invoice tersebut."
+            };
+          }
+
+          try {
+            result = await runWithTimeout(chat.sendMessage([{
+              functionResponse: {
+                name: "cek_pesanan",
+                response: functionResponseData
+              }
+            }]), 55000);
+          } catch (error) {
+            if (error.message === 'TIMEOUT') {
+              const fallbackMsg = "Maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
+              await sendFonnteMessage(sender, fallbackMsg);
+              return;
+            }
+            throw error;
+          }
+        }
+
+        const aiResponseText = result.response.text();
+
+        await sendFonnteMessage(sender, aiResponseText);
+        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: aiResponseText }]);
+
+      } catch (error) {
+        console.error('Error in background processing:', error);
       }
-    }
+    })());
 
-    const aiResponseText = result.response.text();
-
-    await sendFonnteMessage(sender, aiResponseText);
-    await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: aiResponseText }]);
-
-    return NextResponse.json({ success: true, reply: aiResponseText });
+    return NextResponse.json({ success: true, message: 'Processing in background' });
 
   } catch (error) {
     console.error('Error in WhatsApp Webhook:', error);
