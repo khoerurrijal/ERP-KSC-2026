@@ -31,18 +31,20 @@ export default function SettingsClient({ initialSettings }) {
     zakat_percent: initialSettings.cashflow_config?.zakat_percent || 3
   })
   // State for Pricelist & Margin
-  const [pricelist, setPricelist] = useState(initialSettings.pricelist_config || {
-    profit_gudang_nominal: 50,
-    profit_global_percent: 10,
-    margin_jual_polos_percent: 15,
-    save_profit_percent: 30,
-    sablon_matrix: {
-      "BOTOL": { "1": 0, "10": 0, "100": 1200, "500": 850, "1000": 500, "5000": 500, "10000": 500 },
-      "BOX DUS": { "1": 0, "10": 0, "100": 1500, "500": 300, "1000": 200, "5000": 200, "10000": 200 },
-      "CUP GOCUP": { "1": 0, "10": 0, "100": 0, "500": 260, "1000": 200, "5000": 170, "10000": 150 },
-      "CUP INJECT": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 },
-      "CUP PET": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 }
-    }
+  const defaultMatrix = {
+    "BOTOL": { "1": 0, "10": 0, "100": 1200, "500": 850, "1000": 500, "5000": 500, "10000": 500 },
+    "BOX DUS": { "1": 0, "10": 0, "100": 1500, "500": 300, "1000": 200, "5000": 200, "10000": 200 },
+    "CUP GOCUP": { "1": 0, "10": 0, "100": 0, "500": 260, "1000": 200, "5000": 170, "10000": 150 },
+    "CUP INJECT": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 },
+    "CUP PET": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 }
+  }
+  const dbPricelist = initialSettings.pricelist_config || {}
+  const [pricelist, setPricelist] = useState({
+    profit_gudang_nominal: dbPricelist.profit_gudang_nominal ?? 50,
+    profit_global_percent: dbPricelist.profit_global_percent ?? 10,
+    margin_jual_polos_percent: dbPricelist.margin_jual_polos_percent ?? 15,
+    save_profit_percent: dbPricelist.save_profit_percent ?? 30,
+    sablon_matrix: dbPricelist.sablon_matrix || defaultMatrix
   })
 
   // State for Store Config

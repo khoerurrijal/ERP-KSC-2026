@@ -12,6 +12,7 @@
     "@google/generative-ai": "^0.24.1",
     "@supabase/ssr": "^0.12.0",
     "@supabase/supabase-js": "^2.108.1",
+    "@vercel/functions": "^3.7.2",
     "dotenv": "^17.4.2",
     "lucide-react": "^1.17.0",
     "next": "16.2.9",
