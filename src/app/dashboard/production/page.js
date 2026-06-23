@@ -50,6 +50,7 @@ export default async function ProductionPage() {
       status,
       mockup_url,
       order_type,
+      notes,
       sales_orders (id, invoice_number, status, date, notes, customers (name)),
       products (name, workshop_code),
       production_logs (qty_processed)
@@ -79,13 +80,15 @@ export default async function ProductionPage() {
     target_date: (() => {
       if (!item.sales_orders?.date) return null
       const orderDate = new Date(item.sales_orders.date)
-      const notes = (item.sales_orders.notes || '').toLowerCase()
-      const isFastTrack = notes.includes('fast track')
+      const soNotes = (item.sales_orders.notes || '').toLowerCase()
+      const itemNotes = (item.notes || '').toLowerCase()
+      const isFastTrack = soNotes.includes('fast track') || itemNotes.includes('fast_track') || itemNotes.includes('fast track')
       const targetDate = new Date(orderDate)
       targetDate.setDate(targetDate.getDate() + (isFastTrack ? 1 : 4)) // +1 fast track, +4 reguler (3-5 hari, di-average 4)
       return targetDate.toISOString()
     })(),
-    is_fast_track: (item.sales_orders?.notes || '').toLowerCase().includes('fast track'),
+    is_fast_track: (item.sales_orders?.notes || '').toLowerCase().includes('fast track') || (item.notes || '').toLowerCase().includes('fast_track') || (item.notes || '').toLowerCase().includes('fast track'),
+    notes: item.notes,
     status: item.sales_orders?.status, // This is SO status
     item_status: item.status || 'Proses', // This is Item status
     mockup_url: item.mockup_url, // Added mockup_url

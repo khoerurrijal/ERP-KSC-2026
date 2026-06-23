@@ -462,10 +462,40 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <span className="text-foreground/60">Subtotal Item:</span>
                     <span className="font-bold text-primary text-base">Rp {(Number(item.qty) * Number(item.price)).toLocaleString('id-ID')}</span>
                   </div>
-                  {item.order_type === 'Sablon' && (
-                    <div className="mt-4 pt-4 border-t border-white/5 space-y-2">
-                      <label className="text-xs font-medium text-foreground/80 truncate block">URL Mockup / Desain</label>
-                      <input type="url" placeholder="https://..." value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input w-full text-sm text-blue-400" />
+
+                  {item.order_type?.toUpperCase() === 'SABLON' && (
+                    <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
+                      <div className="flex flex-col sm:flex-row gap-4">
+                        <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="w-5 h-5 rounded border-gray-300 text-primary" 
+                            checked={item.isFastTrack || false} 
+                            onChange={(e) => handleItemChange(item.id, 'isFastTrack', e.target.checked)} 
+                          />
+                          <div>
+                            <p className="font-bold text-sm text-red-400">🔥 Jalur Fast Track</p>
+                            <p className="text-[10px] text-foreground/60">+ Rp 100.000 / 1000 pcs</p>
+                          </div>
+                        </label>
+                        <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
+                          <input 
+                            type="checkbox" 
+                            className="w-5 h-5 rounded border-gray-300 text-yellow-500" 
+                            checked={item.isTwoColor || false} 
+                            onChange={(e) => handleItemChange(item.id, 'isTwoColor', e.target.checked)} 
+                          />
+                          <div>
+                            <p className="font-bold text-sm text-yellow-500">🎨 Sablon 2 Warna</p>
+                            <p className="text-[10px] text-foreground/60">+ Rp 250 / pcs</p>
+                          </div>
+                        </label>
+                      </div>
+                      
+                      <div className="space-y-2">
+                        <label className="text-xs font-medium text-foreground/80 truncate block">URL Mockup / Desain</label>
+                        <input type="url" placeholder="https://..." value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input w-full text-sm text-blue-400" />
+                      </div>
                     </div>
                   )}
                 </div>

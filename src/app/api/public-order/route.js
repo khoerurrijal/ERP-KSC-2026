@@ -72,16 +72,52 @@ export async function POST(req) {
     if (orderError) throw orderError;
 
     // 4. Create Sales Items
-    const soItems = items.map(item => ({
-      so_id: order.id,
-      order_type: item.orderType,
-      product_code: item.productId,
-      qty: parseInt(item.qty),
-      unit: 'PCS',
-      unit_multiplier: 1,
-      unit_price: parseFloat(item.unitPrice),
-      total_price: parseFloat(item.unitPrice) * parseInt(item.qty)
-    }));
+    const soItems = [];
+    for (const item of items) {
+      let itemNotes = '';
+      if (fastTrack) itemNotes += '🔥 Fast Track\n';
+      
+      soItems.push({
+        so_id: order.id,
+        order_type: item.orderType,
+        product_code: item.productId,
+        qty: parseInt(item.qty),
+        unit: 'PCS',
+        unit_multiplier: 1,
+        unit_price: parseFloat(item.unitPrice),
+        total_price: parseFloat(item.unitPrice) * parseInt(item.qty),
+        notes: itemNotes.trim()
+      });
+
+      if (fastTrack) {
+        const qtyFastTrack = Math.ceil(parseInt(item.qty) / 1000);
+        soItems.push({
+          so_id: order.id,
+          order_type: 'POLOS',
+          product_code: 'SRV-FAST-TRACK',
+          qty: qtyFastTrack,
+          unit: 'Layanan',
+          unit_multiplier: 1,
+          unit_price: 100000,
+          total_price: 100000 * qtyFastTrack,
+          notes: `Untuk ${item.productName}`
+        });
+      }
+
+      if (item.isTwoColor) {
+        soItems.push({
+          so_id: order.id,
+          order_type: 'SABLON',
+          product_code: 'SRV-2-WARNA',
+          qty: parseInt(item.qty),
+          unit: 'Pcs',
+          unit_multiplier: 1,
+          unit_price: 250,
+          total_price: 250 * parseInt(item.qty),
+          notes: `Untuk ${item.productName} - Warna Ke-2`
+        });
+      }
+    }
 
     const { error: itemError } = await supabase
       .from('sales_items')

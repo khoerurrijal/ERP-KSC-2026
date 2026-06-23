@@ -342,7 +342,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-medium text-foreground/90">{item.sales_order_items?.products?.name || '-'}</p>
-                      <p className="text-xs text-foreground/60">{item.qty_target} {item.unit || 'pcs'}</p>
+                      {item.notes && <p className="text-[10px] text-foreground/60 italic mt-0.5 whitespace-pre-line">{item.notes}</p>}
+                      <p className="text-xs text-foreground/60 mt-1">{item.qty_target} {item.unit || 'pcs'}</p>
                     </td>
                     <td className="px-6 py-4">
                       <p className="font-bold text-green-400">{item.qty_processed} pcs</p>

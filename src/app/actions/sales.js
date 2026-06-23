@@ -129,6 +129,11 @@ export async function createSalesOrder(payload) {
       // Royalty dipisah menjadi kolom sendiri (sesuai SOP baru)
       // Tidak lagi dicampur ke itemBeliGlobal
 
+      let itemNotes = '';
+      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      
+      const productNameForNotes = item.product_search || product?.name || item.product_id;
+
       soItems.push({
         so_id: so.id,
         order_type: item.order_type,
@@ -142,8 +147,47 @@ export async function createSalesOrder(payload) {
         hpp_price: dynamicHPP,
         beli_gudang: itemBeliGudang,
         beli_global: itemBeliGlobal,
-        royalty_fee: itemRoyalty
+        royalty_fee: itemRoyalty,
+        notes: itemNotes.trim()
       });
+
+      if (item.isFastTrack) {
+        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
+        soItems.push({
+          so_id: so.id,
+          order_type: 'POLOS', // don't show in production
+          product_code: 'SRV-FAST-TRACK',
+          qty: qtyFastTrack,
+          unit: 'Layanan',
+          unit_multiplier: 1,
+          unit_price: 100000,
+          total_price: 100000 * qtyFastTrack,
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
+          notes: `Untuk ${productNameForNotes}`
+        });
+      }
+
+      if (item.isTwoColor) {
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+        soItems.push({
+          so_id: so.id,
+          order_type: 'SABLON', // SHOW in production
+          product_code: 'SRV-2-WARNA',
+          qty: actualQty,
+          unit: 'Pcs',
+          unit_multiplier: 1,
+          unit_price: 250,
+          total_price: 250 * actualQty,
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
+          notes: `Untuk ${productNameForNotes} - Warna Ke-2`
+        });
+      }
     }
 
     const { error: itemsError } = await supabase.from('sales_items').insert(soItems)
