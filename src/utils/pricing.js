@@ -12,7 +12,8 @@ export function calculateItemPrice({
 }) {
   if (!product) return 0;
   
-  const baseHpp = Number(product.base_price || 0);
+  // The 'HPP Murni Dasar' from Master Produk is saved in the DB as 'price_polos'
+  const baseHpp = Number(product.price_polos || product.base_price || 0);
   const qtyInt = parseInt(qty, 10) || 1;
   const isSablon = (orderType || '').toUpperCase() === 'SABLON';
 
