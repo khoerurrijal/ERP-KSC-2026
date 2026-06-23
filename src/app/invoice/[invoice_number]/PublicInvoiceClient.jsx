@@ -7,6 +7,7 @@ import { useState } from 'react'
 export default function PublicInvoiceClient({ order, storeConfig }) {
   const router = useRouter()
   const [isProcessing, setIsProcessing] = useState(false)
+  const [isQrisOpen, setIsQrisOpen] = useState(false)
 
   if (!order) {
     return (
@@ -64,7 +65,22 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 pt-8 print:pb-0 print:pt-0 print:space-y-0 print:w-full print:max-w-none print:m-0">
+    <>
+      {isQrisOpen && (
+        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => setIsQrisOpen(false)}>
+          <img src="/qris.png" alt="QRIS Full" className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
+          <div className="mt-8 flex flex-wrap justify-center gap-4">
+            <a href="/qris.png" download="QRIS-KingSablon.png" className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-primary/20" onClick={e => e.stopPropagation()}>
+              <Download className="w-5 h-5" /> Simpan QRIS
+            </a>
+            <button className="bg-white/10 text-white hover:bg-white/20 px-6 py-3 rounded-full font-bold" onClick={() => setIsQrisOpen(false)}>
+              Tutup
+            </button>
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 pt-8 print:pb-0 print:pt-0 print:space-y-0 print:w-full print:max-w-none print:m-0">
 
       {/* Tombol Aksi - Disembunyikan saat di-print */}
       <style dangerouslySetInnerHTML={{
@@ -204,10 +220,20 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
               <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-4">
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pembayaran Digital Instan (QRIS):</p>
                 
-                <div className="bg-white p-4 rounded-xl border border-gray-200 text-center shadow-sm">
-                  <p className="text-sm font-bold text-gray-900 mb-3">Scan QRIS untuk Membayar</p>
-                  <img src="/qris.png" alt="QRIS BCA" className="w-48 h-48 mx-auto object-contain border border-gray-100 rounded-lg p-2" />
-                  <p className="text-xs text-gray-500 mt-3 font-semibold">BCA Digital / Semua E-Wallet</p>
+                <div 
+                  className="bg-white p-4 rounded-xl border border-gray-200 text-center shadow-sm cursor-pointer hover:border-primary/50 transition-all group"
+                  onClick={() => setIsQrisOpen(true)}
+                >
+                  <p className="text-sm font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">Scan QRIS untuk Membayar</p>
+                  
+                  <div className="w-48 h-48 mx-auto relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-inner">
+                    <img src="/qris.png" alt="QRIS BCA" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-none mix-blend-multiply" />
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-3 font-semibold flex flex-col items-center gap-2">
+                    <span>BCA Digital / Semua E-Wallet</span>
+                    <span className="text-[10px] bg-primary/10 text-primary px-3 py-1 rounded-full">Klik untuk Perbesar & Unduh</span>
+                  </p>
                 </div>
 
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest pt-2">Atau Bayar via Virtual Account / Link:</p>
