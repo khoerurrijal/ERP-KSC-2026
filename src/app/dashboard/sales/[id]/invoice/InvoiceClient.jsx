@@ -325,6 +325,7 @@ export default function InvoiceClient({ order, storeConfig }) {
         </div>
 
       </div>
+    </div>
     </>
   )
 }

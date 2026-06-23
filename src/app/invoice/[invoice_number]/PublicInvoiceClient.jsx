@@ -315,5 +315,6 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
 
       </div>
     </div>
+    </>
   )
 }
