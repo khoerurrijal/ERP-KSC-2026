@@ -381,6 +381,13 @@ export async function POST(req) {
 
       } catch (error) {
         console.error('Error in background processing:', error);
+        
+        // Notify the user if Google Gemini service is unavailable or crashes
+        let fallbackMsg = "Maaf kak, sistem Ina sedang ada sedikit kendala teknis (mungkin karena server Google sedang sibuk). Mohon dicoba lagi dalam beberapa menit ya kak 🙏";
+        if (error.status === 503 || error.message?.includes('503')) {
+          fallbackMsg = "Maaf kak, server AI Google saat ini sedang penuh/sibuk. Mohon tunggu beberapa saat dan kirim pesan lagi ya 🙏";
+        }
+        await sendFonnteMessage(sender, fallbackMsg).catch(console.error);
       }
     })());
 
