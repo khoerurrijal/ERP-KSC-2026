@@ -109,7 +109,10 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     return (
       <div className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center justify-between p-4">
-          <img src="/logo.png" alt="Logo" className="h-8 object-contain drop-shadow-md" />
+          <div className="flex shrink-0">
+            <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
+            <img src="/logo-dark.png" alt="Logo Dark" className="h-8 object-contain drop-shadow-md hidden dark:block" />
+          </div>
           <button onClick={() => setIsOpen(!isOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
             <div className="w-5 h-0.5 bg-current mb-1" />
             <div className="w-5 h-0.5 bg-current mb-1" />
@@ -145,11 +148,18 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
   return (
     <aside className="w-64 h-screen fixed left-0 top-0 glass-panel flex flex-col z-50">
       <div className="p-6 pb-2 flex justify-center">
-        <img 
-          src="/logo.png" 
-          alt="King Sablon Logo" 
-          className="w-full max-w-[130px] h-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hover:scale-105 transition-all duration-300 cursor-pointer" 
-        />
+        <div className="w-full max-w-[130px] transition-all duration-300 cursor-pointer hover:scale-105">
+          <img 
+            src="/logo.png" 
+            alt="King Sablon Logo Light" 
+            className="w-full h-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden" 
+          />
+          <img 
+            src="/logo-dark.png" 
+            alt="King Sablon Logo Dark" 
+            className="w-full h-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block" 
+          />
+        </div>
       </div>
 
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-2">

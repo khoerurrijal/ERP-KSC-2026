@@ -54,7 +54,10 @@ export default async function DashboardLayout({ children }) {
       {isOperator && (
         <div className="w-full bg-background/80 backdrop-blur-md border-b border-white/10 p-4 sticky top-0 z-50 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Logo" className="h-8 object-contain drop-shadow-md" />
+            <div className="flex shrink-0">
+              <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
+              <img src="/logo-dark.png" alt="Logo Dark" className="h-8 object-contain drop-shadow-md hidden dark:block" />
+            </div>
             <span className="font-bold text-primary">Operator Panel</span>
           </div>
           <Sidebar allowedMenus={allowedMenus} userRole={userRole} isOperatorOnly={true} />
