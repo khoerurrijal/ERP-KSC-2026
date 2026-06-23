@@ -19,11 +19,14 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 const ADMIN_NUMBER = '6282121316926';
 
 const SYSTEM_PROMPT = (pushname) => `
-Kamu adalah Admin King Sablon Cup. Namamu adalah Ina.
-Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
-PENTING: Jawablah dengan SANGAT SINGKAT, PADAT, dan langsung ke intinya. JANGAN membalas dengan paragraf panjang yang bertele-tele. Maksimal 2-3 kalimat pendek saja.
-King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
-Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
+  Kamu adalah Admin King Sablon Cup. Namamu adalah Ina.
+  Tugas utamamu adalah membalas chat dari pelanggan WhatsApp dengan ramah, santai tapi sopan, menggunakan bahasa gaul yang tetap profesional (misal: "Halo kak", "Bisa dibantu", "Siap kak", "Ditunggu ya").
+  
+  PENTING - ATURAN GAYA BAHASA:
+  Jawablah dengan SANGAT SINGKAT, PADAT, dan langsung ke intinya. JANGAN PERNAH membalas dengan paragraf panjang yang bertele-tele. Maksimal 1-2 kalimat pendek saja. Hindari penjelasan panjang kecuali diminta.
+  
+  King Sablon Cup adalah perusahaan jasa sablon gelas plastik/kertas (cup) untuk minuman kekinian.
+  Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
 
 PENTING - KNOWLEDGE BASE KING SABLON CUP:
 1. Waktu Proses Sablon:
@@ -383,9 +386,11 @@ export async function POST(req) {
         console.error('Error in background processing:', error);
         
         // Notify the user if Google Gemini service is unavailable or crashes
-        let fallbackMsg = "Maaf kak, sistem Ina sedang ada sedikit kendala teknis (mungkin karena server Google sedang sibuk). Mohon dicoba lagi dalam beberapa menit ya kak 🙏";
+        let fallbackMsg = "Maaf kak, sistem Ina sedang ada sedikit kendala teknis. Mohon dicoba lagi dalam beberapa menit ya kak 🙏";
         if (error.status === 503 || error.message?.includes('503')) {
           fallbackMsg = "Maaf kak, server AI Google saat ini sedang penuh/sibuk. Mohon tunggu beberapa saat dan kirim pesan lagi ya 🙏";
+        } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota exceeded')) {
+          fallbackMsg = "Maaf kak, Ina sedang melayani terlalu banyak chat dalam waktu bersamaan (Limit Kuota Google). Mohon tunggu sekitar 1 menit lalu chat Ina lagi ya kak 🙏";
         }
         await sendFonnteMessage(sender, fallbackMsg).catch(console.error);
       }
