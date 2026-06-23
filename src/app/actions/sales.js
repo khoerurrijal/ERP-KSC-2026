@@ -474,10 +474,23 @@ export async function updateSalesItemStatus(itemId, newStatus) {
 
     // Jika dibatalkan, kita juga mencari id sales_order-nya dan menghapus transaksi pembayaran (DP/Lunas)
     if (newStatus === 'BATAL') {
-      const { data: itemData } = await supabase.from('sales_items').select('so_id').eq('id', itemId).single()
+      const { data: itemData } = await supabase.from('sales_items').select('id, so_id, product_code, qty, unit_multiplier, order_type, sales_orders(invoice_number)').eq('id', itemId).single()
       if (itemData && itemData.so_id) {
         // Hapus transaksi kasir terkait SO ini agar saldo tidak menggantung
         await supabase.from('transactions').delete().eq('so_id', itemData.so_id)
+
+        // Insert mutasi REVERT untuk stok
+        const isPolos = !itemData.order_type || itemData.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(itemData.order_type.toUpperCase());
+        const actualQty = Number(itemData.qty) * Number(itemData.unit_multiplier || 1);
+        await supabase.from('stock_mutations').insert({
+          product_code: itemData.product_code,
+          mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
+          reference_id: itemData.id,
+          reference_number: itemData.sales_orders?.invoice_number || itemData.so_id,
+          qty_tersedia_change: actualQty,
+          qty_fisik_change: isPolos ? actualQty : 0,
+          notes: `Pembatalan Item dari Invoice: ${itemData.sales_orders?.invoice_number}`
+        })
       }
     }
     revalidatePath('/dashboard/sales')
@@ -494,11 +507,35 @@ export async function cancelSalesOrder(soId) {
   const supabase = await createClient()
 
   try {
-    // 1. Ubah status semua item menjadi BATAL (ini akan trigger pengembalian stok tersedia di DB)
+    // Ambil data item sebelum status diubah untuk merevert stok
+    const { data: itemsToCancel } = await supabase.from('sales_items')
+      .select('id, product_code, qty, unit_multiplier, order_type, sales_orders(invoice_number)')
+      .eq('so_id', soId)
+
+    // 1. Ubah status semua item menjadi BATAL
     const { error: itemsErr } = await supabase.from('sales_items')
       .update({ status: 'BATAL' })
       .eq('so_id', soId)
     if (itemsErr) throw new Error(itemsErr.message)
+
+    // Insert mutasi REVERT untuk stok
+    if (itemsToCancel && itemsToCancel.length > 0) {
+      const invoiceNum = itemsToCancel[0]?.sales_orders?.invoice_number || soId;
+      const mutations = itemsToCancel.map(item => {
+        const isPolos = !item.order_type || item.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(item.order_type.toUpperCase());
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+        return {
+          product_code: item.product_code,
+          mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
+          reference_id: item.id,
+          reference_number: invoiceNum,
+          qty_tersedia_change: actualQty,
+          qty_fisik_change: isPolos ? actualQty : 0,
+          notes: `Pembatalan Invoice: ${invoiceNum}`
+        }
+      })
+      await supabase.from('stock_mutations').insert(mutations)
+    }
 
     // 2. Ubah status pembayaran invoice menjadi BATAL
     const { error: soErr } = await supabase.from('sales_orders')

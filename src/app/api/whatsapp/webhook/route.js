@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 
+export const maxDuration = 60; // Allow API route to run for up to 60 seconds on Vercel
+
 // Initialize Supabase client
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -169,7 +171,7 @@ export async function POST(req) {
     if (lastMsgData && lastMsgData.length > 0) {
       const lastMsg = lastMsgData[0];
       const timeDiff = new Date() - new Date(lastMsg.created_at);
-      if (lastMsg.role === 'user' && lastMsg.content === message && timeDiff < 15000) {
+      if (lastMsg.role === 'user' && lastMsg.content === message && timeDiff < 30000) {
         console.log(`[Webhook] Ignored duplicate message from ${sender} (Fonnte retry loop protection)`);
         return NextResponse.json({ success: true, message: 'Duplicate ignored' });
       }
@@ -275,7 +277,7 @@ export async function POST(req) {
     }));
 
     const model = genAI.getGenerativeModel({
-      model: "gemini-2.5-flash",
+      model: "gemini-1.5-flash",
       systemInstruction: SYSTEM_PROMPT(pushname),
       tools: [{
         functionDeclarations: [{
@@ -296,8 +298,8 @@ export async function POST(req) {
     let result;
     
     try {
-      // Cutoff at 9 seconds to fit within ~10s webhook constraints
-      result = await runWithTimeout(chat.sendMessage(message), 9000);
+      // Allow up to 30 seconds for Gemini since Vercel maxDuration is 60s
+      result = await runWithTimeout(chat.sendMessage(message), 30000);
     } catch (error) {
       if (error.message === 'TIMEOUT') {
         const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya karena banyak antrian. Tunggu sebentar ya, Ina coba proses ulang... 🙏";
@@ -339,7 +341,7 @@ export async function POST(req) {
             name: "cek_pesanan",
             response: functionResponseData
           }
-        }]), 9000);
+        }]), 30000);
       } catch (error) {
         if (error.message === 'TIMEOUT') {
           const fallbackMsg = "Wah maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";

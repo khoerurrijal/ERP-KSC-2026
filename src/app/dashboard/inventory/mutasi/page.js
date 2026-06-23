@@ -24,7 +24,7 @@ export default async function MutasiPage({ searchParams }) {
   const lastDay = new Date(year, month, 0).getDate()
   const endDateStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`
 
-  const { data: mutations, error } = await supabase
+  const { data: rawMutations, error } = await supabase
     .from('inventory_mutations')
     .select('*')
     .gte('mutation_date', `${selectedMonth}-01`)
@@ -32,12 +32,42 @@ export default async function MutasiPage({ searchParams }) {
     .order('created_at', { ascending: false })
     .limit(50000)
 
+  let mutations = rawMutations || [];
+
+  // Ambil mutasi tambahan dari stock_mutations yang tidak tercover oleh view
+  const { data: stockMutations } = await supabase
+    .from('stock_mutations')
+    .select('*, products(name)')
+    .gte('created_at', `${selectedMonth}-01T00:00:00`)
+    .lte('created_at', `${endDateStr}T23:59:59`)
+    .not('mutation_type', 'in', '("IN","OUT_POLOS","OUT_SABLON")')
+
+  if (stockMutations && stockMutations.length > 0) {
+    const extraMutations = stockMutations.map(m => {
+      const isPositive = (m.qty_tersedia_change > 0) || (m.qty_fisik_change > 0);
+      const isNegative = (m.qty_tersedia_change < 0) || (m.qty_fisik_change < 0);
+      const magnitude = Math.max(Math.abs(m.qty_tersedia_change || 0), Math.abs(m.qty_fisik_change || 0));
+
+      return {
+        mutation_date: m.created_at.substring(0, 10),
+        reference: `${m.mutation_type}: ${m.reference_number || '-'}`,
+        actor: 'SYSTEM',
+        product_code: m.product_code,
+        product_name: m.products?.name || 'Unknown',
+        qty_in: isPositive ? magnitude : 0,
+        qty_out: isNegative ? magnitude : 0,
+        created_at: m.created_at
+      }
+    });
+    mutations = [...mutations, ...extraMutations].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  }
+
   // Ambil data produk untuk dropdown filter
   const { data: products } = await supabase.from('products').select('product_code, name').order('name')
 
   return (
     <MutasiClient 
-      mutations={mutations || []} 
+      mutations={mutations} 
       products={products || []} 
       selectedMonth={selectedMonth} 
       error={error ? error.message : null}

@@ -47,14 +47,14 @@ export default async function DashboardPage({ searchParams }) {
   // SO Lunas: Selesai bulan ini
   const soLunas = thisMonthOrders.filter(o => o.payment_status === 'LUNAS').length
   
-  // SO Belum Lunas & Marketplace Tempo: Hutang berjalan (TIDAK DIFILTER BULAN)
-  const soBelumLunas = rawOrders.filter(o => o.payment_status !== 'LUNAS').length
+  // SO Belum Lunas & Marketplace Tempo: Hutang berjalan (TIDAK DIFILTER BULAN), ABAIKAN BATAL
+  const soBelumLunas = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL').length
 
-  const mpTempo = (marketplaceOrders || []).filter(o => o.payment_status !== 'LUNAS').length
+  const mpTempo = (marketplaceOrders || []).filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL').length
   
-  // Calculate Jumlah Produksi Type Sablon (hanya bulan terpilih)
-  const totalSablonQty = thisMonthOrders.reduce((acc, order) => {
-    const sablonQty = order.sales_items?.filter(item => item.order_type === 'SABLON').reduce((sum, item) => sum + item.qty, 0) || 0
+  // Calculate Jumlah Produksi Type Sablon (hanya bulan terpilih, ABAIKAN BATAL)
+  const totalSablonQty = thisMonthOrders.filter(o => o.payment_status !== 'BATAL').reduce((acc, order) => {
+    const sablonQty = order.sales_items?.filter(item => item.order_type === 'SABLON' && item.status !== 'BATAL').reduce((sum, item) => sum + item.qty, 0) || 0
     return acc + sablonQty
   }, 0)
 
@@ -158,9 +158,9 @@ export default async function DashboardPage({ searchParams }) {
             </h2>
             <Link href="/dashboard/sales" className="text-xs text-primary hover:underline">Lihat SO</Link>
           </div>
-          <div className="p-4 flex-1 overflow-y-auto max-h-[450px] space-y-3">
+             <div className="p-4 flex-1 overflow-y-auto max-h-[450px] space-y-3">
              {(() => {
-               const unpaidOrders = rawOrders.filter(o => o.payment_status !== 'LUNAS')
+               const unpaidOrders = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL')
                if (unpaidOrders.length === 0) {
                  return <div className="text-center text-foreground/40 py-8">Belum ada piutang/pesanan aktif.</div>
                }

@@ -502,6 +502,10 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                     if (itemStatuses.length === 0) itemStatuses = polosStatuses;
                   }
                   
+                  if (currentStatus === 'BATAL') {
+                    itemStatuses = [...itemStatuses, 'BATAL'];
+                  }
+                  
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-2 align-middle">
@@ -545,7 +549,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                           <div className="relative inline-block w-36 text-left">
                             <select 
                               value={currentStatus}
-                              disabled={isUpdating}
+                              disabled={isUpdating || currentStatus === 'BATAL'}
                               onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
                               className={`w-full appearance-none outline-none border rounded-md px-2.5 py-1 text-[11px] font-bold transition-all
                                 ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}

@@ -102,7 +102,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   // TAB 1: Tracking Sales Order (Visual Timeline)
   const trackingSoItems = (productionJobs || []).filter(j => 
-    j.item_status?.toUpperCase() !== 'SELESAI' && j.item_status?.toUpperCase() !== 'DIBATALKAN' &&
+    j.item_status?.toUpperCase() !== 'SELESAI' && j.item_status?.toUpperCase() !== 'BATAL' &&
     ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
      (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
