@@ -5,6 +5,17 @@ import CustomSelect from '@/components/CustomSelect'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 import { ShoppingCart, X, Plus, ChevronRight, Image as ImageIcon } from 'lucide-react'
 
+// Helper to convert Google Drive viewing URLs into direct image URLs
+const getDirectImgUrl = (url) => {
+  if (!url) return url;
+  const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
+  const match = url.match(driveRegex);
+  if (match && match[1]) {
+    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+  }
+  return url;
+}
+
 export default function OrderClient({ products, matrix, dropdownConfig, pricelistConfig = {}, categoryImagesConfig = {} }) {
   // --- STATE ---
   const orderTypeOptions = useMemo(() => {
@@ -267,7 +278,8 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
             {displayedCategories.map(cat => {
               // Placeholder using local logo
               const fallbackImage = '/logo-dark.png'
-              const imgUrl = categoryImagesConfig[cat] || fallbackImage
+              const rawUrl = categoryImagesConfig[cat]
+              const imgUrl = rawUrl ? getDirectImgUrl(rawUrl) : fallbackImage
               
               return (
                 <div 
