@@ -37,7 +37,18 @@ export async function createSalesOrder(payload) {
     const invoiceNumber = `INV-${dateStr}-${randomStr}`
 
     // Calculate grand total
-    const grandTotal = items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price)), 0)
+    const grandTotal = items.reduce((sum, item) => {
+      let itemTotal = Number(item.qty) * Number(item.price);
+      if (item.isFastTrack) {
+        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
+        itemTotal += 100000 * qtyFastTrack;
+      }
+      if (item.isTwoColor) {
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+        itemTotal += 250 * actualQty;
+      }
+      return sum + itemTotal;
+    }, 0)
     const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get customer name
@@ -360,7 +371,18 @@ export async function updateSalesOrder(soId, payload) {
   try {
     const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt } = payload
 
-    const grandTotal = items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price)), 0)
+    const grandTotal = items.reduce((sum, item) => {
+      let itemTotal = Number(item.qty) * Number(item.price);
+      if (item.isFastTrack) {
+        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
+        itemTotal += 100000 * qtyFastTrack;
+      }
+      if (item.isTwoColor) {
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+        itemTotal += 250 * actualQty;
+      }
+      return sum + itemTotal;
+    }, 0)
     const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get profit margins from settings

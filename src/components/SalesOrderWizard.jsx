@@ -126,7 +126,18 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
   
   const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + (Number(item.qty) * Number(item.price)), 0)
+    return items.reduce((sum, item) => {
+      let itemTotal = Number(item.qty) * Number(item.price)
+      if (item.isFastTrack) {
+        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
+        itemTotal += 100000 * qtyFastTrack
+      }
+      if (item.isTwoColor) {
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1)
+        itemTotal += 250 * actualQty
+      }
+      return sum + itemTotal
+    }, 0)
   }
 
   const grandTotal = calculateTotal()
@@ -422,10 +433,23 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     </div>
                   </div>
                   
-                  <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-sm">
-                    <span className="text-foreground/60">Subtotal Item:</span>
-                    <span className="font-bold text-primary text-base">Rp {(Number(item.qty) * Number(item.price)).toLocaleString('id-ID')}</span>
-                  </div>
+                  {(() => {
+                    let itemTotal = Number(item.qty) * Number(item.price);
+                    if (item.isFastTrack) {
+                      const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
+                      itemTotal += 100000 * qtyFastTrack;
+                    }
+                    if (item.isTwoColor) {
+                      const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+                      itemTotal += 250 * actualQty;
+                    }
+                    return (
+                      <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-sm">
+                        <span className="text-foreground/60">Subtotal Item:</span>
+                        <span className="font-bold text-primary text-base">Rp {itemTotal.toLocaleString('id-ID')}</span>
+                      </div>
+                    )
+                  })()}
 
                   {item.order_type?.toUpperCase() === 'SABLON' && (
                     <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
