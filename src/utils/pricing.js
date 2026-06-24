@@ -94,3 +94,32 @@ export function calculateItemPrice({
   // 4. Return rounded up price
   return Math.ceil(basePrice);
 }
+
+export function getMinQty({ orderType, category, printingColors, pricelistConfig }) {
+  const isSablon = (orderType || '').toUpperCase() === 'SABLON';
+  const isPrinting = (orderType || '').toUpperCase() === 'PRINTING';
+
+  if (isPrinting) {
+    const cat = printingColors || '3 Warna';
+    const printingMatrix = pricelistConfig?.printing_matrix || {};
+    if (printingMatrix[cat]) {
+      const tiers = Object.keys(printingMatrix[cat]).map(Number).sort((a, b) => a - b);
+      for (const t of tiers) {
+        if (printingMatrix[cat][t] > 0) return t;
+      }
+    }
+    return 5000; // fallback if empty
+  }
+
+  if (isSablon) {
+    const sablonMatrix = pricelistConfig?.sablon_matrix || {};
+    if (category && sablonMatrix[category]) {
+      const tiers = Object.keys(sablonMatrix[category]).map(Number).sort((a, b) => a - b);
+      for (const t of tiers) {
+        if (sablonMatrix[category][t] > 0) return t;
+      }
+    }
+  }
+
+  return 1;
+}

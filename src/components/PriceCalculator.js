@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Calculator } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
-import { calculateItemPrice } from '@/utils/pricing'
+import { calculateItemPrice, getMinQty } from '@/utils/pricing'
 
 export default function PriceCalculator({ products = [], dropdownConfig = {}, pricelistConfig = {} }) {
   const [orderType, setOrderType] = useState('')
@@ -31,6 +31,9 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
   // Calculate Main Item Price
   const isSablon = orderType?.toUpperCase() === 'SABLON'
   const isPrinting = orderType?.toUpperCase() === 'PRINTING'
+  
+  const minQty = getMinQty({ orderType, category, printingColors, pricelistConfig })
+  
   let basePricePerPcs = 0;
   if (selectedProduct) {
     basePricePerPcs = calculateItemPrice({
@@ -148,9 +151,12 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
             <input 
               type="number" 
               value={qty === 0 ? '' : qty} 
+              onBlur={() => {
+                if (qty < minQty) setQty(minQty)
+              }}
               onChange={(e) => setQty(e.target.value === '' ? 0 : Number(e.target.value))}
               className="glass-input w-full text-sm"
-              min="1"
+              min={minQty}
             />
           </div>
 

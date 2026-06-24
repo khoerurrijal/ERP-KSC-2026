@@ -7,7 +7,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
-import { calculateItemPrice as calculateItemPriceUtil } from '@/utils/pricing'
+import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 
 export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, pricelistConfig = {} }) {
   const router = useRouter()
@@ -197,6 +197,24 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         
         if (['qty', 'product_search', 'order_type', 'category', 'unit', 'printingColors'].includes(field)) {
           const selectedProduct = products.find(p => p.name === updated.product_search)
+          
+          // Auto adjust Qty based on minimum rules
+          const minQty = getMinQty({
+            orderType: updated.order_type,
+            category: updated.category,
+            printingColors: updated.printingColors || '3 Warna',
+            pricelistConfig
+          })
+          
+          if (updated.qty < minQty) {
+            // Only auto-correct if it's not currently being typed (i.e. we enforce it when category/order_type changes)
+            // But if they are typing qty, we shouldn't hard block them from typing "1" before typing "000".
+            // So we'll let 'qty' be updated normally here, but we will add a blur handler on the input itself.
+            if (field !== 'qty') {
+              updated.qty = minQty;
+            }
+          }
+
           if (selectedProduct) {
             const basePrice = calculateItemPriceUtil({
               product: selectedProduct,
@@ -407,7 +425,24 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">Qty</label>
-                      <input type="text" value={formatRp(item.qty)} onChange={e => handleItemChange(item.id, 'qty', parseRp(e.target.value))} className="glass-input w-full text-sm px-2" />
+                      <input 
+                        type="text" 
+                        value={formatRp(item.qty)} 
+                        onBlur={(e) => {
+                          const val = parseRp(e.target.value);
+                          const minQty = getMinQty({
+                            orderType: item.order_type,
+                            category: item.category,
+                            printingColors: item.printingColors,
+                            pricelistConfig
+                          });
+                          if (val < minQty) {
+                            handleItemChange(item.id, 'qty', minQty);
+                          }
+                        }}
+                        onChange={e => handleItemChange(item.id, 'qty', parseRp(e.target.value))} 
+                        className="glass-input w-full text-sm px-2" 
+                      />
                     </div>
 
                     <div className="space-y-1 col-span-2">
