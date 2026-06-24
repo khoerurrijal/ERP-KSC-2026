@@ -5,18 +5,6 @@ import CustomSelect from '@/components/CustomSelect'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 import { ShoppingCart, X, Plus, ChevronRight, Image as ImageIcon } from 'lucide-react'
 
-// Helper to convert Google Drive viewing URLs into direct image URLs
-const getDirectImgUrl = (url) => {
-  if (!url) return url;
-  const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
-  const match = url.match(driveRegex);
-  if (match && match[1]) {
-    // lh3.googleusercontent.com is the only reliable way to hotlink Drive images now
-    return `https://lh3.googleusercontent.com/d/${match[1]}`;
-  }
-  return url;
-}
-
 export default function OrderClient({ products, matrix, dropdownConfig, pricelistConfig = {}, categoryImagesConfig = {} }) {
   // --- STATE ---
   const orderTypeOptions = useMemo(() => {
@@ -279,8 +267,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
             {displayedCategories.map(cat => {
               // Placeholder using local logo
               const fallbackImage = '/logo-dark.png'
-              const rawUrl = categoryImagesConfig[cat]
-              const imgUrl = rawUrl ? getDirectImgUrl(rawUrl) : fallbackImage
+              const imgUrl = categoryImagesConfig[cat] || fallbackImage
               
               return (
                 <div 
