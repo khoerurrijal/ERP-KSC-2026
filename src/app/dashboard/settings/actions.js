@@ -15,6 +15,7 @@ export async function getSettings() {
   const dropdown_config = data.find(d => d.key === 'dropdown_config')?.value || {}
   const cashflow_config = data.find(d => d.key === 'cashflow_config')?.value || {}
   const store_config = data.find(d => d.key === 'store_config')?.value || {}
+  const category_images_config = data.find(d => d.key === 'category_images_config')?.value || {}
   const pricelist_config = data.find(d => d.key === 'pricelist_config')?.value || {
     profit_gudang_nominal: 50,
     profit_global_percent: 10,
@@ -69,13 +70,26 @@ export async function getSettings() {
   }
   pricelist_config.printing_matrix = printing_matrix
 
-  return { dropdown_config, cashflow_config, store_config, pricelist_config, role_permissions, user_roles }
+  return { dropdown_config, cashflow_config, store_config, pricelist_config, role_permissions, user_roles, category_images_config }
 }
 
 export async function updateDropdownConfig(newConfig) {
   const supabase = await createClient()
   const { error } = await supabase.from('system_settings').upsert({
     key: 'dropdown_config',
+    value: newConfig,
+    updated_at: new Date().toISOString()
+  })
+  
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true }
+}
+
+export async function updateCategoryImagesConfig(newConfig) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('system_settings').upsert({
+    key: 'category_images_config',
     value: newConfig,
     updated_at: new Date().toISOString()
   })

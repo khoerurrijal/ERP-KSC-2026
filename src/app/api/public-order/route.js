@@ -8,9 +8,13 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { brandName, whatsappNumber, items, fastTrack, designService, subtotal, grandTotal } = body;
+    console.log("PUBLIC ORDER PAYLOAD:", body);
+    const { brandName, whatsappNumber, waNumber, items, designService, subtotal, grandTotal } = body;
+    
+    const finalWaNumber = whatsappNumber || waNumber;
 
-    if (!brandName || !whatsappNumber || !items || items.length === 0) {
+    if (!brandName || !finalWaNumber || !items || items.length === 0) {
+      console.log("Incomplete data details:", { brandName, finalWaNumber, items });
       return NextResponse.json({ success: false, error: 'Incomplete data' }, { status: 400 });
     }
 
@@ -31,7 +35,7 @@ export async function POST(req) {
         .from('customers')
         .insert([{ 
           name: brandName, 
-          phone: whatsappNumber,
+          phone: finalWaNumber,
           customer_code: newCustomerCode
         }])
         .select()
@@ -50,7 +54,8 @@ export async function POST(req) {
 
     // 3. Create Sales Order
     let notes = `Order via Web Calculator.\nUnik: Rp ${uniqueCode}\nSubtotal: Rp ${subtotal}\n`;
-    if (fastTrack) notes += `- Fast Track (+Rp 100.000)\n`;
+    const totalFastTrack = items.filter(i => i.isFastTrack).length;
+    if (totalFastTrack > 0) notes += `- Fast Track (${totalFastTrack} item) (+Rp ${totalFastTrack * 100000})\n`;
     if (designService) notes += `- Jasa Desain (+Rp 50.000)\n`;
 
     const { data: order, error: orderError } = await supabase
@@ -59,7 +64,7 @@ export async function POST(req) {
         invoice_number: invoiceNumber,
         customer_code: customerId, // The ERP uses the customer_code as string reference
         date: new Date().toISOString().split('T')[0],
-        status: 'PROSES',
+        status: 'DRAFT',
         payment_status: 'BELUM LUNAS',
         payment_method: 'TRANSFER',
         dp_amount: 0,
@@ -75,7 +80,9 @@ export async function POST(req) {
     const soItems = [];
     for (const item of items) {
       let itemNotes = '';
-      if (fastTrack) itemNotes += '🔥 Fast Track\n';
+      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      if (item.isTwoColor) itemNotes += '🎨 2 Warna\n';
+      if (item.printingColors) itemNotes += `🎨 ${item.printingColors}\n`;
       
       soItems.push({
         so_id: order.id,
@@ -89,18 +96,17 @@ export async function POST(req) {
         notes: itemNotes.trim()
       });
 
-      if (fastTrack) {
-        const qtyFastTrack = Math.ceil(parseInt(item.qty) / 1000);
+      if (item.isFastTrack) {
         soItems.push({
           so_id: order.id,
           order_type: 'POLOS',
           product_code: 'SRV-FAST-TRACK',
-          qty: qtyFastTrack,
+          qty: 1, // Fixed 1 service per fast-track item checked
           unit: 'Layanan',
           unit_multiplier: 1,
           unit_price: 100000,
-          total_price: 100000 * qtyFastTrack,
-          notes: `Untuk ${item.productName}`
+          total_price: 100000,
+          notes: `Fast Track untuk ${item.productName || item.productId}`
         });
       }
 
@@ -128,9 +134,12 @@ export async function POST(req) {
     // Return success
     return NextResponse.json({ 
       success: true, 
-      invoice: invoiceNumber, 
-      grandTotal: finalGrandTotal,
-      uniqueCode: uniqueCode 
+      data: {
+        brand_name: brandName,
+        invoice_number: invoiceNumber,
+        grand_total: finalGrandTotal,
+        uniqueCode: uniqueCode 
+      }
     });
 
   } catch (error) {

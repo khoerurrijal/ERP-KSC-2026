@@ -1,8 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users } from 'lucide-react'
-import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig } from './actions'
+import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon } from 'lucide-react'
+import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig } from './actions'
 
 export default function SettingsClient({ initialSettings }) {
   const [activeTab, setActiveTab] = useState('dropdowns')
@@ -70,6 +70,15 @@ export default function SettingsClient({ initialSettings }) {
   // State for Roles & Permissions
   const [rolePermissions, setRolePermissions] = useState(initialSettings.role_permissions || {})
   const [userRoles, setUserRoles] = useState(initialSettings.user_roles || [])
+  
+  // State for Category Images
+  const [categoryImages, setCategoryImages] = useState(initialSettings.category_images_config || {})
+  
+  const allCategoriesSet = new Set()
+  Object.values(dropdowns.category_mapping || {}).forEach(arr => {
+    arr.forEach(cat => allCategoriesSet.add(cat))
+  })
+  const allCategoriesList = Array.from(allCategoriesSet).filter(Boolean).sort()
   
   const MENU_LIST = [
     { key: 'dashboard', label: 'Dashboard' },
@@ -203,6 +212,14 @@ export default function SettingsClient({ initialSettings }) {
     setIsSaving(false)
   }
 
+  const handleSaveCategoryImages = async () => {
+    setIsSaving(true)
+    setError(null)
+    const res = await updateCategoryImagesConfig(categoryImages)
+    if (!res.success) setError(res.error)
+    setIsSaving(false)
+  }
+
   const handleSaveAccess = async () => {
     setIsSaving(true)
     setError(null)
@@ -278,7 +295,18 @@ export default function SettingsClient({ initialSettings }) {
           }`}
         >
           <Store className="w-4 h-4" />
-          Toko & Invoice
+          Informasi Toko / Kop Surat
+        </button>
+        <button
+          onClick={() => setActiveTab('category_images')}
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+            activeTab === 'category_images' 
+              ? 'border-blue-400 text-blue-400' 
+              : 'border-transparent text-foreground/50 hover:text-foreground/80'
+          }`}
+        >
+          <ImageIcon className="w-4 h-4" />
+          Foto Kategori (Katalog)
         </button>
         <button
           onClick={() => setActiveTab('access')}
@@ -894,6 +922,57 @@ export default function SettingsClient({ initialSettings }) {
             >
               <Save className="w-5 h-5" />
               {isSaving ? 'Menyimpan...' : 'Simpan Profil Toko'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Content: Category Images */}
+      {activeTab === 'category_images' && (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+            <div className="mb-6">
+              <h2 className="text-xl font-bold flex items-center gap-2 text-blue-400">
+                <ImageIcon className="w-6 h-6" />
+                Pengaturan Foto Kategori Katalog
+              </h2>
+              <p className="text-foreground/60 text-sm mt-1">Masukkan URL gambar/foto untuk setiap kategori yang akan ditampilkan di halaman Web Order (katalog kustomer).</p>
+            </div>
+
+            <div className="space-y-4">
+              {allCategoriesList.length === 0 ? (
+                <div className="text-center py-8 text-foreground/40 italic bg-white/5 rounded-xl border border-white/5">
+                  Belum ada kategori yang dikonfigurasi di "List Dropdown Form".
+                </div>
+              ) : (
+                allCategoriesList.map(cat => (
+                  <div key={cat} className="flex flex-col sm:flex-row sm:items-center gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+                    <div className="w-full sm:w-1/3">
+                      <p className="font-bold text-base">{cat}</p>
+                    </div>
+                    <div className="w-full sm:w-2/3">
+                      <input
+                        type="text"
+                        placeholder="Masukkan URL foto (https://...)"
+                        value={categoryImages[cat] || ''}
+                        onChange={(e) => setCategoryImages({ ...categoryImages, [cat]: e.target.value })}
+                        className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-2 text-sm focus:outline-none focus:border-blue-400/50 text-foreground"
+                      />
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              onClick={handleSaveCategoryImages}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-blue-500 text-white px-8 py-3 rounded-xl font-bold hover:bg-blue-600 transition-all active:scale-95 shadow-[0_0_20px_rgba(59,130,246,0.3)] disabled:opacity-50"
+            >
+              <Save className="w-5 h-5" />
+              {isSaving ? 'Menyimpan...' : 'Simpan Foto Kategori'}
             </button>
           </div>
         </div>
