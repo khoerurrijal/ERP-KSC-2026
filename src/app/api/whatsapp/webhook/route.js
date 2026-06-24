@@ -29,23 +29,27 @@ const SYSTEM_PROMPT = (pushname) => `
   Nama profil WhatsApp pelanggan saat ini adalah: "${pushname}". Jika dia menanyakan pesanan atas namanya, kamu bisa menggunakan nama ini untuk mencari di database.
 
 PENTING - KNOWLEDGE BASE KING SABLON CUP:
-1. Waktu Proses Sablon:
+1. Alamat & Jam Buka:
+   - Alamat: Jl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).
+   - Google Maps: https://maps.google.com/?q=King+Sablon+Cup
+   - Jam Operasional: Buka Senin s/d Sabtu, pukul 09.00 - 17.00 WIB. (Minggu dan Tanggal Merah TUTUP).
+   - Di luar jam operasional, kamu (AI) yang akan menjawab semua pertanyaan secara otomatis.
+2. Tinta Sablon & Warna:
+   - Sablon cup BUKAN menggunakan sistem warna digital/print/foto (RGB atau CMYK).
+   - Sablon menggunakan **Tinta Sablon Solid** (warna blok pasti). Oleh karena itu, desain tidak boleh ada efek gradasi, bayangan, atau efek foto transparan.
+   - Pilihan warna: Bebas! Konsumen boleh pilih warna tinta solid apa saja (Merah solid, Hitam, Biru, Hijau, Gold, Silver, dll).
+   - Batas Warna: Sablon maksimal adalah **2 Warna** yang posisinya saling terpisah (tidak bisa tumpuk gradasi). Jika 2 warna, biaya jasa bertambah Rp 250/pcs.
+3. Sisi Sablon (Full Melingkar):
+   - Jika ditanya "bisa berapa sisi?", Jawab: "Bisa sablon 1 sisi, 2 sisi, 3 sisi, hingga full melingkar! Harganya tetap sama."
+   - PENTING TENTANG FULL MELINGKAR: Jika desainnya full melingkar keliling cup, beritahu bahwa akan selalu ada **jarak terputus (blank space) sekitar 1-2 cm** di titik ujung pertemuannya. Hal ini wajar karena itu adalah area jepitan layar (screen) pada mesin sablon silinder.
+4. Waktu Proses Sablon:
    - Reguler: 3-5 hari kerja (tergantung antrean produksi).
-   - Fast Track (Jalur Cepat): 1-3 hari kerja. Bisa dikebut sesuai waktu yang diinginkan (jika slot memungkinkan).
-   - Catatan: "1 hari kerja" berarti butuh 1 hari proses. Jika pesan hari ini, kemungkinan selesai besok sore (kalau tidak banyak antrean), BUKAN selesai di hari yang sama.
-2. Aturan Fast Track (Jalur Cepat):
-   - Biaya Tambahan: Rp 100.000 per 1.000 pcs.
-   - Batas Maksimal Fast Track: Hanya melayani maksimal 1.000 pcs per pesanan. Jika pesanan lebih dari 1.000 pcs (misal pesanan 3.000 pcs), maka 1.000 pcs pertama akan diproses Fast Track, sisanya (2.000 pcs) ikut antrean Reguler.
-   - Ongkir: Biaya Fast Track BELUM termasuk ongkir (ongkir tidak ditanggung).
-3. Order & Pricelist Sablon:
-   - Jika pelanggan mengatakan ingin order, pesan, menanyakan daftar harga, pricelist, atau produk, **JANGAN MENGARANG JAWABAN**. Langsung berikan respon persis seperti ini:
-   "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon."
-4. Pertanyaan Umum / Edukasi Cup & Sablon:
-   - Jika pelanggan bertanya hal umum seperti perbedaan cup PP dan PET, perbedaan cup flat dan oval, ukuran 12 oz, 14 oz, 22 oz, atau pengetahuan produk cup lainnya, **GUNAKAN PENGETAHUAN AI-MU SENDIRI** untuk menjawab dengan cerdas dan detail layaknya seorang ahli.
-   - **TIDAK PERLU** mencari di database untuk pertanyaan umum tersebut! Cukup baca database jika ada sangkut pautnya dengan pesanan, invoice, ERP, atau data pelanggan.
-5. Jam Operasional Admin:
-   - Jam operasional admin manusia (toko buka): Senin s/d Sabtu pukul 09.00-17.00 WIB.
-   - Di luar jam operasional tersebut (toko tutup), kamu sebagai AI akan sepenuhnya membantu menjawab pertanyaan pelanggan.
+   - Fast Track (Jalur Cepat): 1-3 hari kerja (+Rp 100.000 per 1.000 pcs). Batas maksimal Fast Track adalah 1.000 pcs per pesanan. Sisanya ikut antrean reguler.
+   - Catatan: "1 hari kerja" berarti butuh 1 hari proses. Jika pesan hari ini, kemungkinan selesai besok sore, BUKAN di hari H.
+5. Order & Pricelist Sablon:
+   - Jika ditanya daftar harga, pricelist, atau produk, berikan link ini: https://erpkscv1.vercel.app/order (Bisa hitung harga dan bikin invoice otomatis).
+6. Edukasi Produk Umum:
+   - Untuk pertanyaan beda PP/PET, ukuran Oz, dsb, gunakan wawasan AI-mu secara cerdas.
 
 Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
@@ -189,13 +193,17 @@ export async function POST(req) {
     if (msgLower.match(/^(halo|pagi|siang|sore|malam|assalamualaikum|ping|hi|hey|p)$/)) {
       templateReply = "Halo kak! Saya Ina, Admin King Sablon Cup. Ada yang bisa dibantu? (Pricelist / Cek Pesanan / Tanya Lainnya)";
     } else if (msgLower.match(/(alamat|dimana|lokasi|toko|tempat)/)) {
-      templateReply = "Alamat kami di:\nJl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).\nBisa dicari di Google Maps: *KING SABLON CUP* 📍";
+      templateReply = "Alamat kami di:\nJl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).\n📍 *Google Maps:* https://maps.google.com/?q=King+Sablon+Cup\n\n🕒 *Jam Buka:*\nSenin - Sabtu: 09.00 - 17.00 WIB\n(Minggu & Tanggal Merah Libur)";
     } else if (msgLower.match(/(pembayaran|rekening|bayar|cod)/)) {
       templateReply = "Pembayaran bisa cash di toko atau transfer:\n- Bank BCA: 6930240107 a/n Khoerur Rijal\n- Bank Mandiri: 9000020365095 a/n Khoerur Rijal";
     } else if (msgLower.match(/(desain|logo)/)) {
       templateReply = "Bisa kak! Jika sudah punya logo, kirim saja logonya lalu detail keinginannya via teks, nanti dibuatkan oleh editor kami.\nJika belum punya logo dan ingin *full* dibuatkan dari nol, ada biaya desain Rp 50.000.\nKakak juga bisa explore desain sendiri di aplikasi kami: cupstudio.id 🎨";
-    } else if (msgLower.match(/(warna|kertas|paper cup|paper bowl|varian)/)) {
-      templateReply = "Sablon cup maksimal 2 warna dengan biaya jasa sablon 2 warna Rp 250/pcs.\nUntuk cup kertas, kami juga menyediakan Paper Cup dan Paper Bowl kak!";
+    } else if (msgLower.match(/(warna|rgb|cmyk|gradasi|tinta)/)) {
+      templateReply = "Sablon cup kami menggunakan *Tinta Solid*, BUKAN sistem print/foto (RGB/CMYK) sehingga tidak bisa pakai desain gradasi/bayangan ya kak.\n\nNamun kakak bebas pilih warna tinta solid apa saja (Hitam, Merah, Gold, dll). Maksimal sablon adalah 2 warna terpisah.";
+    } else if (msgLower.match(/(berapa sisi|sisi|full|melingkar|keliling)/)) {
+      templateReply = "Bisa sablon 1 sisi, 2 sisi, 3 sisi, hingga *full* melingkar, harga tetap sama kak!\n\n*(Catatan penting: Untuk sablon full melingkar, pasti akan ada jarak terputus/kosong sekitar 1-2 cm di titik pertemuannya karena area jepitan mesin sablon).*";
+    } else if (msgLower.match(/(kertas|paper cup|paper bowl|varian)/)) {
+      templateReply = "Untuk sablon cup kertas, kami menyediakan Paper Cup dan Paper Bowl berbagai ukuran kak!";
     } else if (msgLower.match(/(minimal order|min order|moq|bisa pesan \d+|minimal pesan)/)) {
       templateReply = "Minimal order tergantung jenis cup kak. Kalau cup PET minimal order 1.000 pcs (sudah ada di matrix sablon).";
     } else if (msgLower.match(/(harga|pricelist|katalog|produk|price list|mau order|pesan cup|order cup|bikin sablon|mau pesan|pesen)/)) {
