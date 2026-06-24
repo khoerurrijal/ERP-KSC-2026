@@ -11,7 +11,8 @@ const getDirectImgUrl = (url) => {
   const driveRegex = /drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/;
   const match = url.match(driveRegex);
   if (match && match[1]) {
-    return `https://drive.google.com/uc?export=view&id=${match[1]}`;
+    // lh3.googleusercontent.com is the only reliable way to hotlink Drive images now
+    return `https://lh3.googleusercontent.com/d/${match[1]}`;
   }
   return url;
 }
