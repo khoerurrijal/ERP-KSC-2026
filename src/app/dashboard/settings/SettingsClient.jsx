@@ -48,8 +48,8 @@ export default function SettingsClient({ initialSettings }) {
     profit_global_percent: dbPricelist.profit_global_percent ?? 10,
     margin_jual_polos_percent: dbPricelist.margin_jual_polos_percent ?? 15,
     save_profit_percent: dbPricelist.save_profit_percent ?? 30,
-    sablon_matrix: dbPricelist.sablon_matrix || defaultMatrix,
-    printing_matrix: dbPricelist.printing_matrix || defaultPrintingMatrix
+    sablon_matrix: (dbPricelist.sablon_matrix && Object.keys(dbPricelist.sablon_matrix).length > 0) ? dbPricelist.sablon_matrix : defaultMatrix,
+    printing_matrix: (dbPricelist.printing_matrix && Object.keys(dbPricelist.printing_matrix).length > 0) ? dbPricelist.printing_matrix : defaultPrintingMatrix
   })
 
   // State for Store Config
@@ -676,7 +676,7 @@ export default function SettingsClient({ initialSettings }) {
                   <table className="w-full text-sm text-left">
                     <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
-                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Kategori</th>
+                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Varian Warna</th>
                         {['5000', '10000', '30000'].map(tier => (
                           <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
                             &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
