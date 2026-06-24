@@ -407,6 +407,11 @@ export async function updateSalesOrder(soId, payload) {
 
       // Royalty dipisah menjadi kolom sendiri
       // Tidak dicampur ke itemBeliGlobal
+      
+      let itemNotes = '';
+      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      
+      const productNameForNotes = item.product_search || product?.name || item.product_id;
 
       const isExisting = String(item.id).length > 20;
 
@@ -425,6 +430,10 @@ export async function updateSalesOrder(soId, payload) {
         beli_global: itemBeliGlobal,
         royalty_fee: itemRoyalty
       }
+      
+      // Only set notes if there is something to set, 
+      // Actually we must always set it, so if they uncheck it, it gets cleared!
+      preparedItem.notes = itemNotes.trim();
 
       if (isExisting) {
         preparedItem.id = item.id;
@@ -434,6 +443,46 @@ export async function updateSalesOrder(soId, payload) {
       }
 
       preparedItems.push(preparedItem)
+
+      if (item.isFastTrack) {
+        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
+        preparedItems.push({
+          id: crypto.randomUUID(),
+          so_id: soId,
+          order_type: 'POLOS', // don't show in production
+          product_code: 'SRV-FAST-TRACK',
+          qty: qtyFastTrack,
+          unit: 'Layanan',
+          unit_multiplier: 1,
+          unit_price: 100000,
+          total_price: 100000 * qtyFastTrack,
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
+          notes: `Untuk ${productNameForNotes}`
+        });
+      }
+
+      if (item.isTwoColor) {
+        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+        preparedItems.push({
+          id: crypto.randomUUID(),
+          so_id: soId,
+          order_type: 'SABLON', // SHOW in production
+          product_code: 'SRV-2-WARNA',
+          qty: actualQty,
+          unit: 'Pcs',
+          unit_multiplier: 1,
+          unit_price: 250,
+          total_price: 250 * actualQty,
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
+          notes: `Untuk ${productNameForNotes} - Warna Ke-2`
+        });
+      }
     }
 
     const finalBeliGlobal = totalBeliGlobal + virtualRoyaltyGlobal
