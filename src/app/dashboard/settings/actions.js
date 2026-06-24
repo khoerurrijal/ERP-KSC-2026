@@ -54,6 +54,21 @@ export async function getSettings() {
   }
   pricelist_config.sablon_matrix = sablon_matrix
 
+  // Inject printing_matrix from the dedicated table
+  const { data: printMatrixData } = await supabase.from('printing_matrix').select('*')
+  const printing_matrix = {}
+  if (printMatrixData) {
+    printMatrixData.forEach(row => {
+      if (!row.category) return
+      printing_matrix[row.category] = {
+        "5000": Number(row["5000"] || 0),
+        "10000": Number(row["10000"] || 0),
+        "30000": Number(row["30000"] || 0)
+      }
+    })
+  }
+  pricelist_config.printing_matrix = printing_matrix
+
   return { dropdown_config, cashflow_config, store_config, pricelist_config, role_permissions, user_roles }
 }
 
@@ -125,8 +140,9 @@ export async function updateUserRoles(newRoles) {
 export async function updatePricelistConfig(newConfig) {
   const supabase = await createClient()
   
-  // Keep sablon_matrix in system_settings
+  // Keep sablon_matrix and printing_matrix in system_settings
   const matrixObj = newConfig.sablon_matrix
+  const printMatrixObj = newConfig.printing_matrix
   const configToSave = { ...newConfig }
 
   const { error } = await supabase.from('system_settings').upsert({
@@ -156,6 +172,26 @@ export async function updatePricelistConfig(newConfig) {
         await supabase.from('sablon_matrix').update(payload).eq('id', existing.id)
       } else {
         await supabase.from('sablon_matrix').insert(payload)
+      }
+    }
+  }
+
+  // Update printing_matrix table
+  if (printMatrixObj) {
+    for (const [category, tiers] of Object.entries(printMatrixObj)) {
+      const payload = {
+        category,
+        "5000": Number(tiers["5000"] || 0),
+        "10000": Number(tiers["10000"] || 0),
+        "30000": Number(tiers["30000"] || 0),
+        updated_at: new Date().toISOString()
+      }
+      
+      const { data: existing } = await supabase.from('printing_matrix').select('id').eq('category', category).single()
+      if (existing) {
+        await supabase.from('printing_matrix').update(payload).eq('id', existing.id)
+      } else {
+        await supabase.from('printing_matrix').insert(payload)
       }
     }
   }

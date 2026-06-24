@@ -6,16 +6,17 @@
 export function calculateItemPrice({
   product,          // Object: product data from database { base_price, workshop_code, category }
   qty,              // Number: quantity being ordered
-  orderType,        // String: 'SABLON', 'Sablon', 'POLOS', 'Polos'
+  orderType,        // String: 'SABLON', 'Sablon', 'POLOS', 'Polos', 'PRINTING'
   isTwoColor,       // Boolean: is it a 2 color sablon?
+  printingColors,   // String: '3 Warna', '4 Warna'
   pricelistConfig   // Object: from system_settings 'pricelist_config'
 }) {
   if (!product) return 0;
   
-  // The 'HPP Murni Dasar' from Master Produk is saved in the DB as 'price_polos'
   const baseHpp = Number(product.price_polos || product.base_price || 0);
   const qtyInt = parseInt(qty, 10) || 1;
   const isSablon = (orderType || '').toUpperCase() === 'SABLON';
+  const isPrinting = (orderType || '').toUpperCase() === 'PRINTING';
 
   // 1. Calculate Harga Beli King (Base Cost + Workshop Margin)
   let hargaBeliKing = baseHpp;
@@ -62,6 +63,20 @@ export function calculateItemPrice({
     if (isTwoColor) {
       basePrice += 250;
     }
+  } else if (isPrinting) {
+    let currentPrintingFee = 0;
+    const cat = printingColors || '3 Warna'; // Default to 3 Warna if not specified
+    const printingMatrix = pricelistConfig?.printing_matrix || {};
+    
+    if (printingMatrix[cat]) {
+      const tierMatrix = printingMatrix[cat];
+      if (qtyInt >= 30000 && tierMatrix["30000"] > 0) currentPrintingFee = tierMatrix["30000"];
+      else if (qtyInt >= 10000 && tierMatrix["10000"] > 0) currentPrintingFee = tierMatrix["10000"];
+      else if (qtyInt >= 5000 && tierMatrix["5000"] > 0) currentPrintingFee = tierMatrix["5000"];
+      else currentPrintingFee = tierMatrix["5000"] || 0; // fallback
+    }
+    
+    basePrice += currentPrintingFee;
   } else {
     // POLOS Margin
     const marginPolos = pricelistConfig?.margin_jual_polos_percent !== undefined && pricelistConfig?.margin_jual_polos_percent !== '' 

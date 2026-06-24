@@ -10,7 +10,8 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
   const [unit, setUnit] = useState('PCS')
-  const [qty, setQty] = useState(1)
+  const [qty, setQty] = useState(1000)
+  const [printingColors, setPrintingColors] = useState('3 Warna')
   const [addons, setAddons] = useState([]) // [{ id: Date.now(), productId: '', qty: 1 }]
 
   const getCategoriesForItem = (oType) => {
@@ -29,6 +30,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
 
   // Calculate Main Item Price
   const isSablon = orderType?.toUpperCase() === 'SABLON'
+  const isPrinting = orderType?.toUpperCase() === 'PRINTING'
   let basePricePerPcs = 0;
   if (selectedProduct) {
     basePricePerPcs = calculateItemPrice({
@@ -36,6 +38,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
       qty: qty,
       orderType: orderType,
       isTwoColor: false,
+      printingColors: printingColors,
       pricelistConfig
     });
   }
@@ -131,12 +134,12 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
               onChange={(e) => setUnit(e.target.value)} 
               options={(() => {
                 const base = [{ value: 'PCS', label: 'PCS' }]
-                if (!isSablon && selectedProduct && selectedProduct.product_units && selectedProduct.product_units.length > 0) {
+                if (!isSablon && !isPrinting && selectedProduct && selectedProduct.product_units && selectedProduct.product_units.length > 0) {
                   return [...base, ...selectedProduct.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
                 }
                 return base
               })()}
-              disabled={isSablon || !productId}
+              disabled={isSablon || isPrinting || !productId}
             />
           </div>
 
@@ -150,6 +153,34 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
               min="1"
             />
           </div>
+
+          {isPrinting && (
+            <div className="space-y-1 col-span-2">
+              <label className="text-xs font-medium text-foreground/60">Varian Warna Printing</label>
+              <div className="flex gap-4">
+                <label className="flex items-center gap-2 cursor-pointer text-sm bg-black/20 px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors">
+                  <input 
+                    type="radio" 
+                    name="printingColors" 
+                    className="text-blue-500"
+                    checked={printingColors === '3 Warna'} 
+                    onChange={() => setPrintingColors('3 Warna')} 
+                  />
+                  <span className="text-blue-400 font-bold">3 Warna</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm bg-black/20 px-4 py-2 rounded-lg border border-white/10 hover:bg-white/5 transition-colors">
+                  <input 
+                    type="radio" 
+                    name="printingColors" 
+                    className="text-purple-500"
+                    checked={printingColors === '4 Warna'} 
+                    onChange={() => setPrintingColors('4 Warna')} 
+                  />
+                  <span className="text-purple-400 font-bold">4 Warna</span>
+                </label>
+              </div>
+            </div>
+          )}
         </div>
 
         {addons.length > 0 && (

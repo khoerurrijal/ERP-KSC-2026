@@ -38,13 +38,18 @@ export default function SettingsClient({ initialSettings }) {
     "CUP INJECT": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 },
     "CUP PET": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 }
   }
+  const defaultPrintingMatrix = {
+    "3 Warna": { "5000": 0, "10000": 0, "30000": 0 },
+    "4 Warna": { "5000": 0, "10000": 0, "30000": 0 }
+  }
   const dbPricelist = initialSettings.pricelist_config || {}
   const [pricelist, setPricelist] = useState({
     profit_gudang_nominal: dbPricelist.profit_gudang_nominal ?? 50,
     profit_global_percent: dbPricelist.profit_global_percent ?? 10,
     margin_jual_polos_percent: dbPricelist.margin_jual_polos_percent ?? 15,
     save_profit_percent: dbPricelist.save_profit_percent ?? 30,
-    sablon_matrix: dbPricelist.sablon_matrix || defaultMatrix
+    sablon_matrix: dbPricelist.sablon_matrix || defaultMatrix,
+    printing_matrix: dbPricelist.printing_matrix || defaultPrintingMatrix
   })
 
   // State for Store Config
@@ -338,7 +343,7 @@ export default function SettingsClient({ initialSettings }) {
               Filter Kategori Berdasarkan Jenis Pesanan
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-              {(dropdowns.order_type || []).map(orderType => {
+              {Array.from(new Set(dropdowns.order_type || [])).map(orderType => {
                 const mapList = (dropdowns.category_mapping || {})[orderType] || []
                 return (
                   <div key={orderType} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all">
@@ -654,6 +659,56 @@ export default function SettingsClient({ initialSettings }) {
                   {Object.keys(pricelist.sablon_matrix || {}).length === 0 && (
                     <div className="text-center py-12 text-foreground/40 italic">Belum ada matriks kategori.</div>
                   )}
+                </div>
+              </div>
+            </div>
+
+            {/* Kanan Bawah: Matrix Jasa Printing */}
+            <div className="xl:col-span-8 xl:col-start-5 space-y-6">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 overflow-hidden flex flex-col">
+                <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
+                  <ListPlus className="w-5 h-5 text-blue-400" />
+                  Matrix Tarif Jasa Printing (Per Pcs)
+                </h3>
+                <p className="text-sm text-foreground/60 mb-6">Tarif jasa printing murni (Rp) yang akan dijumlahkan dengan HPP King berdasarkan Kategori dan Tiering Qty.</p>
+                
+                <div className="overflow-x-auto custom-scrollbar flex-1">
+                  <table className="w-full text-sm text-left">
+                    <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
+                      <tr>
+                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Kategori</th>
+                        {['5000', '10000', '30000'].map(tier => (
+                          <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
+                            &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/5">
+                      {Object.keys(pricelist.printing_matrix || {}).map((category) => (
+                        <tr key={category} className="hover:bg-white/5 transition-colors">
+                          <td className="px-4 py-4 font-bold text-blue-400 whitespace-nowrap">{category}</td>
+                          {['5000', '10000', '30000'].map(tier => (
+                            <td key={tier} className="px-2 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1">
+                                <span className="text-[10px] text-foreground/40 font-mono">Rp</span>
+                                <input
+                                  type="number"
+                                  value={pricelist.printing_matrix[category][tier]}
+                                  onChange={(e) => {
+                                    const newMatrix = { ...pricelist.printing_matrix }
+                                    newMatrix[category] = { ...newMatrix[category], [tier]: Number(e.target.value) }
+                                    setPricelist({ ...pricelist, printing_matrix: newMatrix })
+                                  }}
+                                  className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-blue-400/50 text-foreground font-mono"
+                                />
+                              </div>
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
             </div>

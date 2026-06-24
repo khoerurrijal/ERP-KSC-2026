@@ -134,14 +134,22 @@ export async function createSalesOrder(payload) {
       let itemBeliGudang = 0;
       let itemBeliGlobal = 0;
 
-      if (product?.workshop_code === 'GUDANG') itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
-      if (product?.workshop_code === 'GLOBAL') itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100));
+      if (item.order_type?.toUpperCase() === 'PRINTING') {
+        itemBeliGudang = 0;
+        itemBeliGlobal = 0;
+      } else {
+        if (product?.workshop_code === 'GUDANG') itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
+        if (product?.workshop_code === 'GLOBAL') itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100));
+      }
       
       // Royalty dipisah menjadi kolom sendiri (sesuai SOP baru)
       // Tidak lagi dicampur ke itemBeliGlobal
 
       let itemNotes = '';
       if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      if (item.order_type?.toUpperCase() === 'PRINTING') {
+        itemNotes += `🎨 Varian: ${item.printingColors || '3 Warna'}\n`;
+      }
       
       const productNameForNotes = item.product_search || product?.name || item.product_id;
 
@@ -636,20 +644,24 @@ export async function cancelSalesOrder(soId) {
     // Insert mutasi REVERT untuk stok
     if (itemsToCancel && itemsToCancel.length > 0) {
       const invoiceNum = itemsToCancel[0]?.sales_orders?.invoice_number || soId;
-      const mutations = itemsToCancel.map(item => {
-        const isPolos = !item.order_type || item.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(item.order_type.toUpperCase());
-        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
-        return {
-          product_code: item.product_code,
-          mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
-          reference_id: item.id,
-          reference_number: invoiceNum,
-          qty_tersedia_change: actualQty,
-          qty_fisik_change: isPolos ? actualQty : 0,
-          notes: `Pembatalan Invoice: ${invoiceNum}`
-        }
-      })
-      await supabase.from('stock_mutations').insert(mutations)
+      const mutations = itemsToCancel
+        .filter(item => item.order_type?.toUpperCase() !== 'PRINTING') // Skip revert for PRINTING
+        .map(item => {
+          const isPolos = !item.order_type || item.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(item.order_type.toUpperCase());
+          const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
+          return {
+            product_code: item.product_code,
+            mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
+            reference_id: item.id,
+            reference_number: invoiceNum,
+            qty_tersedia_change: actualQty,
+            qty_fisik_change: isPolos ? actualQty : 0,
+            notes: `Pembatalan Invoice: ${invoiceNum}`
+          }
+        })
+      if (mutations.length > 0) {
+        await supabase.from('stock_mutations').insert(mutations)
+      }
     }
 
     // 2. Ubah status pembayaran invoice menjadi BATAL

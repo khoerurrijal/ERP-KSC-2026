@@ -76,7 +76,11 @@ export async function handleAutoStatusUpdate(itemId) {
   // Hitung target sebenarnya (memperhitungkan unit_multiplier misal jika beli per dus)
   const targetQty = item.qty * (item.unit_multiplier || 1);
 
-  if (item.order_type?.toUpperCase() === 'POLOS') {
+  if (item.order_type?.toUpperCase() === 'PRINTING') {
+    // RULE UNTUK PRINTING: Bypass otomatisasi, admin yang atur di menu Sales Item Status.
+    // Tidak masuk antrean produksi dan tidak lompat otomatis.
+    newStatus = oldStatus;
+  } else if (item.order_type?.toUpperCase() === 'POLOS') {
     // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas atau dari Marketplace
     if (!canProceed) {
       newStatus = ST_BARU_MASUK;
