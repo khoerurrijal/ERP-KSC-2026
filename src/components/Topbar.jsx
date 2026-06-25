@@ -56,7 +56,7 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
       <div className="flex items-center gap-3 ml-auto">
         
         {/* WA Bot Toggle Switch */}
-        {userRole === 'Owner' && (
+        {(userRole === 'Owner' || userRole === 'Admin') && (
           <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
             <MessageCircle className={`w-4 h-4 ${isWaBotActive ? 'text-green-400' : 'text-foreground/40'}`} />
             <span className="text-xs font-bold hidden sm:block text-foreground/80">WA Bot</span>
