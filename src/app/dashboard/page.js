@@ -4,6 +4,7 @@ import Link from 'next/link'
 import PriceCalculator from '@/components/PriceCalculator'
 import StockSearchWidget from '@/components/StockSearchWidget'
 import MonthFilter from '@/components/MonthFilter'
+import { redirect } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,8 +17,28 @@ export default async function DashboardPage({ searchParams }) {
 
   const supabase = await createClient()
 
-  // For testing dummy UI, we bypass the redirect if error, just mock a user
-  const user = { email: 'admin@kingsablon.com', role: 'Owner' }
+  // Fetch real user
+  const { data: { user: authUser }, error } = await supabase.auth.getUser()
+  if (error || !authUser) {
+    redirect('/login')
+  }
+
+  const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+  const userRoles = settingsData?.value || []
+  const userEmail = authUser.email?.toLowerCase() || ''
+  
+  const matchedUser = userRoles.find(u => {
+    const inputEmail = (u.email || '').trim().toLowerCase()
+    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+  })
+  const userRole = matchedUser ? matchedUser.role : 'Operator'
+
+  // If Operator hits this root dashboard page, redirect immediately
+  if (userRole === 'Operator') {
+    redirect('/dashboard/production')
+  }
+
+  const user = { email: authUser.email, role: userRole }
 
   // Fetch products for Kalkulator
   const { data: products } = await supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name')

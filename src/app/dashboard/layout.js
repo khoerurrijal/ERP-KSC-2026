@@ -2,7 +2,6 @@ import PermissionGuard from '@/components/PermissionGuard'
 import DashboardClientLayout from '@/components/DashboardClientLayout'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
-import { headers } from 'next/headers'
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createClient()
@@ -35,13 +34,6 @@ export default async function DashboardLayout({ children }) {
   const allowedMenus = rolePermissions[userRole] || []
 
   const isOperator = userRole === 'Operator'
-
-  // Redirect Operator if they try to access the main /dashboard page
-  const headersList = await headers()
-  const currentPath = headersList.get('x-invoke-path') || ''
-  if (isOperator && (currentPath === '/dashboard' || currentPath === '/dashboard/')) {
-    redirect('/dashboard/production')
-  }
 
   return (
     <DashboardClientLayout allowedMenus={allowedMenus} userRole={userRole}>
