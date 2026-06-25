@@ -80,30 +80,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     return { ...group, subItems: filteredSubItems }
   }).filter(Boolean)
 
-  if (isOperatorOnly) {
-    return (
-      <div className="relative">
-        <button onClick={() => setIsOpen(!isOpen)} className="p-2 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 text-primary transition-colors flex items-center gap-2">
-           <Users className="w-5 h-5" />
-        </button>
-        {isOpen && (
-          <div className="absolute right-0 top-full mt-2 w-48 bg-background border border-white/10 rounded-xl shadow-xl overflow-hidden animate-in fade-in slide-in-from-top-2 p-2 flex flex-col gap-2">
-            <div className="px-3 py-2 border-b border-white/10 mb-2">
-              <span className="text-xs text-foreground/60 block">Login sebagai:</span>
-              <span className="text-sm font-bold text-primary">{userRole}</span>
-            </div>
-            <ThemeToggle />
-            <form action="/auth/signout" method="post">
-              <button type="submit" className="flex items-center gap-3 px-3 py-2 w-full rounded-lg text-red-400 hover:bg-red-400/10 transition-all font-medium">
-                <LogOut className="w-4 h-4" />
-                <span>Sign Out</span>
-              </button>
-            </form>
-          </div>
-        )}
-      </div>
-    )
-  }
+  // (The isOperatorOnly block has been removed since Topbar handles it)
 
   if (isMobile) {
     return (
@@ -126,19 +103,9 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
                 <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => setIsOpen(false)} />
               ))}
             </div>
-            <div className="mt-8 pt-4 border-t border-white/10 pb-10">
-               <div className="mb-4 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20 text-center">
-                 <span className="text-xs text-foreground/60 block mb-1">Login sebagai:</span>
-                 <span className="text-sm font-bold text-primary">{userRole}</span>
-               </div>
-               <ThemeToggle />
-               <form action="/auth/signout" method="post" className="mt-2">
-                 <button type="submit" className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-400/10 transition-all font-medium justify-center">
-                   <LogOut className="w-5 h-5" />
-                   <span>Sign Out</span>
-                 </button>
-               </form>
-            </div>
+             <div className="mt-8 pt-4 border-t border-white/10 pb-10 flex justify-center text-xs text-foreground/40">
+               King Sablon Cup Master ERP
+             </div>
           </div>
         )}
       </div>
@@ -168,20 +135,8 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
         ))}
       </div>
 
-      <div className="p-4 border-t border-card-border mt-auto">
-        {userRole && (
-          <div className="mb-4 px-4 py-2 bg-primary/10 rounded-xl border border-primary/20 text-center">
-            <span className="text-xs text-foreground/60 block mb-1">Login sebagai:</span>
-            <span className="text-sm font-bold text-primary">{userRole}</span>
-          </div>
-        )}
-        <ThemeToggle />
-        <form action="/auth/signout" method="post" className="mt-2">
-          <button type="submit" className="flex items-center gap-3 px-4 py-3 w-full rounded-xl text-red-400 hover:bg-red-400/10 transition-all font-medium justify-center">
-            <LogOut className="w-5 h-5" />
-            <span>Sign Out</span>
-          </button>
-        </form>
+      <div className="p-4 border-t border-card-border mt-auto flex justify-center text-xs text-foreground/40 text-center">
+        King Sablon Cup Master ERP<br/>v1.0
       </div>
     </aside>
   )

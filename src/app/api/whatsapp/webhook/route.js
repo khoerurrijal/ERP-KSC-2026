@@ -51,10 +51,11 @@ PENTING - KNOWLEDGE BASE KING SABLON CUP:
 6. Edukasi Produk Umum:
    - Untuk pertanyaan beda PP/PET, ukuran Oz, dsb, gunakan wawasan AI-mu secara cerdas.
 
-Jika pelanggan menanyakan status pesanan, minta mereka memberikan Nama atau Nomor Invoice, lalu gunakan alat (tool) "cek_pesanan" untuk mencari data di database.
+Jika pelanggan menanyakan status pesanan, COBA DULU gunakan nama profil WhatsApp mereka ("${pushname}") atau baca dari history chat sebelumnya untuk mencari datanya menggunakan tool "cek_pesanan".
+Jika data tidak ditemukan dengan nama profil tersebut, JANGAN meminta nomor invoice atau kode apapun. Tanyakan dengan ramah: "Boleh diinfokan nama brand-nya apa kak?" lalu gunakan alat "cek_pesanan" lagi dengan nama brand tersebut.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
 PENTING: Setiap kali kamu menemukan data pesanan pelanggan, kamu WAJIB memberikan link Tracking Publik berikut agar mereka bisa memantau sendiri: https://erpkscv1.vercel.app/track/[NOMOR_INVOICE] (ganti [NOMOR_INVOICE] dengan invoice yang sesuai).
-Jika data tidak ditemukan, katakan dengan sopan bahwa data tidak ditemukan dan mohon cek ulang nomor invoicenya.
+Jika data masih tidak ditemukan setelah dicari dengan nama brand, katakan dengan sopan bahwa pesanan atas nama brand tersebut belum ditemukan.
 Jangan menjanjikan sesuatu yang tidak ada di database atau diluar Knowledge Base di atas.
 
 PENTING - HUMAN HANDOVER:
@@ -237,7 +238,7 @@ export async function POST(req) {
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
       } else {
-        const reply = "Wah maaf kak, Ina coba cari pesanan aktif atas nama kakak belum ketemu nih datanya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak. Terima kasih! 🙏";
+        const reply = "Wah maaf kak, Ina coba cari pesanan aktif atas nama WA kakak belum ketemu nih datanya. Boleh diinfokan nama brand-nya apa kak? Biar Ina bantu cari lagi 🙏";
         await sendFonnteMessage(sender, reply);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);

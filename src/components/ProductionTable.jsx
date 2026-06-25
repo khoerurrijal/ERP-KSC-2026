@@ -240,20 +240,22 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       </header>
 
       {/* Tabs */}
-      <div className="flex items-center gap-4 border-b border-white/10 pb-2">
-        <button 
-          onClick={() => setActiveTab('SO')} 
-          className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
-        >
-          Tracking Sales Order
-        </button>
-        <button 
-          onClick={() => setActiveTab('PRODUKSI')} 
-          className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
-        >
-          Tracking Produksi
-        </button>
-      </div>
+      {userRole !== 'Operator' && (
+        <div className="flex items-center gap-4 border-b border-white/10 pb-2">
+          <button 
+            onClick={() => setActiveTab('SO')} 
+            className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+          >
+            Tracking Sales Order
+          </button>
+          <button 
+            onClick={() => setActiveTab('PRODUKSI')} 
+            className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+          >
+            Tracking Produksi
+          </button>
+        </div>
+      )}
 
       {activeTab === 'SO' && (
         <div className="space-y-4">

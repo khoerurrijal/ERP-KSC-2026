@@ -215,3 +215,25 @@ export async function updatePricelistConfig(newConfig) {
   revalidatePath('/order')
   return { success: true }
 }
+
+export async function getWaBotStatus() {
+  const supabase = await createClient()
+  const { data, error } = await supabase.from('wa_global_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single()
+  if (error && error.code !== 'PGRST116') {
+    console.error('Error fetching WA Bot status:', error)
+    return true // Default active if error
+  }
+  return data ? data.value === 'true' : true // Default to true if not set
+}
+
+export async function toggleWaBotStatus(isActive) {
+  const supabase = await createClient()
+  const { error } = await supabase.from('wa_global_settings').upsert({
+    key: 'GLOBAL_BOT_ACTIVE',
+    value: isActive ? 'true' : 'false'
+  })
+  
+  if (error) return { success: false, error: error.message }
+  revalidatePath('/', 'layout')
+  return { success: true, isActive }
+}
