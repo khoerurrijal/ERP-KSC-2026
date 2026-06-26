@@ -218,7 +218,7 @@ export async function updatePricelistConfig(newConfig) {
 
 export async function getWaBotStatus() {
   const supabase = await createClient()
-  const { data, error } = await supabase.from('wa_global_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single()
+  const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single()
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching WA Bot status:', error)
     return true // Default active if error
@@ -228,9 +228,10 @@ export async function getWaBotStatus() {
 
 export async function toggleWaBotStatus(isActive) {
   const supabase = await createClient()
-  const { error } = await supabase.from('wa_global_settings').upsert({
+  const { error } = await supabase.from('system_settings').upsert({
     key: 'GLOBAL_BOT_ACTIVE',
-    value: isActive ? 'true' : 'false'
+    value: isActive ? 'true' : 'false',
+    updated_at: new Date().toISOString()
   })
   
   if (error) return { success: false, error: error.message }

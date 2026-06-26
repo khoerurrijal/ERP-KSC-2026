@@ -19,15 +19,21 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
   }, [])
 
   const handleToggleWaBot = async () => {
-    setIsToggling(true)
-    const newStatus = !isWaBotActive
-    const res = await toggleWaBotStatus(newStatus)
-    if (res.success) {
-      setIsWaBotActive(newStatus)
-    } else {
-      alert("Gagal mengubah status bot: " + res.error)
+    try {
+      setIsToggling(true)
+      const newStatus = !isWaBotActive
+      const res = await toggleWaBotStatus(newStatus)
+      if (res?.success) {
+        setIsWaBotActive(newStatus)
+      } else {
+        alert("Gagal mengubah status bot: " + (res?.error || "Unknown error"))
+      }
+    } catch (error) {
+      console.error(error)
+      alert("Terjadi kesalahan sistem: " + error.message)
+    } finally {
+      setIsToggling(false)
     }
-    setIsToggling(false)
   }
 
   const isDark = theme === 'dark' || (!theme && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
@@ -57,13 +63,17 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
         
         {/* WA Bot Toggle Switch */}
         {(userRole === 'Owner' || userRole === 'Admin') && (
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full">
+          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full relative z-50">
             <MessageCircle className={`w-4 h-4 ${isWaBotActive ? 'text-green-400' : 'text-foreground/40'}`} />
-            <span className="text-xs font-bold hidden sm:block text-foreground/80">WA Bot</span>
+            <span className="text-xs font-bold hidden sm:block text-foreground/80 cursor-default">WA Bot</span>
             <button
               disabled={isToggling}
-              onClick={handleToggleWaBot}
-              className={`relative w-10 h-5 rounded-full transition-colors ${isWaBotActive ? 'bg-green-500' : 'bg-foreground/20'}`}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleToggleWaBot();
+              }}
+              className={`relative w-10 h-5 rounded-full transition-colors cursor-pointer disabled:cursor-not-allowed disabled:opacity-50 ${isWaBotActive ? 'bg-green-500' : 'bg-foreground/20'}`}
             >
               <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform flex items-center justify-center shadow-sm ${isWaBotActive ? 'translate-x-5' : 'translate-x-0'}`}>
                 {isWaBotActive ? <Check className="w-3 h-3 text-green-500" /> : <X className="w-3 h-3 text-foreground/40" />}
