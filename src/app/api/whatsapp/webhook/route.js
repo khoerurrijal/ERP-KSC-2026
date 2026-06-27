@@ -150,19 +150,19 @@ export async function POST(req) {
     // --- 1. GLOBAL MASTER SWITCH ---
     if (normalizedSender === ADMIN_NUMBER) {
       if (message.toLowerCase() === '/bot on') {
-        await supabase.from('wa_global_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'true' });
+        await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'true', updated_at: new Date().toISOString() });
         await sendFonnteMessage(sender, "Sistem Otomatis / AI telah DIAKTIFKAN. AI akan merespon pelanggan.");
         return NextResponse.json({ success: true, message: 'Global bot turned on' });
       }
       if (message.toLowerCase() === '/bot off') {
-        await supabase.from('wa_global_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'false' });
+        await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'false', updated_at: new Date().toISOString() });
         await sendFonnteMessage(sender, "Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
         return NextResponse.json({ success: true, message: 'Global bot turned off' });
       }
     }
 
     // Check if Global Bot is Active
-    const { data: globalSetting } = await supabase.from('wa_global_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single();
+    const { data: globalSetting } = await supabase.from('system_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single();
     const isGlobalBotActive = globalSetting ? globalSetting.value === 'true' : true; 
 
     if (!isGlobalBotActive) {
