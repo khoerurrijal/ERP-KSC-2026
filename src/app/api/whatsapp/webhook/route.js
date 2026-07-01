@@ -91,6 +91,22 @@ async function sendFonnteMessage(target, message) {
   }
 }
 
+// Helper to check if current time is outside business hours (Mon-Sat 09:00 - 17:00 WIB)
+function isOutsideBusinessHours() {
+  const now = new Date();
+  // Convert to Asia/Jakarta (WIB = UTC+7)
+  const jakartaTimeStr = now.toLocaleString("en-US", { timeZone: "Asia/Jakarta" });
+  const jakartaTime = new Date(jakartaTimeStr);
+  const day = jakartaTime.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+  const hour = jakartaTime.getHours(); // 0-23
+  
+  // Sunday is always outside business hours (Sunday = closed)
+  if (day === 0) return true;
+  // Monday to Saturday: business hours are 09:00 - 17:00 WIB
+  if (hour < 9 || hour >= 17) return true;
+  
+  return false;
+}
 
 // Helper to query database for orders
 async function searchOrdersInDB(searchQuery) {
@@ -149,23 +165,29 @@ export async function POST(req) {
 
     // --- 1. GLOBAL MASTER SWITCH ---
     if (normalizedSender === ADMIN_NUMBER) {
-      if (message.toLowerCase() === '/bot on') {
-        await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'true', updated_at: new Date().toISOString() });
-        await sendFonnteMessage(sender, "Sistem Otomatis / AI telah DIAKTIFKAN. AI akan merespon pelanggan.");
-        return NextResponse.json({ success: true, message: 'Global bot turned on' });
+      const lowerMsg = message.toLowerCase().trim();
+      if (lowerMsg === '/bot on' || lowerMsg === '/bot auto') {
+        await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'auto', updated_at: new Date().toISOString() });
+        await sendFonnteMessage(sender, "Sistem Otomatis / AI diatur ke mode AUTO (Aktif di luar jam operasional & hari libur).");
+        return NextResponse.json({ success: true, message: 'Global bot set to auto' });
       }
-      if (message.toLowerCase() === '/bot off') {
+      if (lowerMsg === '/bot off') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'false', updated_at: new Date().toISOString() });
         await sendFonnteMessage(sender, "Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
         return NextResponse.json({ success: true, message: 'Global bot turned off' });
+      }
+      if (lowerMsg === '/bot always') {
+        await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'always', updated_at: new Date().toISOString() });
+        await sendFonnteMessage(sender, "Sistem Otomatis / AI diatur ke mode ALWAYS (Aktif 24/7).");
+        return NextResponse.json({ success: true, message: 'Global bot set to always on' });
       }
     }
 
     // Check if Global Bot is Active
     const { data: globalSetting } = await supabase.from('system_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single();
-    const isGlobalBotActive = globalSetting ? globalSetting.value === 'true' : true; 
+    const globalBotValue = globalSetting ? globalSetting.value : 'true'; // Default to true (auto)
 
-    if (!isGlobalBotActive) {
+    if (globalBotValue === 'false') {
       return NextResponse.json({ success: true, message: 'Global bot is inactive' });
     }
 
@@ -220,6 +242,34 @@ export async function POST(req) {
       return NextResponse.json({ success: true, reply: templateReply });
     }
 
+    // --- 2.5 STATIC HANDLERS FOR COMMON INPUTS (BYPASS GEMINI) ---
+    // Handle non-text messages statically
+    if (msgLower === 'non-text message' || msgLower === '') {
+      const reply = "Maaf kak, saat ini Ina baru bisa membalas chat berupa teks. Ada yang bisa Ina bantu mengenai produk, harga, atau cek status pesanan? 🙏";
+      await sendFonnteMessage(sender, reply);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
+      return NextResponse.json({ success: true, reply });
+    }
+
+    // Handle closing phrases (thank you)
+    if (msgLower.match(/^(terima kasih|makasih|thank you|thx|suwun|hatur nuhun|tq|makasi|thanks)$/)) {
+      const reply = "Sama-sama kak! Senang bisa membantu. Jika ada hal lain yang perlu ditanyakan, silakan chat Ina lagi ya. 😊";
+      await sendFonnteMessage(sender, reply);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
+      return NextResponse.json({ success: true, reply });
+    }
+
+    // Handle quick acknowledgments (ok, oke, siap)
+    if (msgLower.match(/^(ok|oke|siap|sip|okey|yoi|ready|noted)$/)) {
+      const reply = "Siap kak! 👍";
+      await sendFonnteMessage(sender, reply);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
+      return NextResponse.json({ success: true, reply });
+    }
+
     // --- 3. FAST-TRACK ORDER STATUS (BYPASS GEMINI) ---
     // If the message is a simple tracking intent, bypass AI completely!
     if (msgLower.match(/^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/)) {
@@ -243,6 +293,16 @@ export async function POST(req) {
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
+      }
+    }
+
+    // --- 3.5 BUSINESS HOURS FILTER (BEFORE GEMINI FALLBACK) ---
+    if (globalBotValue === 'true' || globalBotValue === 'auto') {
+      if (!isOutsideBusinessHours()) {
+        // Insert user message so history remains complete
+        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+        console.log(`[Webhook] Inside business hours. Ignored fallback Gemini request from ${sender}.`);
+        return NextResponse.json({ success: true, message: 'Inside business hours, ignored fallback' });
       }
     }
 
@@ -275,19 +335,52 @@ export async function POST(req) {
 
     if (!session?.is_bot_active) return NextResponse.json({ success: true, message: 'Local bot inactive' });
 
+    // Insert user message synchronously BEFORE starting background task
+    const { data: insertedMsg, error: insertErr } = await supabase
+      .from('wa_chat_history')
+      .insert([{ phone_number: sender, role: 'user', content: message }])
+      .select('id, created_at')
+      .single();
+
+    if (insertErr) {
+      console.error('[Webhook] Error inserting user message:', insertErr);
+    }
+
     waitUntil((async () => {
       try {
-        // Fetch history
+        // --- DE-BOUNCE PROCESS ---
+        // Wait 2.5 seconds to let any consecutive user messages arrive
+        await new Promise(resolve => setTimeout(resolve, 2500));
+
+        if (insertedMsg) {
+          // Check if a newer message has been received from the same sender
+          const { data: latestMsg } = await supabase
+            .from('wa_chat_history')
+            .select('id')
+            .eq('phone_number', sender)
+            .order('created_at', { ascending: false })
+            .limit(1);
+
+          if (latestMsg && latestMsg.length > 0 && latestMsg[0].id !== insertedMsg.id) {
+            console.log(`[Webhook] Newer message detected for ${sender}. Skipping Gemini execution.`);
+            return;
+          }
+        }
+
+        // Fetch history (limit to 7: 6 previous messages + 1 current message we just inserted)
         const { data: historyData } = await supabase
           .from('wa_chat_history')
           .select('*')
           .eq('phone_number', sender)
           .order('created_at', { ascending: false })
-          .limit(10); 
+          .limit(7); 
 
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
+        let rawHistory = [];
+        if (historyData && historyData.length > 0) {
+          // Skip the first message (which is the current user message we just inserted)
+          rawHistory = historyData.slice(1).reverse();
+        }
 
-        let rawHistory = (historyData || []).reverse();
         let formattedHistory = [];
         
         for (let msg of rawHistory) {
