@@ -72,6 +72,19 @@ export async function savePayroll(payload) {
     const { data: userData } = await supabase.auth.getUser()
     const userId = userData?.user?.id
 
+    // 0. Duplicate period guard
+    const { data: existingPayroll } = await supabase
+      .from('payrolls')
+      .select('id')
+      .eq('start_date', payload.startDate)
+      .eq('end_date', payload.endDate)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingPayroll) {
+      throw new Error(`Rekap gaji untuk periode ${payload.startDate} s/d ${payload.endDate} sudah pernah disimpan.`)
+    }
+
     // 1. Insert ke tabel payrolls
     const { data: payrollRow, error: pErr } = await supabase
       .from('payrolls')
@@ -86,59 +99,122 @@ export async function savePayroll(payload) {
 
     if (pErr) throw pErr
 
-    // 2. Insert ke tabel payroll_items
-    const itemsToInsert = payload.items.map(item => ({
-      payroll_id: payrollRow.id,
-      employee_id: item.employee_id,
-      base_salary: item.base_salary,
-      meal_allowance: item.meal_allowance,
-      weekly_bonus: item.weekly_bonus,
-      borongan_amount: item.borongan_amount,
-      bawahan_bonus: item.bawahan_bonus,
-      other_bonuses: item.other_bonuses,
-      total: item.total
-    }))
+    // 2. Hitung Potongan Pinjaman/Kasbon & Update Loans Secara Dinamis
+    let recalculatedGrandTotal = 0
+    const finalItemsToInsert = []
 
-    if (itemsToInsert.length > 0) {
-      const { error: piErr } = await supabase.from('payroll_items').insert(itemsToInsert)
+    for (const item of payload.items) {
+      // Get all active loans/kasbon for this employee
+      const { data: activeLoans } = await supabase
+        .from('employee_loans')
+        .select('id, remaining_amount, installment_amount, type, notes')
+        .eq('employee_id', item.employee_id)
+        .eq('status', 'BELUM LUNAS')
+        .order('created_at', { ascending: true })
+
+      let totalPinjamanWajib = 0
+      let maxKasbonAvailable = 0
+      
+      const pinjamanLoans = []
+      const kasbonLoans = []
+
+      activeLoans?.forEach(loan => {
+        if (loan.type === 'PINJAMAN') {
+          const installment = Math.min(Number(loan.installment_amount || 0), Number(loan.remaining_amount || 0))
+          totalPinjamanWajib += installment
+          pinjamanLoans.push({ ...loan, currentInstallment: installment })
+        } else if (loan.type === 'KASBON') {
+          maxKasbonAvailable += Number(loan.remaining_amount || 0)
+          kasbonLoans.push(loan)
+        }
+      })
+
+      // Porsi KASBON murni = kasbon_amount dari UI (KASBON-only)
+      const uiKasbonAmount = Number(item.kasbon_amount || 0)
+      let porsiKasbonMurni = Math.min(uiKasbonAmount, maxKasbonAvailable)
+
+      const totalPotonganAktual = totalPinjamanWajib + porsiKasbonMurni
+
+
+      // Update remaining amounts & statuses in DB
+      // 2a. Potong PINJAMAN secara independen (wajib)
+      for (const loan of pinjamanLoans) {
+        const deductAmount = loan.currentInstallment
+        if (deductAmount > 0) {
+          const newRemaining = Number(loan.remaining_amount || 0) - deductAmount
+          const newStatus = newRemaining === 0 ? 'LUNAS' : 'BELUM LUNAS'
+
+          await supabase.from('employee_loans')
+            .update({ remaining_amount: newRemaining, status: newStatus })
+            .eq('id', loan.id)
+
+          // Cicilan PINJAMAN masuk ke TABUNGAN
+          const { data: empData } = await supabase.from('employees').select('full_name').eq('id', item.employee_id).single()
+          await supabase.from('transactions').insert([{
+            date: new Date().toISOString().split('T')[0],
+            reference: 'PINJAMAN',
+            description: `Potongan cicilan pinjaman - ${empData?.full_name || 'Karyawan'}`,
+            payment_method: 'CASH',
+            amount_out: 0,
+            amount_in: deductAmount,
+            workshop_code: 'TABUNGAN'
+          }])
+        }
+      }
+
+      // 2b. Potong KASBON (FIFO) dari porsi KASBON murni
+      let remainingKasbonToDeduct = porsiKasbonMurni
+      for (const loan of kasbonLoans) {
+        if (remainingKasbonToDeduct <= 0) break
+
+        const deductAmount = Math.min(Number(loan.remaining_amount || 0), remainingKasbonToDeduct)
+        if (deductAmount > 0) {
+          remainingKasbonToDeduct -= deductAmount
+          const newRemaining = Number(loan.remaining_amount || 0) - deductAmount
+          const newStatus = newRemaining === 0 ? 'LUNAS' : 'BELUM LUNAS'
+
+          await supabase.from('employee_loans')
+            .update({ remaining_amount: newRemaining, status: newStatus })
+            .eq('id', loan.id)
+          // KASBON tidak membuat transactions/cash IN ke TABUNGAN (hanya netting gaji)
+        }
+      }
+
+      // Hitung ulang Net Salary (total) final untuk payroll_items agar sinkron dengan database
+      const totalSebelumDeduction = Number(item.base_salary || 0) + Number(item.meal_allowance || 0) + Number(item.weekly_bonus || 0) + Number(item.borongan_amount || 0) + Number(item.bawahan_bonus || 0) + Number(item.other_bonuses || 0)
+      const finalNetTotal = totalSebelumDeduction - totalPotonganAktual - Number(item.late_deduction || 0)
+
+      recalculatedGrandTotal += finalNetTotal
+
+      finalItemsToInsert.push({
+        payroll_id: payrollRow.id,
+        employee_id: item.employee_id,
+        base_salary: item.base_salary,
+        meal_allowance: item.meal_allowance,
+        weekly_bonus: item.weekly_bonus,
+        borongan_amount: item.borongan_amount,
+        bawahan_bonus: item.bawahan_bonus,
+        other_bonuses: item.other_bonuses,
+        total: finalNetTotal
+      })
+    }
+
+    // Insert ke tabel payroll_items
+    if (finalItemsToInsert.length > 0) {
+      const { error: piErr } = await supabase.from('payroll_items').insert(finalItemsToInsert)
       if (piErr) throw piErr
     }
 
-    // 3. Update Loans & Insert Transactions for PINJAMAN
-    if (payload.loanDeductions && payload.loanDeductions.length > 0) {
-      for (const deduction of payload.loanDeductions) {
-        // Fetch current loan to check remaining
-        const { data: currentLoan } = await supabase.from('employee_loans').select('remaining_amount, type, employee_id, employees(full_name)').eq('id', deduction.id).single()
-        if (currentLoan) {
-          const newRemaining = Math.max(0, currentLoan.remaining_amount - deduction.deduction)
-          const newStatus = newRemaining === 0 ? 'LUNAS' : 'BELUM LUNAS'
-          
-          await supabase.from('employee_loans')
-            .update({ remaining_amount: newRemaining, status: newStatus })
-            .eq('id', deduction.id)
-          
-          if (currentLoan.type === 'PINJAMAN' && deduction.deduction > 0) {
-            await supabase.from('transactions').insert([{
-              date: new Date().toISOString().split('T')[0],
-              reference: 'PINJAMAN',
-              description: `Potongan cicilan pinjaman - ${currentLoan.employees?.full_name}`,
-              payment_method: 'CASH',
-              amount_out: 0,
-              amount_in: deduction.deduction,
-              workshop_code: 'TABUNGAN'
-            }])
-          }
-        }
-      }
-    }
+    // Update total_amount di rekap payrolls utama
+    await supabase.from('payrolls').update({ total_amount: recalculatedGrandTotal }).eq('id', payrollRow.id)
 
-    // 4. Insert Transaction for the total payroll
+    // 4. Insert Transaction for the total payroll (cash OUT dari KING sebesar net salary)
     const { error: tErr } = await supabase.from('transactions').insert([{
       date: new Date().toISOString().split('T')[0],
       reference: 'GAJI KARYAWAN',
       description: payload.description || 'Gaji Karyawan',
       payment_method: payload.payment_method || 'Cash',
-      amount_out: payload.grandTotal,
+      amount_out: recalculatedGrandTotal,
       amount_in: 0,
       workshop_code: payload.workshop_code || 'KING'
     }])

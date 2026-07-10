@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
+import { normalizePhone } from '@/utils/phone';
+
 
 export const maxDuration = 60; // Allow API route to run for up to 60 seconds on Vercel
 
@@ -108,33 +110,64 @@ function isOutsideBusinessHours() {
   return false;
 }
 
-// Helper to query database for orders
-async function searchOrdersInDB(searchQuery) {
-  // Query 1: Search by invoice
-  const { data: ordersByInvoice } = await supabase
-    .from('sales_orders')
-    .select('invoice_number, status, date, customers (name), sales_items (qty, products (name))')
-    .ilike('invoice_number', `%${searchQuery}%`)
-    .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING']) // Only active orders
-    .limit(3);
+// Helper to query database for orders with phone matching & safe phone linking
+async function searchOrdersWithPhoneLinking(senderPhone, searchQuery) {
+  const normalizedSender = normalizePhone(senderPhone);
 
-  // Query 2: Search by customer name
-  const { data: ordersByName } = await supabase
-    .from('sales_orders')
-    .select('invoice_number, status, date, customers!inner (name), sales_items (qty, products (name))')
-    .ilike('customers.name', `%${searchQuery}%`)
-    .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING']) // Only active orders
-    .order('date', { ascending: false })
-    .limit(3);
+  // 1. PHONE MATCH: Cari customers.phone yang cocok
+  const { data: matchedCustomers } = await supabase
+    .from('customers')
+    .select('customer_code, phone, name')
+    .or(`phone.eq.${normalizedSender},phone.eq.${senderPhone}`);
 
-  // Combine and deduplicate
-  let orders = [];
-  if (ordersByInvoice) orders.push(...ordersByInvoice);
-  if (ordersByName) orders.push(...ordersByName);
-  
-  return orders.filter((o, index, self) => 
-    index === self.findIndex((t) => t.invoice_number === o.invoice_number)
-  ).slice(0, 3);
+  const resolvedCustomer = matchedCustomers?.find(c => normalizePhone(c.phone) === normalizedSender);
+
+  if (resolvedCustomer) {
+    const { data: orders } = await supabase
+      .from('sales_orders')
+      .select('invoice_number, status, date, customers (name), sales_items (qty, products (name))')
+      .eq('customer_code', resolvedCustomer.customer_code)
+      .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING'])
+      .order('date', { ascending: false })
+      .limit(3);
+    return orders || [];
+  }
+
+  // 2. CUSTOMER PHONE BELUM TERHUBUNG: Gunakan exact customer/brand name matching
+  const cleanedQuery = searchQuery ? searchQuery.trim() : '';
+  if (cleanedQuery.length < 3) {
+    return []; // Terlalu pendek, hindari broad search
+  }
+
+  const { data: nameMatchedCustomers } = await supabase
+    .from('customers')
+    .select('customer_code, phone, name')
+    .ilike('name', cleanedQuery);
+
+  if (nameMatchedCustomers && nameMatchedCustomers.length === 1) {
+    const candidateCustomer = nameMatchedCustomers[0];
+    const isCandidatePhoneEmpty = !candidateCustomer.phone || candidateCustomer.phone.trim().length < 5;
+    const isSenderAlreadyLinked = matchedCustomers && matchedCustomers.length > 0;
+
+    // SAFE PHONE LINKING: Simpan nomor jika phone kosong dan sender belum terhubung ke customer lain
+    if (isCandidatePhoneEmpty && !isSenderAlreadyLinked) {
+      await supabase
+        .from('customers')
+        .update({ phone: normalizedSender })
+        .eq('customer_code', candidateCustomer.customer_code);
+    }
+
+    const { data: orders } = await supabase
+      .from('sales_orders')
+      .select('invoice_number, status, date, customers (name), sales_items (qty, products (name))')
+      .eq('customer_code', candidateCustomer.customer_code)
+      .in('status', ['PROSES', 'SIAP KIRIM', 'DRAFT', 'PENDING'])
+      .order('date', { ascending: false })
+      .limit(3);
+    return orders || [];
+  }
+
+  return []; // Ambigu atau tidak ditemukan
 }
 
 export async function POST(req) {
@@ -192,18 +225,22 @@ export async function POST(req) {
     }
 
     // --- IDEMPOTENCY CHECK (ANTI-RETRY LOOP) ---
-    // Fetch the very last message to see if this is a Fonnte webhook retry
-    const { data: lastMsgData } = await supabase
+    // Fetch recent user messages to see if this is a Fonnte webhook retry
+    const { data: recentMsgs } = await supabase
       .from('wa_chat_history')
-      .select('*')
+      .select('created_at, content, role')
       .eq('phone_number', sender)
+      .eq('role', 'user')
       .order('created_at', { ascending: false })
-      .limit(1);
+      .limit(5);
       
-    if (lastMsgData && lastMsgData.length > 0) {
-      const lastMsg = lastMsgData[0];
-      const timeDiff = new Date() - new Date(lastMsg.created_at);
-      if (lastMsg.role === 'user' && lastMsg.content === message && timeDiff < 30000) {
+    if (recentMsgs && recentMsgs.length > 0) {
+      const now = new Date();
+      const isDuplicate = recentMsgs.some(msg => {
+        const timeDiff = now - new Date(msg.created_at);
+        return msg.content === message && timeDiff < 60000; // 60 seconds window
+      });
+      if (isDuplicate) {
         console.log(`[Webhook] Ignored duplicate message from ${sender} (Fonnte retry loop protection)`);
         return NextResponse.json({ success: true, message: 'Duplicate ignored' });
       }
@@ -275,7 +312,7 @@ export async function POST(req) {
     if (msgLower.match(/^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/)) {
       await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu berdasarkan nama WA kakak... ⏳");
       
-      const orders = await searchOrdersInDB(pushname);
+      const orders = await searchOrdersWithPhoneLinking(sender, pushname);
       
       if (orders && orders.length > 0) {
         const orderSummary = orders.map(o => 
@@ -404,7 +441,7 @@ export async function POST(req) {
         }
 
         const model = genAI.getGenerativeModel({
-          model: "gemini-2.5-flash",
+          model: "gemini-1.5-flash",
           systemInstruction: SYSTEM_PROMPT(pushname),
           tools: [{
             functionDeclarations: [{
@@ -440,7 +477,7 @@ export async function POST(req) {
         
         if (functionCall && functionCall.name === "cek_pesanan") {
           await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
-          const orders = await searchOrdersInDB(functionCall.args.search_query);
+          const orders = await searchOrdersWithPhoneLinking(sender, functionCall.args.search_query);
 
           let functionResponseData;
           if (orders && orders.length > 0) {
@@ -492,7 +529,7 @@ export async function POST(req) {
         if (error.status === 503 || error.message?.includes('503')) {
           fallbackMsg = "Maaf kak, server AI Google saat ini sedang penuh/sibuk. Mohon tunggu beberapa saat dan kirim pesan lagi ya 🙏";
         } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota exceeded')) {
-          fallbackMsg = "Maaf kak, Ina sedang melayani terlalu banyak chat dalam waktu bersamaan (Limit Kuota Google). Mohon tunggu sekitar 1 menit lalu chat Ina lagi ya kak 🙏";
+          fallbackMsg = "Maaf kak, saat ini antrean pesan sedang padat. Pesan kakak sudah masuk antrean dan akan segera dibalas oleh tim kami ya kak 🙏";
         }
         await sendFonnteMessage(sender, fallbackMsg).catch(console.error);
       }

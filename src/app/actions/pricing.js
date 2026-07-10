@@ -50,14 +50,15 @@ export async function recalculateProductPrices(productCode) {
 
     // 4. Update Master Produk (base_price = HPP Murni)
     // Harga jual akhir akan dihitung dinamis di frontend (kasir) menggunakan pricelist_config
+    // DEPRECATED: hpp_murni is deprecated and no longer written to.
     const { error: updateErr } = await supabase
       .from('products')
       .update({
-        hpp_murni: hppMurni,
         base_price: hppMurni,
         price_polos: hppMurni // price_polos disimpan sama dengan hpp_murni sebagai backward compatibility
       })
       .eq('product_code', productCode)
+
 
     if (updateErr) {
       console.error(`Gagal update harga produk ${productCode}:`, updateErr)

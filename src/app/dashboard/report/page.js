@@ -80,15 +80,19 @@ export default async function ReportPage({ searchParams }) {
   })
 
   // Apply Automatic Settlement Logic (PRD 5.7)
+  const { data: cashflowSettings } = await supabase.from('system_settings').select('*').eq('key', 'cashflow_config').single()
+  const cashflowConfig = cashflowSettings?.value || {}
+  
+  const SETTLEMENT_KING_OUT = Number(cashflowConfig.king_fixed_expenses !== undefined ? cashflowConfig.king_fixed_expenses : 4100000)
+  const SETTLEMENT_TABUNGAN_IN = Number(cashflowConfig.tabungan_fixed_in !== undefined ? cashflowConfig.tabungan_fixed_in : 2000000)
+
   const monthsInHistory = new Set(historyTransactions.map(t => t.date?.substring(0, 7)).filter(Boolean))
   const numberOfMonthsPassed = monthsInHistory.size
-  const SETTLEMENT_KING_OUT = 4100000
-  const SETTLEMENT_TABUNGAN_IN = 2000000
 
-  // For King, since it resets monthly, we ONLY subtract the 4.1M for the current month!
+  // For King, since it resets monthly, we ONLY subtract the fixed expenses for the current month!
   summary.king.saldo_bersih -= SETTLEMENT_KING_OUT
   
-  // For Tabungan, since it's cumulative, we add 2M per month of history
+  // For Tabungan, since it's cumulative, we add the fixed amount per month of history
   summary.tabungan.akhir += (SETTLEMENT_TABUNGAN_IN * numberOfMonthsPassed)
 
   // Calculate physical method balances from ALL HISTORY
@@ -107,6 +111,8 @@ export default async function ReportPage({ searchParams }) {
   // Initialize automatic settlement for the current month
   summary.king.pengeluaran_tetap = SETTLEMENT_KING_OUT
   summary.tabungan.masuk += SETTLEMENT_TABUNGAN_IN
+  summary.tabungan_fixed_in = SETTLEMENT_TABUNGAN_IN
+
 
   // Calculate analytics
   const analytics = {

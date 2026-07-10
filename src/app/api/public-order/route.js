@@ -1,5 +1,8 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing';
+import { normalizePhone } from '@/utils/phone';
+
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
@@ -18,14 +21,16 @@ export async function POST(req) {
       return NextResponse.json({ success: false, error: 'Incomplete data' }, { status: 400 });
     }
 
-    // 1. Process Customer
+    const normalizedInputPhone = normalizePhone(finalWaNumber);
+
+    // 1. Process Customer (Lookup by WA phone first, then fall back to brand name but verify WA)
     let customerId;
-    const { data: existingCustomer } = await supabase
+    const { data: customers } = await supabase
       .from('customers')
-      .select('customer_code')
-      .eq('name', brandName)
-      .limit(1)
-      .single();
+      .select('customer_code, phone')
+      .or(`phone.eq.${normalizedInputPhone},phone.eq.${finalWaNumber}`);
+
+    const existingCustomer = customers?.find(c => normalizePhone(c.phone) === normalizedInputPhone);
 
     if (existingCustomer && existingCustomer.customer_code) {
       customerId = existingCustomer.customer_code;
@@ -35,8 +40,9 @@ export async function POST(req) {
         .from('customers')
         .insert([{ 
           name: brandName, 
-          phone: finalWaNumber,
-          customer_code: newCustomerCode
+          phone: normalizedInputPhone, // Save in normalized canonical format
+          customer_code: newCustomerCode,
+          type: 'Reguler' // Default retail customer type
         }])
         .select()
         .single();
@@ -52,6 +58,16 @@ export async function POST(req) {
     
     const finalGrandTotal = parseInt(grandTotal) + uniqueCode;
 
+    // Fetch pricelist settings to calculate financial snapshots
+    const { data: settings } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'pricelist_config')
+      .single();
+    const pricelistConfig = settings?.value || {};
+    const profitGudangNom = Number(pricelistConfig.profit_gudang_nominal || 0);
+    const profitGlobalPct = Number(pricelistConfig.profit_global_percent || 0);
+
     // 3. Create Sales Order
     let notes = `Order via Web Calculator.\nUnik: Rp ${uniqueCode}\nSubtotal: Rp ${subtotal}\n`;
     const totalFastTrack = items.filter(i => i.isFastTrack).length;
@@ -62,7 +78,7 @@ export async function POST(req) {
       .from('sales_orders')
       .insert([{
         invoice_number: invoiceNumber,
-        customer_code: customerId, // The ERP uses the customer_code as string reference
+        customer_code: customerId, 
         date: new Date().toISOString().split('T')[0],
         status: 'DRAFT',
         payment_status: 'BELUM LUNAS',
@@ -83,6 +99,25 @@ export async function POST(req) {
       if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
       if (item.isTwoColor) itemNotes += '🎨 2 Warna\n';
       if (item.printingColors) itemNotes += `🎨 ${item.printingColors}\n`;
+
+      // Get product details
+      const { data: product } = await supabase
+        .from('products')
+        .select('workshop_code, base_price, category')
+        .eq('product_code', item.productId)
+        .single();
+
+      const dynamicHPP = await calculateDynamicHPP(supabase, item.productId, product?.base_price || 0);
+
+      const snapshot = calculateCostSnapshot({
+        product,
+        orderType: item.orderType,
+        qty: item.qty,
+        unitMultiplier: 1,
+        dynamicHPP,
+        profitGudangNom,
+        profitGlobalPct
+      });
       
       soItems.push({
         so_id: order.id,
@@ -93,19 +128,28 @@ export async function POST(req) {
         unit_multiplier: 1,
         unit_price: parseFloat(item.unitPrice),
         total_price: parseFloat(item.unitPrice) * parseInt(item.qty),
+        hpp_price: dynamicHPP,
+        beli_gudang: snapshot.beliGudang,
+        beli_global: snapshot.beliGlobal,
+        royalty_fee: snapshot.royaltyFee,
         notes: itemNotes.trim()
       });
+
 
       if (item.isFastTrack) {
         soItems.push({
           so_id: order.id,
           order_type: 'POLOS',
           product_code: 'SRV-FAST-TRACK',
-          qty: 1, // Fixed 1 service per fast-track item checked
+          qty: 1, 
           unit: 'Layanan',
           unit_multiplier: 1,
           unit_price: 100000,
           total_price: 100000,
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
           notes: `Fast Track untuk ${item.productName || item.productId}`
         });
       }
@@ -120,6 +164,10 @@ export async function POST(req) {
           unit_multiplier: 1,
           unit_price: 250,
           total_price: 250 * parseInt(item.qty),
+          hpp_price: 0,
+          beli_gudang: 0,
+          beli_global: 0,
+          royalty_fee: 0,
           notes: `Untuk ${item.productName} - Warna Ke-2`
         });
       }
@@ -146,4 +194,5 @@ export async function POST(req) {
     console.error('Error creating public order:', error);
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
+
 }

@@ -95,7 +95,8 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
     try {
       const res = await processMarketplaceSettlement(settlementData, settlementMethod, settlementDate)
       if (res.success) {
-        alert('Pencairan berhasil diproses dan dicatat di Buku Besar!')
+        const skipMsg = res.skipped > 0 ? ` (${res.skipped} pesanan dilewati karena sudah cair)` : ''
+        alert(`Pencairan berhasil diproses dan dicatat di Buku Besar!${skipMsg}`)
         setIsSettlementModalOpen(false)
         setInputPencairan({}) // reset
         router.refresh()

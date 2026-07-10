@@ -3,27 +3,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
-
-export async function calculateDynamicHPP(supabase, productCode, fallbackPrice) {
-  try {
-    const { data: purchases, error } = await supabase
-      .from('purchase_items')
-      .select('unit_price')
-      .eq('product_code', productCode)
-      .order('id', { ascending: false });
-      
-    if (error || !purchases || purchases.length === 0) return fallbackPrice;
-    
-    if (purchases.length >= 3) {
-      const sum = purchases.reduce((acc, curr) => acc + Number(curr.unit_price || 0), 0);
-      return sum / purchases.length;
-    } else {
-      return Math.max(...purchases.map(p => Number(p.unit_price || 0)));
-    }
-  } catch(e) {
-    return fallbackPrice;
-  }
-}
+import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
 
 export async function createSalesOrder(payload) {
   const supabase = await createClient()
@@ -67,28 +47,29 @@ export async function createSalesOrder(payload) {
     let virtualRoyaltyGlobal = 0;
     
     for (const item of items) {
-      const category = item.category?.toLowerCase() || '';
-      const isPlastik = category.includes('plastik');
-      const isSealer = category.includes('sealer');
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
 
-      if (isPlastik && item.order_type === 'Sablon') {
-        virtualRoyaltyGlobal += (20 * Number(item.qty) * Number(item.unit_multiplier || 1));
-      } else if (isSealer) {
-        virtualRoyaltyGlobal += (20000 * Number(item.qty) * Number(item.unit_multiplier || 1));
-      }
-
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price').eq('product_code', item.product_id).single();
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
       
+      const snapshot = calculateCostSnapshot({
+        product,
+        orderType: item.order_type,
+        qty: item.qty,
+        unitMultiplier: item.unit_multiplier,
+        dynamicHPP,
+        profitGudangNom,
+        profitGlobalPct
+      });
+
       if (product) {
-        const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1);
         if (product.workshop_code === 'GUDANG') {
-          totalHppGudang += itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
+          totalHppGudang += snapshot.beliGudang;
         }
         if (product.workshop_code === 'GLOBAL') {
-          totalHppGlobal += itemHppTotal * (1 + (profitGlobalPct / 100));
+          totalHppGlobal += snapshot.beliGlobal - snapshot.royaltyFee;
         }
       }
+      virtualRoyaltyGlobal += snapshot.royaltyFee;
     }
     
     const finalBeliGlobal = totalHppGlobal + virtualRoyaltyGlobal;
@@ -116,31 +97,19 @@ export async function createSalesOrder(payload) {
     // 2. Process Items
     const soItems = [];
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price').eq('product_code', item.product_id).single();
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
 
-      const category = item.category?.toLowerCase() || '';
-      const isPlastik = category.includes('plastik');
-      const isSealer = category.includes('sealer');
+      const snapshot = calculateCostSnapshot({
+        product,
+        orderType: item.order_type,
+        qty: item.qty,
+        unitMultiplier: item.unit_multiplier,
+        dynamicHPP,
+        profitGudangNom,
+        profitGlobalPct
+      });
 
-      let itemRoyalty = 0;
-      if (isPlastik && item.order_type === 'Sablon') {
-        itemRoyalty = (20 * Number(item.qty) * Number(item.unit_multiplier || 1));
-      } else if (isSealer) {
-        itemRoyalty = (20000 * Number(item.qty) * Number(item.unit_multiplier || 1));
-      }
-
-      const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1);
-      let itemBeliGudang = 0;
-      let itemBeliGlobal = 0;
-
-      if (item.order_type?.toUpperCase() === 'PRINTING') {
-        itemBeliGudang = 0;
-        itemBeliGlobal = 0;
-      } else {
-        if (product?.workshop_code === 'GUDANG') itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1));
-        if (product?.workshop_code === 'GLOBAL') itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100));
-      }
       
       // Royalty dipisah menjadi kolom sendiri (sesuai SOP baru)
       // Tidak lagi dicampur ke itemBeliGlobal
@@ -164,9 +133,9 @@ export async function createSalesOrder(payload) {
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
-        beli_gudang: itemBeliGudang,
-        beli_global: itemBeliGlobal,
-        royalty_fee: itemRoyalty,
+        beli_gudang: snapshot.beliGudang,
+        beli_global: snapshot.beliGlobal,
+        royalty_fee: snapshot.royaltyFee,
         notes: itemNotes.trim()
       });
 
@@ -303,14 +272,30 @@ export async function addSalesPayment(soId, paymentData) {
     const { data: so, error: soError } = await supabase.from('sales_orders').select('*, customers(name)').eq('id', soId).single()
     if (soError) throw soError
 
-    const newDpAmount = Number(so.dp_amount || 0) + Number(paymentAmount)
-    const paymentStatus = newDpAmount >= Number(so.total_amount) ? 'LUNAS' : 'BELUM LUNAS'
+    const currentPaid = Number(so.dp_amount || 0)
+    const totalAmount = Number(so.total_amount || 0)
+    const remaining = totalAmount - currentPaid
+
+    // Guard 1: Sudah lunas, tolak pembayaran baru
+    if (so.payment_status === 'LUNAS' || remaining <= 0) {
+      throw new Error('Invoice sudah lunas. Tidak dapat menambah pembayaran lagi.')
+    }
+
+    // Guard 2: Overpayment — pembayaran melebihi sisa tagihan
+    if (Number(paymentAmount) > remaining) {
+      throw new Error(`Pembayaran (Rp ${Number(paymentAmount).toLocaleString('id-ID')}) melebihi sisa tagihan (Rp ${remaining.toLocaleString('id-ID')}). Kurangi nominal pembayaran.`)
+    }
+
+    const newDpAmount = currentPaid + Number(paymentAmount)
+    // Gunakan exact payment_status values yang ada di sistem: BELUM LUNAS / DP / LUNAS
+    const paymentStatus = newDpAmount >= totalAmount ? 'LUNAS' : (newDpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Update SO
     await supabase.from('sales_orders').update({
       dp_amount: newDpAmount,
       payment_status: paymentStatus
     }).eq('id', soId)
+
 
     // Insert Transaction
     const custName = so.customers?.name || so.customer_code
@@ -391,7 +376,15 @@ export async function updateSalesOrder(soId, payload) {
       }
       return sum + itemTotal;
     }, 0)
-    const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
+
+    // Baca dp_amount aktual dari DB — JANGAN overwrite dari payload UI
+    // dp_amount hanya boleh diubah oleh addSalesPayment()
+    const { data: existingSo } = await supabase.from('sales_orders').select('dp_amount').eq('id', soId).single()
+    const currentDbDpAmount = Number(existingSo?.dp_amount || 0)
+
+    // Recalculate payment_status berdasarkan paid aktual vs total baru
+    // Jika paid > total baru (total diedit turun), status LUNAS tanpa buat refund/kredit
+    const paymentStatus = currentDbDpAmount >= grandTotal ? 'LUNAS' : (currentDbDpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get profit margins from settings
     const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'pricelist_config').single();
@@ -406,38 +399,28 @@ export async function updateSalesOrder(soId, payload) {
     const preparedItems = []
 
     for (const item of items) {
-      const category = item.category?.toLowerCase() || ''
-      const isPlastik = category.includes('plastik')
-      const isSealer = category.includes('sealer')
-
-      let itemRoyalty = 0
-      if (isPlastik && item.order_type === 'Sablon') {
-        itemRoyalty = (20 * Number(item.qty) * Number(item.unit_multiplier || 1))
-      } else if (isSealer) {
-        itemRoyalty = (20000 * Number(item.qty) * Number(item.unit_multiplier || 1))
-      }
-      virtualRoyaltyGlobal += itemRoyalty
-
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price').eq('product_code', item.product_id).single()
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single()
       
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0)
-      const itemHppTotal = dynamicHPP * Number(item.qty) * Number(item.unit_multiplier || 1)
       
-      let itemBeliGudang = 0;
-      let itemBeliGlobal = 0;
+      const snapshot = calculateCostSnapshot({
+        product,
+        orderType: item.order_type,
+        qty: item.qty,
+        unitMultiplier: item.unit_multiplier,
+        dynamicHPP,
+        profitGudangNom,
+        profitGlobalPct
+      });
 
       if (product?.workshop_code === 'GUDANG') {
-        itemBeliGudang = itemHppTotal + (profitGudangNom * Number(item.qty) * Number(item.unit_multiplier || 1))
-        totalBeliGudang += itemBeliGudang
+        totalBeliGudang += snapshot.beliGudang
       }
       if (product?.workshop_code === 'GLOBAL') {
-        itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100))
-        totalBeliGlobal += itemBeliGlobal
+        totalBeliGlobal += snapshot.beliGlobal - snapshot.royaltyFee
       }
+      virtualRoyaltyGlobal += snapshot.royaltyFee
 
-      // Royalty dipisah menjadi kolom sendiri
-      // Tidak dicampur ke itemBeliGlobal
-      
       let itemNotes = '';
       if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
       
@@ -456,10 +439,11 @@ export async function updateSalesOrder(soId, payload) {
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
         hpp_price: dynamicHPP,
-        beli_gudang: itemBeliGudang,
-        beli_global: itemBeliGlobal,
-        royalty_fee: itemRoyalty
+        beli_gudang: snapshot.beliGudang,
+        beli_global: snapshot.beliGlobal,
+        royalty_fee: snapshot.royaltyFee
       }
+
       
       // Only set notes if there is something to set, 
       // Actually we must always set it, so if they uncheck it, it gets cleared!
@@ -525,7 +509,7 @@ export async function updateSalesOrder(soId, payload) {
         customer_code: customerId,
         notes: notes,
         total_amount: grandTotal,
-        dp_amount: dpAmount,
+        // dp_amount TIDAK disentuh — hanya addSalesPayment() yang boleh ubah dp_amount
         payment_method: paymentAccount,
         payment_status: paymentStatus
       })
@@ -588,6 +572,31 @@ export async function updateMockupUrl(itemId, mockupUrl) {
 export async function updateSalesItemStatus(itemId, newStatus) {
   const supabase = await createClient()
   try {
+    const { data: item, error: fetchErr } = await supabase
+      .from('sales_items')
+      .select('*, sales_orders(payment_status)')
+      .eq('id', itemId)
+      .single()
+    
+    if (fetchErr || !item) throw new Error("Item tidak ditemukan")
+
+    const oldStatus = (item.status || 'BARU MASUK').toUpperCase()
+    const targetStatus = newStatus.toUpperCase()
+
+    // Guard 1: Terminal BATAL state cannot be changed
+    if (oldStatus === 'BATAL' && targetStatus !== 'BATAL') {
+      throw new Error("Item yang sudah dibatalkan tidak bisa diubah statusnya.")
+    }
+
+    // Guard 2: Prevent illegal leaps from BARU MASUK to shipping/completion
+    if (oldStatus === 'BARU MASUK') {
+      const isPolos = item.order_type?.toUpperCase() === 'POLOS'
+      const allowedNext = isPolos ? ['BARU MASUK', 'SIAP KIRIM', 'BATAL'] : ['BARU MASUK', 'SIAP PROSES', 'BATAL']
+      if (!allowedNext.includes(targetStatus)) {
+        throw new Error(`Transisi status tidak valid: ${oldStatus} -> ${targetStatus}. Harus melewati status Siap Proses atau Siap Kirim.`)
+      }
+    }
+
     const { error } = await supabase
       .from('sales_items')
       .update({ status: newStatus })
@@ -595,27 +604,6 @@ export async function updateSalesItemStatus(itemId, newStatus) {
     
     if (error) throw new Error(error.message)
 
-    // Jika dibatalkan, kita juga mencari id sales_order-nya dan menghapus transaksi pembayaran (DP/Lunas)
-    if (newStatus === 'BATAL') {
-      const { data: itemData } = await supabase.from('sales_items').select('id, so_id, product_code, qty, unit_multiplier, order_type, sales_orders(invoice_number)').eq('id', itemId).single()
-      if (itemData && itemData.so_id) {
-        // Hapus transaksi kasir terkait SO ini agar saldo tidak menggantung
-        await supabase.from('transactions').delete().eq('so_id', itemData.so_id)
-
-        // Insert mutasi REVERT untuk stok
-        const isPolos = !itemData.order_type || itemData.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(itemData.order_type.toUpperCase());
-        const actualQty = Number(itemData.qty) * Number(itemData.unit_multiplier || 1);
-        await supabase.from('stock_mutations').insert({
-          product_code: itemData.product_code,
-          mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
-          reference_id: itemData.id,
-          reference_number: itemData.sales_orders?.invoice_number || itemData.so_id,
-          qty_tersedia_change: actualQty,
-          qty_fisik_change: isPolos ? actualQty : 0,
-          notes: `Pembatalan Item dari Invoice: ${itemData.sales_orders?.invoice_number}`
-        })
-      }
-    }
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/production')
     revalidatePath('/track')
@@ -630,39 +618,11 @@ export async function cancelSalesOrder(soId) {
   const supabase = await createClient()
 
   try {
-    // Ambil data item sebelum status diubah untuk merevert stok
-    const { data: itemsToCancel } = await supabase.from('sales_items')
-      .select('id, product_code, qty, unit_multiplier, order_type, sales_orders(invoice_number)')
-      .eq('so_id', soId)
-
     // 1. Ubah status semua item menjadi BATAL
     const { error: itemsErr } = await supabase.from('sales_items')
       .update({ status: 'BATAL' })
       .eq('so_id', soId)
     if (itemsErr) throw new Error(itemsErr.message)
-
-    // Insert mutasi REVERT untuk stok
-    if (itemsToCancel && itemsToCancel.length > 0) {
-      const invoiceNum = itemsToCancel[0]?.sales_orders?.invoice_number || soId;
-      const mutations = itemsToCancel
-        .filter(item => item.order_type?.toUpperCase() !== 'PRINTING') // Skip revert for PRINTING
-        .map(item => {
-          const isPolos = !item.order_type || item.order_type.toUpperCase() === 'POLOS' || !['SABLON', 'PRINTING'].includes(item.order_type.toUpperCase());
-          const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
-          return {
-            product_code: item.product_code,
-            mutation_type: isPolos ? 'REVERT_OUT_POLOS' : 'REVERT_OUT_SABLON',
-            reference_id: item.id,
-            reference_number: invoiceNum,
-            qty_tersedia_change: actualQty,
-            qty_fisik_change: isPolos ? actualQty : 0,
-            notes: `Pembatalan Invoice: ${invoiceNum}`
-          }
-        })
-      if (mutations.length > 0) {
-        await supabase.from('stock_mutations').insert(mutations)
-      }
-    }
 
     // 2. Ubah status pembayaran invoice menjadi BATAL
     const { error: soErr } = await supabase.from('sales_orders')

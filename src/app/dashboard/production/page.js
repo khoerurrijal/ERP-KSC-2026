@@ -89,8 +89,8 @@ export default async function ProductionPage() {
     })(),
     is_fast_track: (item.sales_orders?.notes || '').toLowerCase().includes('fast track') || (item.notes || '').toLowerCase().includes('fast_track') || (item.notes || '').toLowerCase().includes('fast track'),
     notes: item.notes,
-    status: item.sales_orders?.status, // This is SO status
-    item_status: item.status || 'Proses', // This is Item status
+    status: item.status || 'BARU MASUK',
+    item_status: item.status || 'BARU MASUK',
     mockup_url: item.mockup_url, // Added mockup_url
     qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
   }))

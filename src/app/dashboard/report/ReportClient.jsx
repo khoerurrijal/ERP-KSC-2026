@@ -70,8 +70,8 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
   ];
 
   const tabunganDetails = [
-    { label: "Suntikan Otomatis King", value: 2000000, isPositive: true },
-    { label: "Masuk Buku Besar", value: Math.max(0, Number(summary.tabungan?.masuk || 0) - 2000000), isPositive: true },
+    { label: "Suntikan Otomatis King", value: summary.tabungan_fixed_in || 2000000, isPositive: true },
+    { label: "Masuk Buku Besar", value: Math.max(0, Number(summary.tabungan?.masuk || 0) - (summary.tabungan_fixed_in || 2000000)), isPositive: true },
     { label: "Keluar Buku Besar", value: summary.tabungan?.keluar || 0, isPositive: false }
   ];
 

@@ -64,6 +64,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   // TAB 2: Tracking Produksi (Input Qty by Operator)
   const filteredAndSortedJobs = useMemo(() => {
     let result = (productionJobs || []).filter(j => 
+      j.order_type?.toUpperCase() === 'SABLON' &&
       (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
       ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
        (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

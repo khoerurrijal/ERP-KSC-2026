@@ -219,14 +219,30 @@ export async function deletePurchaseOrder(id) {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
 
-    // 1. Stock reverting is automatically handled by DB Trigger on purchase_items ON DELETE
+    // 1. Ambil PO sebelum dihapus untuk rollback cash dan pricing
+    const { data: po, error: poFetchErr } = await supabase
+      .from('purchase_orders')
+      .select('id, po_number, status, workshop_code')
+      .eq('id', id)
+      .single()
+    if (poFetchErr || !po) throw new Error('PO tidak ditemukan.')
+
     const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
 
-    // 2. Delete PO (Items will cascade if ON DELETE CASCADE, but we already reverted stock)
+    // 2. Rollback cash OUT jika PO pernah LUNAS
+    // Gunakan exact po_id FK — bukan LIKE description
+    if (po.status === 'LUNAS') {
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('po_id', id)
+    }
+
+    // 3. Hapus PO (items CASCADE via FK)
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id)
     if (error) throw new Error(error.message)
 
-    // 3. Recalculate Dynamic Pricing for affected products
+    // 4. Recalculate Dynamic Pricing for affected products
     if (oldItems && oldItems.length > 0) {
       const uniqueProducts = [...new Set(oldItems.map(i => i.product_code))]
       for (const prodCode of uniqueProducts) {
@@ -251,26 +267,42 @@ export async function payPurchaseOrder(id, paymentMethod) {
     const supabase = await createClient()
 
     // 1. Ambil data PO
-    const { data: po, error: poError } = await supabase.from('purchase_orders').select('*').eq('id', id).single()
+    const { data: po, error: poError } = await supabase
+      .from('purchase_orders')
+      .select('id, po_number, status, total_amount, supplier, workshop_code')
+      .eq('id', id)
+      .single()
     if (poError || !po) throw new Error('Data PO tidak ditemukan.')
 
-    if (po.status === 'LUNAS') throw new Error('PO sudah lunas.')
+    // Guard 1: PO sudah lunas
+    if (po.status === 'LUNAS') throw new Error('PO sudah lunas. Tidak bisa membayar ulang.')
 
-    // 2. Insert ke transaksi (buku besar)
+    // Guard 2: Duplicate cash transaction — cek exact po_id FK
+    const { data: existingTx } = await supabase
+      .from('transactions')
+      .select('id')
+      .eq('po_id', po.id)
+      .gt('amount_out', 0)
+      .limit(1)
+    if (existingTx && existingTx.length > 0) {
+      throw new Error('Transaksi pembayaran untuk PO ini sudah pernah dicatat. Hubungi admin jika perlu koreksi.')
+    }
+
+    const paymentDate = new Date().toISOString().split('T')[0]
+
+    // 2. Insert tepat 1 transaksi amount_out sebesar total PO penuh
     const { error: txError } = await supabase.from('transactions').insert({
-      date: new Date().toISOString().split('T')[0],
+      date: paymentDate,
       reference: 'PEMBELIAN',
-      description: `Pelunasan ke ${po.supplier || 'Supplier'}`,
+      description: `PEMBELIAN:${po.po_number} - Pelunasan ke ${po.supplier || 'Supplier'}`,
       amount_in: 0,
       amount_out: Number(po.total_amount || 0),
       workshop_code: po.workshop_code || 'GLOBAL',
-      payment_method: paymentMethod || 'KAS GUDANG' // fallback to kas gudang
+      payment_method: paymentMethod || 'KAS GUDANG',
+      po_id: po.id
     })
 
-    if (txError) {
-      console.error('Insert Transaksi Error:', txError)
-      throw new Error(`Gagal mencatat transaksi pengeluaran: ${txError.message}`)
-    }
+    if (txError) throw new Error(`Gagal mencatat transaksi pengeluaran: ${txError.message}`)
 
     // 3. Update status PO jadi LUNAS
     const { error: updateError } = await supabase.from('purchase_orders')

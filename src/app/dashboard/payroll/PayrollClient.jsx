@@ -3,7 +3,9 @@
 import { useState } from 'react'
 import { Calendar, CheckCircle2, Loader2, Calculator, Receipt } from 'lucide-react'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import CustomSelect from '@/components/CustomSelect'
 import { calculatePayroll, savePayroll } from './actions'
+
 
 export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
   const [startDate, setStartDate] = useState('')
@@ -66,12 +68,13 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
           const meal_allowance = (emp.uang_makan || 0) * daysWorked
           const weekly_bonus = schema.bonus_mingguan || 0
 
-          // Ambil total deduction otomatis (kasbon + cicilan pinjaman)
+          // Ambil total deduction otomatis secara terpisah
           const loanData = res.deductionsPerEmployee[emp.id]
-          const autoDeduction = loanData ? loanData.totalDeduction : 0
+          const kasbonOnly = loanData ? Number(loanData.kasbon || 0) : 0
+          const pinjamanOnly = loanData ? Number(loanData.pinjaman || 0) : 0
 
           const total_sebelum_kasbon = base_salary + meal_allowance + weekly_bonus + borongan_amount + bawahan_bonus + totalBonusHarian
-          const total = total_sebelum_kasbon - autoDeduction
+          const total = total_sebelum_kasbon - kasbonOnly - pinjamanOnly
 
           return {
             employee_id: emp.id,
@@ -86,7 +89,8 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
             borongan_amount,
             bawahan_bonus,
             other_bonuses: totalBonusHarian,
-            kasbon_amount: autoDeduction,
+            kasbon_amount: kasbonOnly,
+            pinjaman_amount: pinjamanOnly,
             late_deduction: 0,
             total
           }
@@ -125,9 +129,9 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
       const newItems = prev.items.map(item => {
         if (item.employee_id === employee_id) {
           const numValue = Number(value.replace(/[^0-9]/g, '')) || 0
-          // Hitung ulang total (kasbon dikurangi dari total_sebelum_deduction)
+          // Hitung ulang total (kasbon dikurangi dari total_sebelum_deduction beserta pinjaman & late)
           const total_sebelum_deduction = item.base_salary + item.meal_allowance + item.weekly_bonus + item.borongan_amount + item.bawahan_bonus + item.other_bonuses
-          return { ...item, kasbon_amount: numValue, total: total_sebelum_deduction - numValue - (item.late_deduction || 0) }
+          return { ...item, kasbon_amount: numValue, total: total_sebelum_deduction - numValue - (item.pinjaman_amount || 0) - (item.late_deduction || 0) }
         }
         return item
       })
@@ -143,7 +147,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
           const numValue = Number(value.replace(/[^0-9]/g, '')) || 0
           // Hitung ulang total
           const total_sebelum_deduction = item.base_salary + item.meal_allowance + item.weekly_bonus + item.borongan_amount + item.bawahan_bonus + item.other_bonuses
-          return { ...item, late_deduction: numValue, total: total_sebelum_deduction - (item.kasbon_amount || 0) - numValue }
+          return { ...item, late_deduction: numValue, total: total_sebelum_deduction - (item.kasbon_amount || 0) - (item.pinjaman_amount || 0) - numValue }
         }
         return item
       })
@@ -243,7 +247,8 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                   <th className="px-6 py-4 font-medium">Gaji + Makan (Hr)</th>
                   <th className="px-6 py-4 font-medium">Hasil Borongan</th>
                   <th className="px-6 py-4 font-medium">Bonus (Mingguan+Bawahan+Lain)</th>
-                  <th className="px-6 py-4 font-medium text-red-400">Potong Kasbon/Bon</th>
+                  <th className="px-6 py-4 font-medium text-red-400">Potong Kasbon (Edit)</th>
+                  <th className="px-6 py-4 font-medium text-purple-400">Cicilan Pinjaman (Oto)</th>
                   <th className="px-6 py-4 font-medium text-orange-400">Potong Telat</th>
                   <th className="px-6 py-4 font-medium text-right text-green-400">Total Take Home Pay</th>
                 </tr>
@@ -251,7 +256,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
               <tbody className="divide-y divide-white/5">
                 {payrollData.items.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-foreground/40">Tidak ada data produksi untuk periode ini.</td>
+                    <td colSpan="9" className="px-6 py-12 text-center text-foreground/40">Tidak ada data produksi untuk periode ini.</td>
                   </tr>
                 ) : payrollData.items.map((item, i) => (
                   <tr key={i} className="hover:bg-white/5 transition-colors">
@@ -281,6 +286,9 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                         className="glass-input w-24 text-sm text-red-400 font-bold text-right"
                       />
                     </td>
+                    <td className="px-6 py-4 font-bold text-purple-400">
+                      Rp {(item.pinjaman_amount || 0).toLocaleString('id-ID')}
+                    </td>
                     <td className="px-6 py-4">
                       <input 
                         type="text" 
@@ -296,6 +304,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                   </tr>
                 ))}
               </tbody>
+
             </table>
           </div>
         </div>

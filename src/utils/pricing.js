@@ -123,3 +123,72 @@ export function getMinQty({ orderType, category, printingColors, pricelistConfig
 
   return 1;
 }
+
+export async function calculateDynamicHPP(supabase, productCode, fallbackPrice) {
+  try {
+    const { data: purchases, error } = await supabase
+      .from('purchase_items')
+      .select('unit_price')
+      .eq('product_code', productCode)
+      .order('id', { ascending: false });
+      
+    if (error || !purchases || purchases.length === 0) return fallbackPrice;
+    
+    if (purchases.length >= 3) {
+      const sum = purchases.reduce((acc, curr) => acc + Number(curr.unit_price || 0), 0);
+      return sum / purchases.length;
+    } else {
+      return Math.max(...purchases.map(p => Number(p.unit_price || 0)));
+    }
+  } catch(e) {
+    return fallbackPrice;
+  }
+}
+
+export function calculateCostSnapshot({
+  product,          // Object: product data { workshop_code, category }
+  orderType,        // String: 'POLOS', 'SABLON', 'PRINTING'
+  qty,              // Number
+  unitMultiplier,   // Number (default 1)
+  dynamicHPP,       // Number
+  profitGudangNom,  // Number
+  profitGlobalPct   // Number
+}) {
+  const qtyNum = Number(qty || 0);
+  const mult = Number(unitMultiplier || 1);
+  const actualQty = qtyNum * mult;
+  const itemHppTotal = dynamicHPP * actualQty;
+
+  const category = (product?.category || '').toLowerCase();
+  const isPlastik = category.includes('plastik');
+  const isSealer = category.includes('sealer');
+
+  let itemRoyalty = 0;
+  if (isPlastik && (orderType || '').toUpperCase() === 'SABLON') {
+    itemRoyalty = 20 * actualQty;
+  } else if (isSealer) {
+    itemRoyalty = 20000 * actualQty;
+  }
+
+  let itemBeliGudang = 0;
+  let itemBeliGlobal = 0;
+
+  if ((orderType || '').toUpperCase() === 'PRINTING') {
+    itemBeliGudang = 0;
+    itemBeliGlobal = 0;
+  } else {
+    if (product?.workshop_code === 'GUDANG') {
+      itemBeliGudang = itemHppTotal + (profitGudangNom * actualQty);
+    }
+    if (product?.workshop_code === 'GLOBAL') {
+      itemBeliGlobal = itemHppTotal * (1 + (profitGlobalPct / 100));
+    }
+  }
+
+  return {
+    beliGudang: itemBeliGudang,
+    beliGlobal: itemBeliGlobal,
+    royaltyFee: itemRoyalty
+  };
+}
+

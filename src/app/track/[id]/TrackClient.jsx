@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Printer, Settings, PackageOpen, CreditCard } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Printer, Settings, PackageOpen, CreditCard, XCircle } from 'lucide-react'
 
 const STATUS_STEPS = [
   { key: 'BARU MASUK', label: 'Baru Masuk', icon: PackageOpen },
@@ -236,85 +236,95 @@ export default function TrackClient({ order, logs, settings, employees }) {
                   {/* Expanded Pipeline */}
                   {isExpanded && (
                     <div className="mt-4 pt-5 border-t border-white/5 animate-in slide-in-from-top-4 duration-300 fade-in">
-                      <div className="relative pl-5 space-y-6 before:absolute before:inset-0 before:ml-[1.55rem] before:h-full before:w-px before:bg-gradient-to-b before:from-primary before:via-white/10 before:to-white/10">
-                        {STATUS_STEPS.map((step) => {
-                          // Bypass SIAP PROSES dan PROSES untuk jenis POLOS
-                          if (isPolos && (step.key === 'SIAP PROSES' || step.key === 'PROSES')) return null;
+                      {itemStatus === 'BATAL' ? (
+                        <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-red-400 flex items-center gap-3">
+                          <XCircle className="w-5 h-5 shrink-0" />
+                          <div>
+                            <p className="font-bold text-sm">Pesanan Dibatalkan</p>
+                            <p className="text-xs opacity-80">Item ini telah dibatalkan dari sistem operasional.</p>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="relative pl-5 space-y-6 before:absolute before:inset-0 before:ml-[1.55rem] before:h-full before:w-px before:bg-gradient-to-b before:from-primary before:via-white/10 before:to-white/10">
+                          {STATUS_STEPS.map((step) => {
+                            // Bypass SIAP PROSES dan PROSES untuk jenis POLOS
+                            if (isPolos && (step.key === 'SIAP PROSES' || step.key === 'PROSES')) return null;
 
-                          const state = getStepState(step.key, step.label, itemStatus)
-                          const Icon = step.icon
+                            const state = getStepState(step.key, step.label, itemStatus)
+                            const Icon = step.icon
 
-                          let iconColor = 'text-white/20'
-                          let bgColor = 'bg-[#1b1f27] border-white/10'
-                          let glow = ''
+                            let iconColor = 'text-white/20'
+                            let bgColor = 'bg-[#1b1f27] border-white/10'
+                            let glow = ''
 
-                          if (state === 'passed') {
-                            iconColor = 'text-primary'
-                            bgColor = 'bg-primary/20 border-primary/50'
-                          } else if (state === 'active') {
-                            iconColor = 'text-white'
-                            bgColor = 'bg-primary border-primary'
-                            glow = 'shadow-[0_0_12px_rgba(168,85,247,0.5)]'
-                          } else if (state === 'active-blinking') {
-                            iconColor = 'text-yellow-400'
-                            bgColor = 'bg-yellow-500/20 border-yellow-500'
-                            glow = 'shadow-[0_0_12px_rgba(234,179,8,0.5)] animate-pulse'
-                          }
+                            if (state === 'passed') {
+                              iconColor = 'text-primary'
+                              bgColor = 'bg-primary/20 border-primary/50'
+                            } else if (state === 'active') {
+                              iconColor = 'text-white'
+                              bgColor = 'bg-primary border-primary'
+                              glow = 'shadow-[0_0_12px_rgba(168,85,247,0.5)]'
+                            } else if (state === 'active-blinking') {
+                              iconColor = 'text-yellow-400'
+                              bgColor = 'bg-yellow-500/20 border-yellow-500'
+                              glow = 'shadow-[0_0_12px_rgba(234,179,8,0.5)] animate-pulse'
+                            }
 
-                          return (
-                            <div key={step.key} className="relative flex items-start group">
-                              <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border shrink-0 translate-y-0.5 transition-colors ${bgColor} ${glow}`}>
-                                {state === 'passed' ? <Check className={`w-3 h-3 ${iconColor}`} /> : <Icon className={`w-3 h-3 ${iconColor}`} />}
-                              </div>
-                              <div className="ml-4">
-                                <h4 className={`text-sm font-bold ${state === 'future' ? 'text-foreground/30' : state === 'active-blinking' ? 'text-yellow-400' : 'text-foreground'}`}>
-                                  {step.label}
-                                </h4>
+                            return (
+                              <div key={step.key} className="relative flex items-start group">
+                                <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border shrink-0 translate-y-0.5 transition-colors ${bgColor} ${glow}`}>
+                                  {state === 'passed' ? <Check className={`w-3 h-3 ${iconColor}`} /> : <Icon className={`w-3 h-3 ${iconColor}`} />}
+                                </div>
+                                <div className="ml-4">
+                                  <h4 className={`text-sm font-bold ${state === 'future' ? 'text-foreground/30' : state === 'active-blinking' ? 'text-yellow-400' : 'text-foreground'}`}>
+                                    {step.label}
+                                  </h4>
 
-                                {/* Menunggu Lunas Alert */}
-                                {state === 'active-blinking' && step.label === 'Menunggu Lunas' && sisa > 0 && (
-                                  <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 flex items-start gap-2 text-yellow-500">
-                                    <AlertCircle className="w-4 h-4 shrink-0 translate-y-0.5" />
-                                    <div>
-                                      <span className="text-xs font-semibold block">Menunggu Pelunasan</span>
-                                      <span className="text-[10px] opacity-80 block mt-0.5">Sisa tagihan: Rp {sisa.toLocaleString('id-ID')}</span>
+                                  {/* Menunggu Lunas Alert */}
+                                  {state === 'active-blinking' && step.label === 'Menunggu Lunas' && sisa > 0 && (
+                                    <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 flex items-start gap-2 text-yellow-500">
+                                      <AlertCircle className="w-4 h-4 shrink-0 translate-y-0.5" />
+                                      <div>
+                                        <span className="text-xs font-semibold block">Menunggu Pelunasan</span>
+                                        <span className="text-[10px] opacity-80 block mt-0.5">Sisa tagihan: Rp {sisa.toLocaleString('id-ID')}</span>
+                                      </div>
                                     </div>
-                                  </div>
-                                )}
+                                  )}
 
-                                {/* Production Logs details */}
-                                {step.key === 'PROSES' && (state === 'active' || state === 'passed') && (
-                                  <div className="mt-2 space-y-2">
-                                    {itemLogs.filter(l => l.qty_processed > 0).map((log, lIdx) => (
-                                      <div key={lIdx} className="flex flex-col gap-0.5 bg-black/20 rounded border border-white/5 px-2.5 py-1.5 w-fit">
-                                        <div className="flex items-center gap-1.5">
-                                          <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
-                                          <span className="text-[10px] text-foreground/50">{new Date(log.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
+                                  {/* Production Logs details */}
+                                  {step.key === 'PROSES' && (state === 'active' || state === 'passed') && (
+                                    <div className="mt-2 space-y-2">
+                                      {itemLogs.filter(l => l.qty_processed > 0).map((log, lIdx) => (
+                                        <div key={lIdx} className="flex flex-col gap-0.5 bg-black/20 rounded border border-white/5 px-2.5 py-1.5 w-fit">
+                                          <div className="flex items-center gap-1.5">
+                                            <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
+                                            <span className="text-[10px] text-foreground/50">{new Date(log.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
+                                          </div>
+                                          <p className="text-xs pl-5">
+                                            <span className="font-semibold text-white">Disablon {Number(log.qty_processed).toLocaleString('id-ID')} Pcs</span>
+                                            <span className="text-foreground/60"> oleh {getEmployeeName(log.employee_id)}</span>
+                                          </p>
                                         </div>
-                                        <p className="text-xs pl-5">
-                                          <span className="font-semibold text-white">Disablon {Number(log.qty_processed).toLocaleString('id-ID')} Pcs</span>
-                                          <span className="text-foreground/60"> oleh {getEmployeeName(log.employee_id)}</span>
-                                        </p>
-                                      </div>
-                                    ))}
-                                    {state === 'active' && completedQty < targetQty && (
-                                      <div className="mt-2">
-                                        <div className="flex justify-between text-[10px] text-foreground/50 mb-1">
-                                          <span>Progres Sablon</span>
-                                          <span>{completedQty.toLocaleString('id-ID')} / {targetQty.toLocaleString('id-ID')} Pcs</span>
+                                      ))}
+                                      {state === 'active' && completedQty < targetQty && (
+                                        <div className="mt-2">
+                                          <div className="flex justify-between text-[10px] text-foreground/50 mb-1">
+                                            <span>Progres Sablon</span>
+                                            <span>{completedQty.toLocaleString('id-ID')} / {targetQty.toLocaleString('id-ID')} Pcs</span>
+                                          </div>
+                                          <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
+                                            <div className="bg-primary h-1 rounded-full" style={{ width: `${Math.min(100, Math.max(0, (completedQty/targetQty)*100))}%` }}></div>
+                                          </div>
                                         </div>
-                                        <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
-                                          <div className="bg-primary h-1 rounded-full" style={{ width: `${Math.min(100, Math.max(0, (completedQty/targetQty)*100))}%` }}></div>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          )
-                        })}
-                      </div>
+                            )
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
