@@ -21,7 +21,7 @@ export default function DashboardClientLayout({ allowedMenus, userRole, children
       {/* Sidebar Component */}
       <div className={`
         fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-        md:relative md:translate-x-0 w-64
+        md:relative md:translate-x-0 w-64 print:hidden
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <Sidebar 
@@ -32,18 +32,20 @@ export default function DashboardClientLayout({ allowedMenus, userRole, children
       </div>
 
       {/* Main Content Area (Includes Topbar and Children) */}
-      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-w-0 min-h-screen relative overflow-x-hidden print:min-h-0">
         
         {/* Topbar */}
-        <Topbar userRole={userRole} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        <div className="print:hidden w-full">
+          <Topbar userRole={userRole} onToggleSidebar={() => setIsSidebarOpen(!isSidebarOpen)} />
+        </div>
 
         {/* Main Content Scrollable Area */}
-        <main className="flex-1 relative p-4 md:p-8">
+        <main className="flex-1 relative p-4 md:p-8 print:p-0 print:m-0 print:w-full print:max-w-none">
           {/* Background decorations for main area */}
-          <div className="fixed top-[-5%] left-[20%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[150px] pointer-events-none" />
-          <div className="fixed bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[150px] pointer-events-none" />
+          <div className="fixed top-[-5%] left-[20%] w-[50%] h-[50%] bg-primary/5 rounded-full blur-[150px] pointer-events-none print:hidden" />
+          <div className="fixed bottom-[-5%] right-[-5%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[150px] pointer-events-none print:hidden" />
           
-          <div className="relative z-10 max-w-6xl mx-auto pb-20">
+          <div className="relative z-10 max-w-6xl mx-auto pb-20 print:pb-0 print:m-0 print:w-full print:max-w-none">
             {children}
           </div>
         </main>

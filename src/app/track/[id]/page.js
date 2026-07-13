@@ -16,7 +16,7 @@ export default async function PublicTrackingPage({ params }) {
     .from('sales_orders')
     .select(`
       *,
-      customers (name, phone),
+      customers (name, phone, address),
       sales_items (
         id,
         product_code,
@@ -66,10 +66,26 @@ export default async function PublicTrackingPage({ params }) {
     .limit(1)
     .single()
 
+  // Find store config settings (banks, email, address, slogan, etc.)
+  const { data: storeConfigData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'store_config')
+    .single()
+  const storeConfig = storeConfigData?.value || null
+
   // Fetch employees for mapping names
   const { data: employees } = await supabase
     .from('employees')
     .select('id, full_name')
 
-  return <TrackClient order={order} logs={logs || []} settings={settings || {}} employees={employees || []} />
+  return (
+    <TrackClient 
+      order={order} 
+      logs={logs || []} 
+      settings={settings || {}} 
+      storeConfig={storeConfig} 
+      employees={employees || []} 
+    />
+  )
 }
