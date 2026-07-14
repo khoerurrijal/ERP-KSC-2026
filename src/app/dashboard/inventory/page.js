@@ -6,22 +6,36 @@ export const dynamic = 'force-dynamic'
 export default async function InventoryPage() {
   const supabase = await createClient()
 
-  // Fetch products with their workshop data
-  const { data: products } = await supabase
-    .from('products')
-    .select(`
-      *,
-      workshops (name)
-    `)
-    .eq('is_active', true)
-    .limit(100000)
-    .order('name')
+  // Fetch products, pipeline, and workshops
+  const [
+    { data: products },
+    { data: pipelineData },
+    { data: workshops }
+  ] = await Promise.all([
+    supabase
+      .from('products')
+      .select(`
+        *,
+        workshops (name)
+      `)
+      .eq('is_active', true)
+      .limit(100000)
+      .order('name'),
+    supabase
+      .from('product_pipeline_view')
+      .select('*')
+      .limit(100000),
+    supabase
+      .from('workshops')
+      .select('*')
+      .order('name')
+  ])
 
-  // Fetch pipeline data for active products
-  const { data: pipelineData } = await supabase
-    .from('product_pipeline_view')
-    .select('*')
-    .limit(100000)
-
-  return <InventoryClient products={products || []} pipelineData={pipelineData || []} />
+  return (
+    <InventoryClient 
+      products={products || []} 
+      pipelineData={pipelineData || []} 
+      workshops={workshops || []}
+    />
+  )
 }

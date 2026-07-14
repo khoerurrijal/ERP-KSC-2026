@@ -16,7 +16,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [showAddCustomer, setShowAddCustomer] = useState(false)
   const [newCustomerName, setNewCustomerName] = useState("")
   const [newCustomerPhone, setNewCustomerPhone] = useState("")
-  const [newCustomerType, setNewCustomerType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Umum")
+  const [newCustomerType, setNewCustomerType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -30,7 +30,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     const val = e.target.value
     setCustomerId(val)
     const cust = localCustomers.find(c => c.customer_code === val || c.name === val)
-    if (cust && (cust.type === 'Marketplace' || cust.type === 'Shopee' || cust.type === 'Tokopedia')) {
+    const ctype = (cust?.type || '').toUpperCase()
+    if (cust && (ctype === 'MARKETPLACE' || ctype === 'SHOPEE' || ctype === 'TOKOPEDIA')) {
       setIsMarketplace(true)
       setDpAmount(0)
     } else {
@@ -663,7 +664,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   value={newCustomerType} 
                   onChange={e => setNewCustomerType(e.target.value)} 
                   options={[
-                    ...(dropdownConfig.customer_type || ["Umum", "Member", "Grosir"]).map(t => ({ value: t, label: t }))
+                    ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
                   ]}
                 />
               </div>

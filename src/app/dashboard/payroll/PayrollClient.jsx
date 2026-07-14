@@ -352,10 +352,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                   <CustomSelect 
                     value={saveWorkshop} 
                     onChange={e => setSaveWorkshop(e.target.value)} 
-                    options={[
-                      { value: "KING", label: "KING" },
-                      { value: "TABUNGAN", label: "TABUNGAN" }
-                    ]}
+                    options={(dropdownConfig.kas_account || ["KING", "TABUNGAN"]).map(acc => ({ value: acc, label: acc }))}
                   />
                 </div>
               </div>

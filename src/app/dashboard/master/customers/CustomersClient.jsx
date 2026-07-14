@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Search, Plus, Users, CheckCircle2, Trash2, Loader2 } from 'lucide-react'
-import { addCustomer, deleteCustomer } from './actions'
+import { addCustomer, deleteCustomer, updateCustomer } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
 export default function CustomersClient({ initialCustomers = [], error, dropdownConfig = {} }) {
@@ -14,7 +14,7 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
   // Form State
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [type, setType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler")
+  const [type, setType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
   const [city, setCity] = useState('')
   const [isPending, setIsPending] = useState(false)
 
@@ -54,7 +54,7 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
     setEditingId(null)
     setName('')
     setPhone('')
-    setType((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler")
+    setType((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
     setCity('')
   }
 
@@ -62,7 +62,7 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
     setEditingId(customer.id)
     setName(customer.name)
     setPhone(customer.phone || '')
-    setType(customer.type || ((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "Reguler"))
+    setType(customer.type || ((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER"))
     setCity(customer.city || '')
     setShowModal(true)
   }
@@ -193,7 +193,7 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
                     value={type} 
                     onChange={e => setType(e.target.value)} 
                     options={[
-                      ...(dropdownConfig.customer_type || ["Reguler", "Reseller", "Shopee", "Tokopedia"]).map(t => ({ value: t, label: t }))
+                      ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
                     ]}
                   />
                 </div>

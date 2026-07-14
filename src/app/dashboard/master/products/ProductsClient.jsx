@@ -5,7 +5,7 @@ import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X, Upload } from 'luc
 import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function ProductsClient({ products: initialProducts = [], error = null }) {
+export default function ProductsClient({ products: initialProducts = [], error = null, workshops = [] }) {
   const [products, setProducts] = useState(initialProducts)
   const [searchQuery, setSearchQuery] = useState('')
   const [showModal, setShowModal] = useState(false)
@@ -267,9 +267,13 @@ export default function ProductsClient({ products: initialProducts = [], error =
                     value={workshop} 
                     onChange={e => setWorkshop(e.target.value)} 
                     options={[
-                      { value: "GLOBAL", label: "GLOBAL" },
-                      { value: "KING", label: "KING" },
-                      { value: "GUDANG", label: "GUDANG" }
+                      ...(workshops.length > 0
+                        ? workshops.map(w => ({ value: w.code, label: w.name }))
+                        : [
+                            { value: "GLOBAL", label: "GLOBAL" },
+                            { value: "KING", label: "KING" },
+                            { value: "GUDANG", label: "GUDANG" }
+                          ])
                     ]}
                   />
                 </div>

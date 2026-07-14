@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function InventoryClient({ products: initialProducts = [], pipelineData = [] }) {
+export default function InventoryClient({ products: initialProducts = [], pipelineData = [], workshops = [] }) {
   const [activeTab, setActiveTab] = useState('tabel')
   const [products, setProducts] = useState(initialProducts)
   const [searchQuery, setSearchQuery] = useState('')
@@ -196,8 +196,12 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
                 onChange={e => setFilterWorkshop(e.target.value)} 
                 options={[
                   { value: "", label: "- Semua Workshop -" },
-                  { value: "GUDANG", label: "GUDANG" },
-                  { value: "GLOBAL", label: "GLOBAL" }
+                  ...(workshops.length > 0
+                    ? workshops.map(w => ({ value: w.code, label: w.name }))
+                    : [
+                        { value: "GUDANG", label: "GUDANG" },
+                        { value: "GLOBAL", label: "GLOBAL" }
+                      ])
                 ]}
               />
             </div>

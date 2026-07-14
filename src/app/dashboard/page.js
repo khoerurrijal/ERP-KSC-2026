@@ -48,7 +48,7 @@ export default async function DashboardPage({ searchParams }) {
 
   // Fetch orders for metrics
   const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
-  const { data: marketplaceOrders } = await supabase.from('sales_orders').select('*, customers!inner(type)').limit(100000).in('customers.type', ['Marketplace', 'Shopee', 'Tokopedia', 'TikTok'])
+  const { data: marketplaceOrders } = await supabase.from('sales_orders').select('*, customers!inner(type)').limit(100000).in('customers.type', ['Marketplace', 'Shopee', 'Tokopedia', 'TikTok', 'MARKETPLACE', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK'])
 
   const rawOrders = salesOrders || []
   

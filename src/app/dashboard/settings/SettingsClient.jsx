@@ -14,7 +14,7 @@ export default function SettingsClient({ initialSettings }) {
     payment_method: ["BCA", "MANDIRI", "CASH"],
     payment_status_po: ["TEMPO", "LUNAS"],
     transaction_reference: ["PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "HPP GUDANG", "BAYAR HPP GUDANG", "LAIN-LAIN"],
-    customer_type: ["Umum", "Member", "Grosir"],
+    customer_type: ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"],
     order_type: ["SABLON", "POLOS"],
     kas_account: ["KING", "GLOBAL", "GUDANG", "TABUNGAN"],
     production_status: ["DRAFT", "BARU MASUK", "SIAP PROSES", "PROSES", "SUDAH JADI", "SIAP KIRIM", "DIKIRIM", "SUDAH DIAMBIL", "SELESAI"],
