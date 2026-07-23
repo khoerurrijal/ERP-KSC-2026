@@ -630,11 +630,27 @@ export async function cancelSalesOrder(soId) {
       .eq('id', soId)
     if (soErr) throw new Error(soErr.message)
 
-    // 3. Hapus semua riwayat transaksi uang terkait invoice ini
-    const { error: trxErr } = await supabase.from('transactions')
+    // 3. Hapus transaksi alokasi HPP Virtual, dan beri penanda [DIBATALKAN] pada transaksi kas fisik
+    const { error: virtualErr } = await supabase.from('transactions')
       .delete()
       .eq('so_id', soId)
-    if (trxErr) throw new Error(trxErr.message)
+      .eq('payment_method', 'Virtual')
+    if (virtualErr) console.error('Error deleting virtual tx:', virtualErr)
+
+    const { data: realTx } = await supabase.from('transactions')
+      .select('id, description')
+      .eq('so_id', soId)
+      .neq('payment_method', 'Virtual')
+    
+    if (realTx && realTx.length > 0) {
+      for (const tx of realTx) {
+        if (!tx.description?.includes('[DIBATALKAN]')) {
+          await supabase.from('transactions')
+            .update({ description: `[DIBATALKAN] ${tx.description}` })
+            .eq('id', tx.id)
+        }
+      }
+    }
 
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/inventory')

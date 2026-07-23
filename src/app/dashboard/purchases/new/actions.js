@@ -89,6 +89,27 @@ export async function createPurchaseOrder(payload) {
 
     // 5. Inventory is updated automatically by DB Trigger on purchase_items
 
+    // 5.5. Insert transaction log if payment status is LUNAS
+    if (payload.paymentStatus === 'LUNAS') {
+      const { error: txError } = await supabase.from('transactions').insert({
+        date: payload.poDate,
+        reference: 'PEMBELIAN',
+        description: `PEMBELIAN:${po.po_number} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
+        amount_in: 0,
+        amount_out: Number(payload.grandTotal || 0),
+        workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
+        payment_method: payload.paymentAccount || 'CASH',
+        po_id: po.id
+      })
+
+      if (txError) {
+        console.error('PO Transaction Insert Error:', txError)
+        // Cleanup PO if transaction log fails to maintain consistency
+        await supabase.from('purchase_orders').delete().eq('id', po.id)
+        return { success: false, error: 'Gagal mencatat transaksi kas: ' + txError.message }
+      }
+    }
+
     // 6. Recalculate Dynamic Pricing for all affected products
     const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
     for (const prodCode of uniqueProducts) {
@@ -111,6 +132,14 @@ export async function updatePurchaseOrder(id, payload) {
   try {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const supabase = await createClient()
+
+    const { data: poInfo } = await supabase
+      .from('purchase_orders')
+      .select('po_number')
+      .eq('id', id)
+      .single()
+    const poNumber = poInfo?.po_number || 'PO'
+
     // 1. Stock reverting is automatically handled by DB Trigger on purchase_items BEFORE DELETE
     const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
     
@@ -195,6 +224,48 @@ export async function updatePurchaseOrder(id, payload) {
     if (itemsError) throw new Error(itemsError.message)
 
     // 5. Inventory is updated automatically by DB Trigger on purchase_items
+
+    // 5.5. Synchronize cash transaction ledger depending on paymentStatus
+    if (payload.paymentStatus === 'LUNAS') {
+      const { data: existingTx } = await supabase
+        .from('transactions')
+        .select('id')
+        .eq('po_id', id)
+        .maybeSingle()
+
+      if (existingTx) {
+        const { error: txUpdateError } = await supabase
+          .from('transactions')
+          .update({
+            date: payload.poDate,
+            amount_out: Number(payload.grandTotal || 0),
+            payment_method: payload.paymentAccount,
+            workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
+            description: `PEMBELIAN:${poNumber} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'} (Updated)`
+          })
+          .eq('id', existingTx.id)
+        if (txUpdateError) throw txUpdateError
+      } else {
+        const { error: txInsertError } = await supabase
+          .from('transactions')
+          .insert({
+            date: payload.poDate,
+            reference: 'PEMBELIAN',
+            description: `PEMBELIAN:${poNumber} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
+            amount_in: 0,
+            amount_out: Number(payload.grandTotal || 0),
+            workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
+            payment_method: payload.paymentAccount || 'CASH',
+            po_id: id
+          })
+        if (txInsertError) throw txInsertError
+      }
+    } else if (payload.paymentStatus === 'TEMPO') {
+      await supabase
+        .from('transactions')
+        .delete()
+        .eq('po_id', id)
+    }
 
     // 6. Recalculate Dynamic Pricing for all affected products
     const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]

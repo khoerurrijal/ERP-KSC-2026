@@ -101,6 +101,7 @@ export async function savePayroll(payload) {
 
     // 2. Hitung Potongan Pinjaman/Kasbon & Update Loans Secara Dinamis
     let recalculatedGrandTotal = 0
+    let recalculatedGrandGrossTotal = 0
     const finalItemsToInsert = []
 
     for (const item of payload.items) {
@@ -149,11 +150,11 @@ export async function savePayroll(payload) {
             .eq('id', loan.id)
 
           // Cicilan PINJAMAN masuk ke TABUNGAN
-          const { data: empData } = await supabase.from('employees').select('full_name').eq('id', item.employee_id).single()
+          const empName = item.employee_name || 'Karyawan'
           await supabase.from('transactions').insert([{
             date: new Date().toISOString().split('T')[0],
             reference: 'PINJAMAN',
-            description: `Potongan cicilan pinjaman - ${empData?.full_name || 'Karyawan'}`,
+            description: `Potongan cicilan pinjaman - ${empName}`,
             payment_method: 'CASH',
             amount_out: 0,
             amount_in: deductAmount,
@@ -176,15 +177,28 @@ export async function savePayroll(payload) {
           await supabase.from('employee_loans')
             .update({ remaining_amount: newRemaining, status: newStatus })
             .eq('id', loan.id)
-          // KASBON tidak membuat transactions/cash IN ke TABUNGAN (hanya netting gaji)
+
+          // KASBON membuat transactions/cash IN ke KING (pelunasan kasbon)
+          const empName = item.employee_name || 'Karyawan'
+          await supabase.from('transactions').insert([{
+            date: new Date().toISOString().split('T')[0],
+            reference: 'KASBON',
+            description: `Potongan pelunasan kasbon - ${empName}`,
+            payment_method: 'CASH',
+            amount_out: 0,
+            amount_in: deductAmount,
+            workshop_code: 'KING'
+          }])
         }
       }
 
-      // Hitung ulang Net Salary (total) final untuk payroll_items agar sinkron dengan database
+      // Hitung ulang Net/Gross Salary (total) final untuk payroll_items agar sinkron dengan database
       const totalSebelumDeduction = Number(item.base_salary || 0) + Number(item.meal_allowance || 0) + Number(item.weekly_bonus || 0) + Number(item.borongan_amount || 0) + Number(item.bawahan_bonus || 0) + Number(item.other_bonuses || 0)
       const finalNetTotal = totalSebelumDeduction - totalPotonganAktual - Number(item.late_deduction || 0)
+      const itemGrossTotal = totalSebelumDeduction - Number(item.late_deduction || 0)
 
       recalculatedGrandTotal += finalNetTotal
+      recalculatedGrandGrossTotal += itemGrossTotal
 
       finalItemsToInsert.push({
         payroll_id: payrollRow.id,
@@ -208,13 +222,13 @@ export async function savePayroll(payload) {
     // Update total_amount di rekap payrolls utama
     await supabase.from('payrolls').update({ total_amount: recalculatedGrandTotal }).eq('id', payrollRow.id)
 
-    // 4. Insert Transaction for the total payroll (cash OUT dari KING sebesar net salary)
+    // 4. Insert Transaction for the total payroll (cash OUT dari KING sebesar gross salary)
     const { error: tErr } = await supabase.from('transactions').insert([{
       date: new Date().toISOString().split('T')[0],
       reference: 'GAJI KARYAWAN',
       description: payload.description || 'Gaji Karyawan',
       payment_method: payload.payment_method || 'Cash',
-      amount_out: recalculatedGrandTotal,
+      amount_out: recalculatedGrandGrossTotal,
       amount_in: 0,
       workshop_code: payload.workshop_code || 'KING'
     }])

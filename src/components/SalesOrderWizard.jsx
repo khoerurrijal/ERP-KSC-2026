@@ -76,7 +76,16 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setCustomerId(res.customer.customer_code)
     setShowAddCustomer(false)
     setNewCustomerName('')
-    setCurrentTab(2)
+
+    const ctype = (res.customer?.type || newCustomerType || '').toUpperCase()
+    if (ctype === 'MARKETPLACE' || ctype === 'SHOPEE' || ctype === 'TOKOPEDIA') {
+      setIsMarketplace(true)
+      setDpAmount(0)
+    } else {
+      setIsMarketplace(false)
+      setMarketplaceReceipt('')
+      setCurrentTab(2)
+    }
   }
 
   // Tab 2: Detail Pesanan
