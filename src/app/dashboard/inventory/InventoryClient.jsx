@@ -1,30 +1,69 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2 } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function InventoryClient({ products: initialProducts = [], pipelineData = [], workshops = [] }) {
+export default function InventoryClient({ 
+  products: initialProducts = [], 
+  totalCount = 0,
+  page = 1,
+  pageSize = 50,
+  pipelineData = [], 
+  workshops = [],
+  categories: passedCategories = [],
+  searchParams = {}
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentSearchParams = useSearchParams()
+
   const [activeTab, setActiveTab] = useState('tabel')
   const [products, setProducts] = useState(initialProducts)
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [filterCategory, setFilterCategory] = useState('')
-  const [filterWorkshop, setFilterWorkshop] = useState('')
-  const [sortConfig, setSortConfig] = useState({ key: 'name', direction: 'asc' })
+  const [searchQuery, setSearchQuery] = useState(searchParams.search || '')
+  const [showFilters, setShowFilters] = useState(Boolean(searchParams.category || searchParams.workshop))
+  const [filterCategory, setFilterCategory] = useState(searchParams.category || '')
+  const [filterWorkshop, setFilterWorkshop] = useState(searchParams.workshop || '')
+  const [sortConfig, setSortConfig] = useState({ 
+    key: searchParams.sortKey || 'name', 
+    direction: searchParams.sortDir || 'asc' 
+  })
 
-  // Opname Modal State
-  const [showOpnameModal, setShowOpnameModal] = useState(false)
-  const [opnameProduct, setOpnameProduct] = useState(null)
-  const [newStock, setNewStock] = useState('')
-  const [isPending, setIsPending] = useState(false)
+  // Sync initialProducts if server re-renders
+  useEffect(() => {
+    setProducts(initialProducts)
+  }, [initialProducts])
+
+  const updateQueryParams = useCallback((newParams) => {
+    const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
+    Object.entries(newParams).forEach(([key, val]) => {
+      if (val) {
+        params.set(key, val)
+      } else {
+        params.delete(key)
+      }
+    })
+    router.push(`${pathname}?${params.toString()}`)
+  }, [currentSearchParams, pathname, router])
+
+  // Debounce search input -> update URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((searchParams.search || '') !== searchQuery) {
+        updateQueryParams({ search: searchQuery, page: '1' })
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery, searchParams.search, updateQueryParams])
 
   const handleSort = (key) => {
     let direction = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
     setSortConfig({ key, direction })
+    updateQueryParams({ sortKey: key, sortDir: direction, page: '1' })
   }
 
   const renderSortIcon = (key) => {
@@ -32,7 +71,9 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
     return sortConfig.direction === 'asc' ? <ChevronUp className="w-3 h-3 inline ml-1" /> : <ChevronDown className="w-3 h-3 inline ml-1" />
   }
 
-  const categories = [...new Set(products.map(p => p.category).filter(Boolean))]
+  const categories = passedCategories.length > 0 
+    ? passedCategories 
+    : [...new Set(products.map(p => p.category).filter(Boolean))]
 
   const handleOpnameSubmit = async () => {
     if (!opnameProduct || newStock === '') return alert('Masukkan jumlah stok yang benar.')
@@ -60,46 +101,16 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
   }
 
   const filteredAndSorted = useMemo(() => {
-    let result = products.filter(p => {
-      const matchSearch = ((p.name || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-                          ((p.category || '').toLowerCase().includes(searchQuery.toLowerCase()))
-      
-      const matchCat = filterCategory ? p.category === filterCategory : true
-      
-      // Workshop is normally a relation, e.g. p.workshops?.name
-      const wsName = (p.workshop_code || p.workshops?.name || '').toUpperCase()
-      let matchWs = true
-      if (filterWorkshop) {
-        matchWs = wsName === filterWorkshop
-      }
-
-      return matchSearch && matchCat && matchWs
-    })
-
-    result.sort((a, b) => {
-      let valA = a[sortConfig.key]
-      let valB = b[sortConfig.key]
-      
-      if (sortConfig.key === 'workshop') {
-         valA = a.workshop_code || a.workshops?.name || ''
-         valB = b.workshop_code || b.workshops?.name || ''
-      }
-
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-
-    return result
-  }, [products, searchQuery, filterCategory, filterWorkshop, sortConfig])
+    return products
+  }, [products])
 
   const filteredPipelineData = useMemo(() => {
     let result = pipelineData.filter(pipe => {
       const isActive = products.some(p => p.product_code === pipe.product_code)
       if (!isActive) return false
 
-      const matchSearch = ((pipe.product_name || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-                          ((pipe.category || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchSearch = ((pipe.product_name || '').toLowerCase().includes(debouncedSearch.toLowerCase())) || 
+                          ((pipe.category || '').toLowerCase().includes(debouncedSearch.toLowerCase()))
       
       const matchCat = filterCategory ? pipe.category === filterCategory : true
       
@@ -125,7 +136,7 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
     })
 
     return result
-  }, [pipelineData, searchQuery, filterCategory, sortConfig])
+  }, [pipelineData, debouncedSearch, filterCategory, sortConfig])
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
@@ -185,7 +196,11 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
             <div className="p-4 border-b border-white/10 bg-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
               <CustomSelect 
                 value={filterCategory} 
-                onChange={e => setFilterCategory(e.target.value)} 
+                onChange={e => {
+                  const val = e.target.value
+                  setFilterCategory(val)
+                  updateQueryParams({ category: val, page: '1' })
+                }} 
                 options={[
                   { value: "", label: "- Semua Kategori -" },
                   ...categories.map(c => ({ value: c, label: c }))
@@ -193,7 +208,11 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
               />
               <CustomSelect 
                 value={filterWorkshop} 
-                onChange={e => setFilterWorkshop(e.target.value)} 
+                onChange={e => {
+                  const val = e.target.value
+                  setFilterWorkshop(val)
+                  updateQueryParams({ workshop: val, page: '1' })
+                }} 
                 options={[
                   { value: "", label: "- Semua Workshop -" },
                   ...(workshops.length > 0
@@ -252,6 +271,32 @@ export default function InventoryClient({ products: initialProducts = [], pipeli
                 )}
               </tbody>
             </table>
+          </div>
+
+          {/* Pagination Bar */}
+          <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+            <div>
+              Menampilkan {totalCount === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)} dari <span className="font-bold text-foreground">{totalCount}</span> barang
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={page <= 1}
+                onClick={() => updateQueryParams({ page: (page - 1).toString() })}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+              </button>
+              <span className="px-3 font-medium text-foreground">
+                Halaman {page} dari {Math.ceil(totalCount / pageSize) || 1}
+              </span>
+              <button
+                disabled={page >= Math.ceil(totalCount / pageSize)}
+                onClick={() => updateQueryParams({ page: (page + 1).toString() })}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       </div>

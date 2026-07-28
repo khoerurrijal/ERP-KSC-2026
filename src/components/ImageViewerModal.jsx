@@ -1,4 +1,5 @@
 import { X } from 'lucide-react'
+import Image from 'next/image'
 
 export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
   if (!isOpen || !imageUrl) return null
@@ -16,11 +17,12 @@ export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
         </button>
         
         {/* Image Container */}
-        <div className="relative w-full h-full flex items-center justify-center pointer-events-auto">
-          <img 
+        <div className="relative w-full h-[85vh] flex items-center justify-center pointer-events-auto">
+          <Image 
             src={imageUrl} 
             alt="Mockup Zoom" 
-            className="max-w-full max-h-[85vh] object-contain rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 animate-in zoom-in-95 duration-300"
+            fill
+            className="object-contain rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] border border-white/10 animate-in zoom-in-95 duration-300"
           />
         </div>
       </div>

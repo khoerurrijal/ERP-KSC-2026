@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { X, UploadCloud, Link as LinkIcon, CheckCircle2 } from 'lucide-react'
 import { updateMockupUrl } from '@/app/actions/sales'
 import { createClient } from '@/utils/supabase/client'
+import Image from 'next/image'
 
 export default function MockupUploadModal({ isOpen, onClose, itemId, initialUrl = '' }) {
   const [url, setUrl] = useState(initialUrl || '')
@@ -72,8 +73,8 @@ export default function MockupUploadModal({ isOpen, onClose, itemId, initialUrl 
         
         <div className="p-6 space-y-6">
           {preview && (
-            <div className="w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center">
-              <img src={preview} alt="Preview" className="max-h-full object-contain" />
+            <div className="relative w-full h-40 rounded-xl bg-white/5 border border-white/10 overflow-hidden flex items-center justify-center">
+              <Image src={preview} alt="Preview" fill className="object-contain" unoptimized />
             </div>
           )}
 

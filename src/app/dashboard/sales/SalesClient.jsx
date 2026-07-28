@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera, Navigation } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera, Navigation, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
@@ -12,9 +12,18 @@ import CustomDatePicker from '@/components/CustomDatePicker'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 
-export default function SalesClient({ salesOrders = [], salesItems = [], dropdownConfig = {} }) {
+export default function SalesClient({ 
+  salesOrders = [], 
+  totalCount = 0,
+  page = 1,
+  pageSize = 50,
+  salesItems = [], 
+  dropdownConfig = {},
+  searchParams: passedSearchParams = {}
+}) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const pathname = usePathname()
   const supabase = createClient()
 
   // Status order is now dynamic from settings
@@ -23,40 +32,34 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
   // Tab State: 'INVOICE' | 'ITEMS'
   const [activeTab, setActiveTab] = useState('INVOICE')
 
-  const [searchQuery, setSearchQuery] = useState('')
-  const [showFilters, setShowFilters] = useState(false)
-  const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') 
-  const [filterCustomerType, setFilterCustomerType] = useState('ALL')
+  const [searchQuery, setSearchQuery] = useState(passedSearchParams.search || '')
+  const [debouncedSearch, setDebouncedSearch] = useState(passedSearchParams.search || '')
+  const [showFilters, setShowFilters] = useState(Boolean(passedSearchParams.status || passedSearchParams.customerType))
+  const [filterStatus, setFilterStatus] = useState(passedSearchParams.status || 'BELUM_LUNAS') 
+  const [filterCustomerType, setFilterCustomerType] = useState(passedSearchParams.customerType || 'ALL')
   const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
-  
-  // Correction popup state
-  const [correctionModal, setCorrectionModal] = useState({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })
-  const [isCorrecting, setIsCorrecting] = useState(false) // For items tab
 
-  // Mockup popup state
-  const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
-  const [zoomImage, setZoomImage] = useState(null)
+  const updateQueryParams = useCallback((newParams) => {
+    const params = new URLSearchParams(Array.from(searchParams.entries()))
+    Object.entries(newParams).forEach(([key, val]) => {
+      if (val) {
+        params.set(key, val)
+      } else {
+        params.delete(key)
+      }
+    })
+    router.push(`${pathname}?${params.toString()}`)
+  }, [searchParams, pathname, router])
 
-  const filterMonth = searchParams.get('month') || (() => {
-    const now = new Date()
-    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
-  })()
-  
-  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
-  const [itemSortConfig, setItemSortConfig] = useState({ key: 'created_at', direction: 'desc' })
-  
-  // Modal Edit State
-  const [editingOrder, setEditingOrder] = useState(null)
-  const [paymentHistory, setPaymentHistory] = useState([])
-  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
-  
-  const [newPaymentAmount, setNewPaymentAmount] = useState('')
-  const [newPaymentMethod, setNewPaymentMethod] = useState('BCA')
-  const [newPaymentDate, setNewPaymentDate] = useState(new Date().toISOString().split('T')[0])
-  const [isSaving, setIsSaving] = useState(false)
-
-  // Items status loading
-  const [updatingItem, setUpdatingItem] = useState(null)
+  // Debounce search input 300ms
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((passedSearchParams.search || '') !== searchQuery) {
+        updateQueryParams({ search: searchQuery, page: '1' })
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery, passedSearchParams.search, updateQueryParams])
 
   const handleEditClick = async (order) => {
     setEditingOrder(order)
@@ -196,49 +199,15 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
 
   // Memoized Invoice Data
   const filteredAndSortedOrders = useMemo(() => {
-    let filtered = salesOrders.filter(order => {
-      const matchSearch = order.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          order.customers?.name?.toLowerCase().includes(searchQuery.toLowerCase())
-      
-      const orderMonth = order.date?.substring(0, 7)
-      const matchMonth = filterMonth ? orderMonth === filterMonth : true
-
-      let matchStatus = true
-      if (filterStatus === 'BELUM_LUNAS') {
-        matchStatus = order.payment_status === 'BELUM LUNAS' || order.payment_status === 'DP'
-      } else if (filterStatus === 'LUNAS') {
-        matchStatus = order.payment_status === 'LUNAS'
-      }
-
-      let matchCustomerType = true
-      if (filterCustomerType !== 'ALL') {
-        matchCustomerType = (order.customers?.type || 'REGULER').toUpperCase() === filterCustomerType.toUpperCase()
-      }
-
-      return matchSearch && matchMonth && matchStatus && matchCustomerType
-    })
-
-    return filtered.sort((a, b) => {
-      let aVal = a[sortConfig.key]
-      let bVal = b[sortConfig.key]
-
-      if (sortConfig.key === 'customers_name') {
-        aVal = a.customers?.name || ''
-        bVal = b.customers?.name || ''
-      }
-
-      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
-    })
-  }, [salesOrders, searchQuery, filterMonth, filterStatus, filterCustomerType, sortConfig])
+    return salesOrders
+  }, [salesOrders])
 
   // Memoized Item Data
   const filteredAndSortedItems = useMemo(() => {
     let filtered = salesItems.filter(item => {
-      const matchSearch = item.sales_orders?.invoice_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.sales_orders?.customers?.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                          item.products?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+      const matchSearch = item.sales_orders?.invoice_number?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                          item.sales_orders?.customers?.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+                          item.products?.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
       
       const itemMonth = item.sales_orders?.date?.substring(0, 7)
       const matchMonth = filterMonth ? itemMonth === filterMonth : true
@@ -270,7 +239,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
       if (aVal > bVal) return itemSortConfig.direction === 'asc' ? 1 : -1
       return 0
     })
-  }, [salesItems, searchQuery, filterMonth, itemFilterStatus, itemSortConfig])
+  }, [salesItems, debouncedSearch, filterMonth, itemFilterStatus, itemSortConfig])
 
   const totalOmset = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0), [salesOrders, filterMonth])
   const totalPiutang = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0), [salesOrders, filterMonth])
@@ -472,6 +441,32 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                 })}
               </tbody>
             </table>
+
+            {/* Pagination Controls for Sales Orders */}
+            <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+              <div>
+                Menampilkan {totalCount === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)} dari <span className="font-bold text-foreground">{totalCount}</span> transaksi
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={page <= 1}
+                  onClick={() => updateQueryParams({ page: (page - 1).toString() })}
+                  className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                </button>
+                <span className="px-3 font-medium text-foreground">
+                  Halaman {page} dari {Math.ceil(totalCount / pageSize) || 1}
+                </span>
+                <button
+                  disabled={page >= Math.ceil(totalCount / pageSize)}
+                  onClick={() => updateQueryParams({ page: (page + 1).toString() })}
+                  className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         ) : (
           /* TAB 2: ITEMS */

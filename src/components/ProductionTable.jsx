@@ -6,6 +6,7 @@ import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Ca
 import { saveProductionProgress, updateSalesOrderStatus, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
 import TrackingTimeline from '@/components/TrackingTimeline'
+import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 
@@ -338,8 +339,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     </td>
                     <td className="px-6 py-4">
                       {item.mockup_url ? (
-                        <button onClick={() => setZoomImage(item.mockup_url)} className="w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
-                          <img src={item.mockup_url} className="w-full h-full object-cover" alt="Mockup" />
+                        <button onClick={() => setZoomImage(item.mockup_url)} className="relative w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
+                          <Image src={item.mockup_url} fill className="object-cover" alt="Mockup" sizes="48px" />
                         </button>
                       ) : (
                         <span className="text-[10px] text-foreground/40 italic">-</span>

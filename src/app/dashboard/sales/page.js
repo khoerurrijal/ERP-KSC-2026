@@ -1,41 +1,33 @@
-import { createClient } from '@/utils/supabase/server'
-import SalesClient from './SalesClient'
+import { Suspense } from 'react'
+import { TrendingUp, Loader2 } from 'lucide-react'
+import SalesData from './SalesData'
 
 export const dynamic = 'force-dynamic'
 
-export default async function SalesPage() {
-  const supabase = await createClient()
+function SalesSkeleton() {
+  return (
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
+            <TrendingUp className="w-6 h-6 text-primary" /> Transaksi Penjualan
+          </h1>
+          <p className="text-sm text-foreground/60 mt-1">Memuat data penjualan...</p>
+        </div>
+      </header>
+      <div className="glass-card p-8 flex flex-col items-center justify-center gap-4 min-h-[400px]">
+        <Loader2 className="w-10 h-10 text-primary animate-spin" />
+        <p className="text-foreground/50 text-sm animate-pulse">Mengambil data invoice & item penjualan...</p>
+      </div>
+    </div>
+  )
+}
 
-  // Fetch sales orders with customer data and items
-  const { data: rawOrders } = await supabase
-    .from('sales_orders')
-    .select(`
-      *,
-      customers (name, type),
-      sales_items (qty, unit_price)
-    `)
-    .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1000)
-
-  const salesOrders = rawOrders || [];
-
-  // Fetch all sales items for the new "Status Item" tab
-  const { data: rawItems } = await supabase
-    .from('sales_items')
-    .select(`
-      *,
-      sales_orders!inner(invoice_number, date, payment_status, customers(name)),
-      products(name)
-    `)
-    .order('id', { ascending: false })
-    .limit(10000)
-
-  const salesItems = rawItems || [];
-
-  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
-  const dropdownConfig = settings?.value || {}
-
-  return <SalesClient salesOrders={salesOrders} salesItems={salesItems} dropdownConfig={dropdownConfig} />
+export default async function SalesPage({ searchParams }) {
+  const resolvedSearchParams = await Promise.resolve(searchParams || {})
+  return (
+    <Suspense key={JSON.stringify(resolvedSearchParams)} fallback={<SalesSkeleton />}>
+      <SalesData searchParams={resolvedSearchParams} />
+    </Suspense>
+  )
 }

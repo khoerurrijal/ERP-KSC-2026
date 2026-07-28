@@ -1,15 +1,54 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Plus, Users, CheckCircle2, Trash2, Loader2 } from 'lucide-react'
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
+import { Search, Plus, Users, CheckCircle2, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { addCustomer, deleteCustomer, updateCustomer } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
-export default function CustomersClient({ initialCustomers = [], error, dropdownConfig = {} }) {
+export default function CustomersClient({ 
+  initialCustomers = [], 
+  totalCount = 0,
+  page = 1,
+  pageSize = 50,
+  error, 
+  dropdownConfig = {},
+  searchParams: passedSearchParams = {}
+}) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentSearchParams = useSearchParams()
+
   const [customers, setCustomers] = useState(initialCustomers)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(passedSearchParams.search || '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
+
+  useEffect(() => {
+    setCustomers(initialCustomers)
+  }, [initialCustomers])
+
+  const updateQueryParams = useCallback((newParams) => {
+    const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
+    Object.entries(newParams).forEach(([key, val]) => {
+      if (val) {
+        params.set(key, val)
+      } else {
+        params.delete(key)
+      }
+    })
+    router.push(`${pathname}?${params.toString()}`)
+  }, [currentSearchParams, pathname, router])
+
+  // Debounce search -> update URL
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((passedSearchParams.search || '') !== searchQuery) {
+        updateQueryParams({ search: searchQuery, page: '1' })
+      }
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [searchQuery, passedSearchParams.search, updateQueryParams])
 
   // Form State
   const [name, setName] = useState('')
@@ -77,10 +116,7 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
     }
   }
 
-  const filteredCustomers = customers.filter(c => 
-    ((c.name || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-    ((c.customer_code || '').toLowerCase().includes(searchQuery.toLowerCase()))
-  )
+  const filteredCustomers = customers
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
@@ -153,6 +189,32 @@ export default function CustomersClient({ initialCustomers = [], error, dropdown
               ))}
             </tbody>
           </table>
+        </div>
+
+        {/* Pagination Bar */}
+        <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+          <div>
+            Menampilkan {totalCount === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, totalCount)} dari <span className="font-bold text-foreground">{totalCount}</span> pelanggan
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => updateQueryParams({ page: (page - 1).toString() })}
+              className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Previous
+            </button>
+            <span className="px-3 font-medium text-foreground">
+              Halaman {page} dari {Math.ceil(totalCount / pageSize) || 1}
+            </span>
+            <button
+              disabled={page >= Math.ceil(totalCount / pageSize)}
+              onClick={() => updateQueryParams({ page: (page + 1).toString() })}
+              className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 

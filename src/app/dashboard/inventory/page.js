@@ -1,41 +1,34 @@
-import { createClient } from '@/utils/supabase/server'
-import InventoryClient from './InventoryClient'
+import { Suspense } from 'react'
+import { Boxes, Loader2 } from 'lucide-react'
+import InventoryData from './InventoryData'
 
 export const dynamic = 'force-dynamic'
 
-export default async function InventoryPage() {
-  const supabase = await createClient()
-
-  // Fetch products, pipeline, and workshops
-  const [
-    { data: products },
-    { data: pipelineData },
-    { data: workshops }
-  ] = await Promise.all([
-    supabase
-      .from('products')
-      .select(`
-        *,
-        workshops (name)
-      `)
-      .eq('is_active', true)
-      .limit(100000)
-      .order('name'),
-    supabase
-      .from('product_pipeline_view')
-      .select('*')
-      .limit(100000),
-    supabase
-      .from('workshops')
-      .select('*')
-      .order('name')
-  ])
-
+function InventorySkeleton() {
   return (
-    <InventoryClient 
-      products={products || []} 
-      pipelineData={pipelineData || []} 
-      workshops={workshops || []}
-    />
+    <div className="space-y-6 animate-in fade-in duration-300">
+      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+            <Boxes className="w-6 h-6 text-green-400" />
+            Inventory
+          </h1>
+          <p className="text-sm text-foreground/60 mt-1">Memuat data stok gudang...</p>
+        </div>
+      </header>
+      <div className="glass-card p-8 flex flex-col items-center justify-center gap-4 min-h-[400px]">
+        <Loader2 className="w-10 h-10 text-green-400 animate-spin" />
+        <p className="text-foreground/50 text-sm animate-pulse">Mengambil data produk & pipeline...</p>
+      </div>
+    </div>
+  )
+}
+
+export default async function InventoryPage({ searchParams }) {
+  const resolvedSearchParams = await Promise.resolve(searchParams || {})
+  return (
+    <Suspense key={JSON.stringify(resolvedSearchParams)} fallback={<InventorySkeleton />}>
+      <InventoryData searchParams={resolvedSearchParams} />
+    </Suspense>
   )
 }
