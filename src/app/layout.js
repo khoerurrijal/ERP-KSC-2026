@@ -17,6 +17,7 @@ export const metadata = {
 };
 
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { CustomAlertProvider } from "@/components/CustomAlertProvider";
 
 export default function RootLayout({ children }) {
   return (
@@ -28,8 +29,10 @@ export default function RootLayout({ children }) {
           enableSystem={false}
           disableTransitionOnChange
         >
-          <NextTopLoader color="#a855f7" showSpinner={false} height={3} />
-          {children}
+          <CustomAlertProvider>
+            <NextTopLoader color="#a855f7" showSpinner={false} height={3} />
+            {children}
+          </CustomAlertProvider>
         </ThemeProvider>
       </body>
     </html>

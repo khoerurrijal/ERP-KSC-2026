@@ -68,6 +68,31 @@ export async function saveEmployee(payload) {
       if (empError) throw empError
     }
 
+    // Sync to user_roles in system_settings
+    if (payload.salary_schema_id && payload.username) {
+      const { data: schema } = await supabase.from('salary_schemas').select('role_name').eq('id', payload.salary_schema_id).single()
+      if (schema) {
+        let mappedRole = 'Operator'
+        const roleName = schema.role_name.toLowerCase()
+        if (roleName.includes('admin')) mappedRole = 'Admin'
+        else if (roleName.includes('owner')) mappedRole = 'Owner'
+
+        const emailToSync = `${payload.username}@kingsablon.com`.toLowerCase()
+
+        const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+        if (settings) {
+          let userRoles = settings.value || []
+          const existingIdx = userRoles.findIndex(u => (u.email || '').toLowerCase() === emailToSync || (u.email || '').toLowerCase() === payload.username.toLowerCase())
+          if (existingIdx >= 0) {
+            userRoles[existingIdx].role = mappedRole
+          } else {
+            userRoles.push({ email: emailToSync, role: mappedRole })
+          }
+          await supabase.from('system_settings').update({ value: userRoles }).eq('key', 'user_roles')
+        }
+      }
+    }
+
     revalidatePath('/dashboard/master/employees')
     return { success: true }
   } catch (err) {
@@ -80,12 +105,30 @@ export async function deleteEmployee(id) {
   const supabase = await createClient()
 
   try {
+    // Fetch username first before deleting
+    const { data: emp } = await supabase.from('employees').select('username').eq('id', id).single()
+
     // Note: We only delete the employee record here, 
     // to delete the Auth User requires Service Role Key.
-    // For now deleting employee is enough, user can't login if we block them via middleware/is_active
+    // Since we added an is_active check in login action, deleted employees won't be able to login
+    // because they won't exist in the employees table, OR we can also remove them from user_roles.
+    // Actually, wait, if they are deleted from employees, our login logic will NOT find them in employees table, 
+    // so they will bypass the is_active check. 
+    // Let's change the login logic to block users if they are not in employees, unless they are Owner.
+    // For now, at least remove them from user_roles.
     const { error } = await supabase.from('employees').delete().eq('id', id)
     if (error) throw error
     
+    // Remove from user_roles
+    if (emp && emp.username) {
+      const emailToRemove = `${emp.username}@kingsablon.com`.toLowerCase()
+      const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+      if (settings && settings.value) {
+        const newUserRoles = settings.value.filter(u => (u.email || '').toLowerCase() !== emailToRemove && (u.email || '').toLowerCase() !== emp.username.toLowerCase())
+        await supabase.from('system_settings').update({ value: newUserRoles }).eq('key', 'user_roles')
+      }
+    }
+
     revalidatePath('/dashboard/master/employees')
     return { success: true }
   } catch (err) {

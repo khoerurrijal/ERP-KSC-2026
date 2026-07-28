@@ -7,6 +7,7 @@ import { saveProductionProgress, updateSalesOrderStatus, correctProductionProgre
 import CustomSelect from '@/components/CustomSelect'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import MockupUploadModal from '@/components/MockupUploadModal'
+import ImageViewerModal from '@/components/ImageViewerModal'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
@@ -47,6 +48,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   // Mockup popup state
   const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
+  const [zoomImage, setZoomImage] = useState(null)
 
   const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
 
@@ -336,9 +338,9 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     </td>
                     <td className="px-6 py-4">
                       {item.mockup_url ? (
-                        <a href={item.mockup_url} target="_blank" rel="noopener noreferrer" className="w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
+                        <button onClick={() => setZoomImage(item.mockup_url)} className="w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
                           <img src={item.mockup_url} className="w-full h-full object-cover" alt="Mockup" />
-                        </a>
+                        </button>
                       ) : (
                         <span className="text-[10px] text-foreground/40 italic">-</span>
                       )}
@@ -562,6 +564,13 @@ export default function ProductionTable({ productionJobs, operators = [], curren
         onClose={() => setMockupModal({ isOpen: false, itemId: null, url: '' })} 
         itemId={mockupModal.itemId} 
         initialUrl={mockupModal.url} 
+      />
+
+      {/* Image Zoom Modal */}
+      <ImageViewerModal 
+        isOpen={!!zoomImage} 
+        onClose={() => setZoomImage(null)} 
+        imageUrl={zoomImage} 
       />
 
     </div>

@@ -10,6 +10,7 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import MockupUploadModal from '@/components/MockupUploadModal'
+import ImageViewerModal from '@/components/ImageViewerModal'
 
 export default function SalesClient({ salesOrders = [], salesItems = [], dropdownConfig = {} }) {
   const router = useRouter()
@@ -34,6 +35,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
 
   // Mockup popup state
   const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
+  const [zoomImage, setZoomImage] = useState(null)
 
   const filterMonth = searchParams.get('month') || (() => {
     const now = new Date()
@@ -532,7 +534,7 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
                           <button 
                             onClick={() => {
                               if (item.mockup_url) {
-                                window.open(item.mockup_url, '_blank');
+                                setZoomImage(item.mockup_url);
                               } else {
                                 setMockupModal({ isOpen: true, itemId: item.id, url: '' });
                               }
@@ -713,6 +715,12 @@ export default function SalesClient({ salesOrders = [], salesItems = [], dropdow
         onClose={() => setMockupModal({ isOpen: false, itemId: null, url: '' })} 
         itemId={mockupModal.itemId} 
         initialUrl={mockupModal.url} 
+      />
+
+      <ImageViewerModal 
+        isOpen={!!zoomImage} 
+        onClose={() => setZoomImage(null)} 
+        imageUrl={zoomImage} 
       />
 
     </div>
