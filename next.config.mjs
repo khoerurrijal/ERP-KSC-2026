@@ -19,6 +19,25 @@ const nextConfig = {
       },
     ],
   },
+  async redirects() {
+    return [
+      {
+        source: '/sales',
+        destination: '/dashboard/sales',
+        permanent: false,
+      },
+      {
+        source: '/sales-order',
+        destination: '/dashboard/sales',
+        permanent: false,
+      },
+      {
+        source: '/inventory',
+        destination: '/dashboard/inventory',
+        permanent: false,
+      }
+    ];
+  },
 };
 
 export default nextConfig;

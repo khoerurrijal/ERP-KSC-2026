@@ -181,7 +181,6 @@ function MenuGroup({ group, pathname, onClick }) {
     return (
       <Link
         href={group.path}
-        prefetch={false}
         onClick={onClick}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
           isDirectActive
@@ -221,7 +220,6 @@ function MenuGroup({ group, pathname, onClick }) {
               <Link
                 key={idx}
                 href={sub.path}
-                prefetch={false}
                 onClick={onClick}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
                   isSubActive

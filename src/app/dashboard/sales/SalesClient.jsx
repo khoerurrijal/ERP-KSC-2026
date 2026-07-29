@@ -38,6 +38,8 @@ export default function SalesClient({
   const [filterStatus, setFilterStatus] = useState(passedSearchParams.status || 'BELUM_LUNAS') 
   const [filterCustomerType, setFilterCustomerType] = useState(passedSearchParams.customerType || 'ALL')
   const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
+  const [itemPage, setItemPage] = useState(1)
+  const itemPageSize = 50
 
   const updateQueryParams = useCallback((newParams) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()))
@@ -240,6 +242,15 @@ export default function SalesClient({
       return 0
     })
   }, [salesItems, debouncedSearch, filterMonth, itemFilterStatus, itemSortConfig])
+
+  useEffect(() => {
+    setItemPage(1)
+  }, [debouncedSearch, filterMonth, itemFilterStatus, itemSortConfig])
+
+  const paginatedItems = useMemo(() => {
+    const start = (itemPage - 1) * itemPageSize
+    return filteredAndSortedItems.slice(start, start + itemPageSize)
+  }, [filteredAndSortedItems, itemPage, itemPageSize])
 
   const totalOmset = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0), [salesOrders, filterMonth])
   const totalPiutang = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0), [salesOrders, filterMonth])
@@ -482,13 +493,13 @@ export default function SalesClient({
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredAndSortedItems.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
                       Belum ada data barang.
                     </td>
                   </tr>
-                ) : filteredAndSortedItems.map((item) => {
+                ) : paginatedItems.map((item) => {
                   const currentStatus = (item.status || 'BARU MASUK').toUpperCase();
                   const isUpdating = updatingItem === item.id;
                   
@@ -570,6 +581,32 @@ export default function SalesClient({
                 })}
               </tbody>
             </table>
+            
+            {/* Pagination Controls for Items */}
+            <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+              <div>
+                Menampilkan {filteredAndSortedItems.length === 0 ? 0 : (itemPage - 1) * itemPageSize + 1} - {Math.min(itemPage * itemPageSize, filteredAndSortedItems.length)} dari <span className="font-bold text-foreground">{filteredAndSortedItems.length}</span> item
+              </div>
+              <div className="flex items-center gap-2">
+                <button
+                  disabled={itemPage <= 1}
+                  onClick={() => setItemPage(p => p - 1)}
+                  className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                </button>
+                <span className="px-3 font-medium text-foreground">
+                  Halaman {itemPage} dari {Math.ceil(filteredAndSortedItems.length / itemPageSize) || 1}
+                </span>
+                <button
+                  disabled={itemPage >= Math.ceil(filteredAndSortedItems.length / itemPageSize)}
+                  onClick={() => setItemPage(p => p + 1)}
+                  className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

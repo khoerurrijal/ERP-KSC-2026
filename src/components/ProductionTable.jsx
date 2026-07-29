@@ -53,6 +53,10 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
 
+  const [soPage, setSoPage] = useState(1)
+  const [prodPage, setProdPage] = useState(1)
+  const pageSize = 50
+
   const handleSort = (key) => {
     let direction = 'asc'
     if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc'
@@ -111,6 +115,16 @@ export default function ProductionTable({ productionJobs, operators = [], curren
      (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
      (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
   )
+
+  const paginatedProdJobs = useMemo(() => {
+    const start = (prodPage - 1) * pageSize
+    return filteredAndSortedJobs.slice(start, start + pageSize)
+  }, [filteredAndSortedJobs, prodPage, pageSize])
+
+  const paginatedSoItems = useMemo(() => {
+    const start = (soPage - 1) * pageSize
+    return trackingSoItems.slice(start, start + pageSize)
+  }, [trackingSoItems, soPage, pageSize])
 
   const handleOpenModal = (job) => {
     setSelectedJob(job)
@@ -263,12 +277,12 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
       {activeTab === 'SO' && (
         <div className="space-y-4">
-          {trackingSoItems.length === 0 ? (
+          {paginatedSoItems.length === 0 ? (
              <div className="glass-card p-12 text-center text-foreground/50">
                Tidak ada pesanan aktif.
              </div>
           ) : (
-            trackingSoItems.map(item => {
+            paginatedSoItems.map(item => {
               const paymentStatus = item.sales_order_items?.sales_orders?.payment_status || 'BELUM LUNAS'
               return (
                 <div key={item.id} className="glass-card p-3 sm:p-4 animate-in fade-in flex flex-col xl:flex-row items-center gap-4">
@@ -306,6 +320,31 @@ export default function ProductionTable({ productionJobs, operators = [], curren
               )
             })
           )}
+          {/* Pagination Controls for SO */}
+          <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70 rounded-xl">
+            <div>
+              Menampilkan {trackingSoItems.length === 0 ? 0 : (soPage - 1) * pageSize + 1} - {Math.min(soPage * pageSize, trackingSoItems.length)} dari <span className="font-bold text-foreground">{trackingSoItems.length}</span> pesanan
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={soPage <= 1}
+                onClick={() => setSoPage(p => p - 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 font-medium text-foreground">
+                Halaman {soPage} dari {Math.ceil(trackingSoItems.length / pageSize) || 1}
+              </span>
+              <button
+                disabled={soPage >= Math.ceil(trackingSoItems.length / pageSize)}
+                onClick={() => setSoPage(p => p + 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -325,13 +364,13 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredAndSortedJobs?.length === 0 ? (
+                {paginatedProdJobs?.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">
                       Belum ada antrean pekerjaan sablon saat ini.
                     </td>
                   </tr>
-                ) : filteredAndSortedJobs?.map((item) => (
+                ) : paginatedProdJobs?.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 font-medium text-purple-400">
                       {item.sales_order_items?.sales_orders?.customers?.name || '-'}
@@ -386,6 +425,31 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                 ))}
               </tbody>
             </table>
+          </div>
+          {/* Pagination Controls for Produksi */}
+          <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+            <div>
+              Menampilkan {filteredAndSortedJobs.length === 0 ? 0 : (prodPage - 1) * pageSize + 1} - {Math.min(prodPage * pageSize, filteredAndSortedJobs.length)} dari <span className="font-bold text-foreground">{filteredAndSortedJobs.length}</span> pekerjaan
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={prodPage <= 1}
+                onClick={() => setProdPage(p => p - 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Previous
+              </button>
+              <span className="px-3 font-medium text-foreground">
+                Halaman {prodPage} dari {Math.ceil(filteredAndSortedJobs.length / pageSize) || 1}
+              </span>
+              <button
+                disabled={prodPage >= Math.ceil(filteredAndSortedJobs.length / pageSize)}
+                onClick={() => setProdPage(p => p + 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next
+              </button>
+            </div>
           </div>
         </div>
       )}

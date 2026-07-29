@@ -31,6 +31,8 @@ export default function InventoryClient({
     key: searchParams.sortKey || 'name', 
     direction: searchParams.sortDir || 'asc' 
   })
+  const [pipelinePage, setPipelinePage] = useState(1)
+  const pipelinePageSize = 50
 
   // Sync initialProducts if server re-renders
   useEffect(() => {
@@ -137,6 +139,15 @@ export default function InventoryClient({
 
     return result
   }, [pipelineData, debouncedSearch, filterCategory, sortConfig])
+
+  useEffect(() => {
+    setPipelinePage(1)
+  }, [debouncedSearch, filterCategory, sortConfig])
+
+  const paginatedPipeline = useMemo(() => {
+    const start = (pipelinePage - 1) * pipelinePageSize
+    return filteredPipelineData.slice(start, start + pipelinePageSize)
+  }, [filteredPipelineData, pipelinePage, pipelinePageSize])
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
@@ -355,7 +366,7 @@ export default function InventoryClient({
                 </tr>
               </thead>
               <tbody>
-                {filteredPipelineData.map(pipe => (
+                {paginatedPipeline.map(pipe => (
                   <tr key={pipe.product_code} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
                     <td className="p-4 sticky left-0 bg-background/95 backdrop-blur-sm group-hover:bg-white/5 transition-colors">
                       <p className="font-semibold text-foreground text-sm truncate w-64">{pipe.product_name}</p>
@@ -391,11 +402,37 @@ export default function InventoryClient({
                     </td>
                   </tr>
                 ))}
-                {filteredPipelineData.length === 0 && (
+                {paginatedPipeline.length === 0 && (
                   <tr><td colSpan="7" className="text-center p-8 text-foreground/50">Tidak ada data produk yang ditemukan.</td></tr>
                 )}
               </tbody>
             </table>
+          </div>
+          
+          {/* Pagination Controls for Pipeline */}
+          <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+            <div>
+              Menampilkan {filteredPipelineData.length === 0 ? 0 : (pipelinePage - 1) * pipelinePageSize + 1} - {Math.min(pipelinePage * pipelinePageSize, filteredPipelineData.length)} dari <span className="font-bold text-foreground">{filteredPipelineData.length}</span> produk
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                disabled={pipelinePage <= 1}
+                onClick={() => setPipelinePage(p => p - 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                <ChevronLeft className="w-3.5 h-3.5" /> Previous
+              </button>
+              <span className="px-3 font-medium text-foreground">
+                Halaman {pipelinePage} dari {Math.ceil(filteredPipelineData.length / pipelinePageSize) || 1}
+              </span>
+              <button
+                disabled={pipelinePage >= Math.ceil(filteredPipelineData.length / pipelinePageSize)}
+                onClick={() => setPipelinePage(p => p + 1)}
+                className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Next <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            </div>
           </div>
         </div>
       )}
