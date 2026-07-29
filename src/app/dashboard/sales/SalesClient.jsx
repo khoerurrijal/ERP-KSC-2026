@@ -40,7 +40,22 @@ export default function SalesClient({
   const [itemFilterStatus, setItemFilterStatus] = useState('ALL') // For items tab
   const [itemPage, setItemPage] = useState(1)
   const itemPageSize = 50
+  const filterMonth = passedSearchParams.month || ''
 
+  const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
+  const [itemSortConfig, setItemSortConfig] = useState({ key: 'id', direction: 'desc' })
+  const [editingOrder, setEditingOrder] = useState(null)
+  const [newPaymentAmount, setNewPaymentAmount] = useState('')
+  const [newPaymentMethod, setNewPaymentMethod] = useState('BCA')
+  const [newPaymentDate, setNewPaymentDate] = useState('')
+  const [paymentHistory, setPaymentHistory] = useState([])
+  const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
+  const [updatingItem, setUpdatingItem] = useState(null)
+  const [correctionModal, setCorrectionModal] = useState({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })
+  const [isCorrecting, setIsCorrecting] = useState(false)
+  const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
+  const [zoomImage, setZoomImage] = useState(null)
   const updateQueryParams = useCallback((newParams) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     Object.entries(newParams).forEach(([key, val]) => {
@@ -56,6 +71,7 @@ export default function SalesClient({
   // Debounce search input 300ms
   useEffect(() => {
     const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
       if ((passedSearchParams.search || '') !== searchQuery) {
         updateQueryParams({ search: searchQuery, page: '1' })
       }

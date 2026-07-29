@@ -30,7 +30,7 @@ export default async function ProductionData() {
       `)
       .or('status.in.("BARU MASUK","SIAP PROSES","PROSES","SUDAH JADI","SIAP KIRIM","Proses"),status.is.null')
       .order('id', { ascending: false })
-      .limit(10000)
+      .limit(500)
   ])
 
   const userRoles = settingsData?.value || []

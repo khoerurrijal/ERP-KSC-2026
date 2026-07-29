@@ -51,15 +51,16 @@ export default async function InventoryData({ searchParams = {} }) {
     supabase
       .from('product_pipeline_view')
       .select('*')
-      .limit(10000),
+      .limit(200),
     supabase
       .from('workshops')
-      .select('*')
+      .select('id, name, code')
       .order('name'),
     supabase
       .from('products')
       .select('category')
       .eq('is_active', true)
+      .limit(300)
   ])
 
   const categories = Array.from(new Set((allCategories || []).map(c => c.category).filter(Boolean))).sort()

@@ -7,6 +7,7 @@ export default async function TransactionsPage() {
     .from('transactions')
     .select('*, sales_orders(invoice_number, customers(name))')
     .order('date', { ascending: false })
+    .limit(1000)
 
   const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
   const dropdownConfig = settings?.value || {}

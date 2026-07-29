@@ -10,19 +10,19 @@ export default async function PurchasesPage({ searchParams }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })()
 
-  // Ambil semua PO (Max Rows harus diubah di Supabase jika > 1000)
+  // Ambil PO terbaru
   const { data: purchaseOrders } = await supabase
     .from('purchase_orders')
     .select(`
       *,
       purchase_items(total_price)
     `)
-    .limit(100000)
+    .limit(1000)
     .order('date', { ascending: false })
 
   const allPOs = purchaseOrders || []
 
-  // Ambil semua purchase items untuk tab "Purchase Items"
+  // Ambil purchase items terbaru
   const { data: rawItems } = await supabase
     .from('purchase_items')
     .select(`
@@ -31,7 +31,7 @@ export default async function PurchasesPage({ searchParams }) {
       products(name)
     `)
     .order('id', { ascending: false })
-    .limit(10000)
+    .limit(500)
 
   const purchaseItems = rawItems || [];
 

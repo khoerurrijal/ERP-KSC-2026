@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
 import { Search, Plus, ShoppingCart, Filter, ChevronUp, ChevronDown } from 'lucide-react'
 import { deletePurchaseOrder, payPurchaseOrder } from './new/actions'
@@ -22,6 +22,11 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const [payTargetId, setPayTargetId] = useState(null)
   const [payMethod, setPayMethod] = useState('BCA')
   const [isPaying, setIsPaying] = useState(false)
+
+  // Pagination State
+  const [poPage, setPoPage] = useState(1)
+  const [itemPage, setItemPage] = useState(1)
+  const pageSize = 50
 
   const handleSort = (key) => {
     let direction = 'asc'
@@ -114,6 +119,15 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     return result
   }, [purchaseOrders, searchQuery, filterStatus, sortConfig, selectedMonth])
 
+  useEffect(() => {
+    setPoPage(1)
+  }, [searchQuery, filterStatus, sortConfig, selectedMonth])
+
+  const paginatedPOs = useMemo(() => {
+    const start = (poPage - 1) * pageSize
+    return filteredAndSorted.slice(start, start + pageSize)
+  }, [filteredAndSorted, poPage, pageSize])
+
   const filteredAndSortedItems = useMemo(() => {
     let result = purchaseItems.filter(item => {
       const matchSearch = ((item.products?.name || item.item_name || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
@@ -152,6 +166,15 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
 
     return result
   }, [purchaseItems, itemSearchQuery, itemSortConfig, selectedMonth])
+
+  useEffect(() => {
+    setItemPage(1)
+  }, [itemSearchQuery, itemSortConfig, selectedMonth])
+
+  const paginatedItems = useMemo(() => {
+    const start = (itemPage - 1) * pageSize
+    return filteredAndSortedItems.slice(start, start + pageSize)
+  }, [filteredAndSortedItems, itemPage, pageSize])
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
@@ -248,13 +271,13 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredAndSorted.length === 0 ? (
+                {paginatedPOs.length === 0 ? (
                   <tr>
                     <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
                       {filterStatus === 'LUNAS' ? 'Tidak ada riwayat Lunas di bulan ini.' : 'Belum ada riwayat Purchase Order.'}
                     </td>
                   </tr>
-                ) : filteredAndSorted.map((item) => {
+                ) : paginatedPOs.map((item) => {
                   const totalAmount = item.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
                   return (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
@@ -297,13 +320,13 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
-                {filteredAndSortedItems.length === 0 ? (
+                {paginatedItems.length === 0 ? (
                   <tr>
                     <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">
                       Tidak ada purchase items.
                     </td>
                   </tr>
-                ) : filteredAndSortedItems.map((item) => (
+                ) : paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.date ? new Date(item.purchase_orders.date).toLocaleDateString('id-ID') : '-'}</td>
                     <td className="px-6 py-4 text-foreground/90 font-medium">{item.purchase_orders?.po_number || '-'}</td>
@@ -316,6 +339,41 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                 ))}
               </tbody>
             </table>
+          )}
+        </div>
+        
+        {/* Pagination Controls */}
+        <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+          {activeTab === 'PO' ? (
+            <>
+              <div>
+                Menampilkan {filteredAndSorted.length === 0 ? 0 : (poPage - 1) * pageSize + 1} - {Math.min(poPage * pageSize, filteredAndSorted.length)} dari <span className="font-bold text-foreground">{filteredAndSorted.length}</span> PO
+              </div>
+              <div className="flex items-center gap-2">
+                <button disabled={poPage <= 1} onClick={() => setPoPage(p => p - 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Previous
+                </button>
+                <span className="px-3 font-medium text-foreground">Halaman {poPage} dari {Math.ceil(filteredAndSorted.length / pageSize) || 1}</span>
+                <button disabled={poPage >= Math.ceil(filteredAndSorted.length / pageSize)} onClick={() => setPoPage(p => p + 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Next
+                </button>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                Menampilkan {filteredAndSortedItems.length === 0 ? 0 : (itemPage - 1) * pageSize + 1} - {Math.min(itemPage * pageSize, filteredAndSortedItems.length)} dari <span className="font-bold text-foreground">{filteredAndSortedItems.length}</span> item
+              </div>
+              <div className="flex items-center gap-2">
+                <button disabled={itemPage <= 1} onClick={() => setItemPage(p => p - 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Previous
+                </button>
+                <span className="px-3 font-medium text-foreground">Halaman {itemPage} dari {Math.ceil(filteredAndSortedItems.length / pageSize) || 1}</span>
+                <button disabled={itemPage >= Math.ceil(filteredAndSortedItems.length / pageSize)} onClick={() => setItemPage(p => p + 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+                  Next
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>

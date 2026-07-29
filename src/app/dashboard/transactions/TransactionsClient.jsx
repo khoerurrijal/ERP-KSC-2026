@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
-import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2 } from 'lucide-react'
+import { useState, useMemo, useEffect } from 'react'
+import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createManualTransaction, updateTransaction, deleteTransaction } from './actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
@@ -25,6 +25,10 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
   // Sorting
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
+
+  // Pagination
+  const [page, setPage] = useState(1)
+  const pageSize = 50
 
   // Dummy form state
   const [formType, setFormType] = useState('MASUK')
@@ -152,6 +156,15 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
     return result
   }, [transactions, searchQuery, filterMonth, filterMethod, filterWorkshop, filterRef, sortConfig, currentTab])
+
+  useEffect(() => {
+    setPage(1)
+  }, [searchQuery, filterMonth, filterMethod, filterWorkshop, filterRef, sortConfig, currentTab])
+
+  const paginatedTransactions = useMemo(() => {
+    const start = (page - 1) * pageSize
+    return filteredAndSorted.slice(start, start + pageSize)
+  }, [filteredAndSorted, page, pageSize])
 
   const totalIn = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_in || 0), 0)
   const totalOut = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_out || 0), 0)
@@ -300,11 +313,11 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredAndSorted.length === 0 ? (
+              {paginatedTransactions.length === 0 ? (
                  <tr>
                     <td colSpan="8" className="px-6 py-12 text-center text-foreground/40">Belum ada data transaksi.</td>
                  </tr>
-              ) : filteredAndSorted.map((trx) => (
+              ) : paginatedTransactions.map((trx) => (
                 <tr key={trx.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
                   <td className="px-6 py-4 font-medium text-foreground/90">
@@ -328,6 +341,32 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
               ))}
             </tbody>
           </table>
+        </div>
+        
+        {/* Pagination Controls */}
+        <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70">
+          <div>
+            Menampilkan {filteredAndSorted.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, filteredAndSorted.length)} dari <span className="font-bold text-foreground">{filteredAndSorted.length}</span> transaksi
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              disabled={page <= 1}
+              onClick={() => setPage(p => p - 1)}
+              className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Previous
+            </button>
+            <span className="px-3 font-medium text-foreground">
+              Halaman {page} dari {Math.ceil(filteredAndSorted.length / pageSize) || 1}
+            </span>
+            <button
+              disabled={page >= Math.ceil(filteredAndSorted.length / pageSize)}
+              onClick={() => setPage(p => p + 1)}
+              className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Next <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
 

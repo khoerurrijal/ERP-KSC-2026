@@ -10,6 +10,10 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   
+  // Pagination
+  const [page, setPage] = useState(1)
+  const pageSize = 50
+  
   const [formData, setFormData] = useState({
     id: '',
     username: '',
@@ -107,6 +111,8 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
     }
   }
 
+  const paginatedEmployees = employees.slice((page - 1) * pageSize, page * pageSize)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -131,7 +137,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {employees.map(emp => (
+            {paginatedEmployees.map(emp => (
               <tr key={emp.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-4 font-bold text-white">{emp.full_name}</td>
                 <td className="px-4 py-4 text-blue-400">@{emp.username}</td>
@@ -174,6 +180,22 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Pagination Controls */}
+      <div className="p-4 border-t border-white/10 bg-white/5 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-foreground/70 rounded-b-xl">
+        <div>
+          Menampilkan {employees.length === 0 ? 0 : (page - 1) * pageSize + 1} - {Math.min(page * pageSize, employees.length)} dari <span className="font-bold text-foreground">{employees.length}</span> karyawan
+        </div>
+        <div className="flex items-center gap-2">
+          <button disabled={page <= 1} onClick={() => setPage(p => p - 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+            Previous
+          </button>
+          <span className="px-3 font-medium text-foreground">Halaman {page} dari {Math.ceil(employees.length / pageSize) || 1}</span>
+          <button disabled={page >= Math.ceil(employees.length / pageSize)} onClick={() => setPage(p => p + 1)} className="btn-secondary px-3 py-1.5 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed">
+            Next
+          </button>
+        </div>
       </div>
 
       {isModalOpen && (

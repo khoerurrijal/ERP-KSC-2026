@@ -27,7 +27,10 @@ export default async function SalesData({ searchParams = {} }) {
   }
 
   if (filterMonth) {
-    query = query.gte('date', `${filterMonth}-01`).lte('date', `${filterMonth}-31`)
+    const [y, m] = filterMonth.split('-').map(Number)
+    const startDate = `${filterMonth}-01`
+    const endDate = new Date(y, m, 1).toISOString().slice(0, 10)
+    query = query.gte('date', startDate).lt('date', endDate)
   }
 
   if (filterStatus === 'BELUM_LUNAS') {
@@ -42,20 +45,29 @@ export default async function SalesData({ searchParams = {} }) {
   const end = start + pageSize - 1
   query = query.range(start, end)
 
+  let itemsQuery = supabase
+    .from('sales_items')
+    .select(`
+      id, qty, unit_price, total_price, product_name, item_name, status, mockup_url, order_type, unit_multiplier, product_code,
+      sales_orders!inner(invoice_number, date, payment_status, customers(name)),
+      products(name)
+    `)
+  
+  if (filterMonth) {
+    const [y, m] = filterMonth.split('-').map(Number)
+    const startDate = `${filterMonth}-01`
+    const endDate = new Date(y, m, 1).toISOString().slice(0, 10)
+    itemsQuery = itemsQuery.gte('sales_orders.date', startDate).lt('sales_orders.date', endDate)
+  }
+
+  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(300)
+
   const [salesOrdersResult, salesItemsResult, settingsResult] = await Promise.all([
     query,
-    supabase
-      .from('sales_items')
-      .select(`
-        *,
-        sales_orders!inner(invoice_number, date, payment_status, customers(name)),
-        products(name)
-      `)
-      .order('id', { ascending: false })
-      .limit(1000),
+    itemsQuery,
     supabase
       .from('system_settings')
-      .select('*')
+      .select('value')
       .eq('key', 'dropdown_config')
       .single()
   ])

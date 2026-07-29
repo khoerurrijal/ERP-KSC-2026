@@ -33,6 +33,12 @@ export default function InventoryClient({
   })
   const [pipelinePage, setPipelinePage] = useState(1)
   const pipelinePageSize = 50
+  
+  const [debouncedSearch, setDebouncedSearch] = useState(searchParams.search || '')
+  const [showOpnameModal, setShowOpnameModal] = useState(false)
+  const [opnameProduct, setOpnameProduct] = useState(null)
+  const [newStock, setNewStock] = useState('')
+  const [isPending, setIsPending] = useState(false)
 
   // Sync initialProducts if server re-renders
   useEffect(() => {
@@ -54,6 +60,7 @@ export default function InventoryClient({
   // Debounce search input -> update URL
   useEffect(() => {
     const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery)
       if ((searchParams.search || '') !== searchQuery) {
         updateQueryParams({ search: searchQuery, page: '1' })
       }
