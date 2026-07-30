@@ -223,13 +223,15 @@ export default function SalesClient({
       const productName = (prod?.name || item.product_name || item.item_name || '').toLowerCase()
       const productCode = (item.product_code || '').toLowerCase()
       const notesStr = (item.notes || '').toLowerCase()
+      const itemProdStatus = (item.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim()
 
       const matchSearch = !searchLower || 
         invoiceNum.includes(searchLower) ||
         customerName.includes(searchLower) ||
         productName.includes(searchLower) ||
         productCode.includes(searchLower) ||
-        notesStr.includes(searchLower)
+        notesStr.includes(searchLower) ||
+        itemProdStatus.toLowerCase().includes(searchLower)
       
       const rawDate = so?.date || ''
       let itemMonth = ''
@@ -244,10 +246,8 @@ export default function SalesClient({
 
       let matchStatus = true
       if (itemFilterStatus !== 'ALL') {
-        const rawItemStatus = item.status || so?.status || 'BARU MASUK'
-        const normItemStatus = rawItemStatus.toString().replace(/_/g, ' ').toUpperCase().trim()
         const normFilterStatus = itemFilterStatus.toString().replace(/_/g, ' ').toUpperCase().trim()
-        matchStatus = normItemStatus === normFilterStatus
+        matchStatus = itemProdStatus === normFilterStatus
       }
 
       return matchSearch && matchMonth && matchStatus
@@ -557,7 +557,7 @@ export default function SalesClient({
                   const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
                   const prod = Array.isArray(item.products) ? item.products[0] : item.products
 
-                  const currentStatus = (item.status || so?.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim();
+                  const currentStatus = (item.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim();
                   const isUpdating = updatingItem === item.id;
                   
                   let itemStatuses = productionStatuses;
