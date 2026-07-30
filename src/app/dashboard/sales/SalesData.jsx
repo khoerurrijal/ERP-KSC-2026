@@ -1,8 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import SalesClient from './SalesClient'
 
-// Komponen server ini di-render di dalam Suspense boundary di page.js
-// sehingga layout dashboard bisa muncul instan, data dimuat secara streaming
 export default async function SalesData({ searchParams = {} }) {
   const supabase = await createClient()
 
@@ -13,40 +11,43 @@ export default async function SalesData({ searchParams = {} }) {
   const filterCustomerType = searchParams.customerType || 'ALL'
   const filterMonth = searchParams.month || ''
 
-  // 1. KPI Summary Query (Computed over entire month without page limit)
-  const targetMonth = filterMonth || new Date().toISOString().slice(0, 7)
-  const [sy, sm] = targetMonth.split('-').map(Number)
-  const sStart = `${targetMonth}-01`
-  const sEnd = new Date(sy, sm, 1).toISOString().slice(0, 10)
+  // 1. Calculate Date Bounds for Filter Month
+  let startDate = ''
+  let endDate = ''
+  if (filterMonth) {
+    const [y, m] = filterMonth.split('-').map(Number)
+    const lastDay = new Date(y, m, 0).getDate()
+    startDate = `${filterMonth}-01`
+    endDate = `${filterMonth}-${String(lastDay).padStart(2, '0')}`
+  }
 
-  const summaryQuery = supabase
+  // 2. Summary KPI Query (Filtered by month if selected, or overall)
+  let summaryQuery = supabase
     .from('sales_orders')
-    .select('grand_total, total_amount, dp_amount, payment_status')
+    .select('grand_total, total_amount, dp_amount, payment_status, date')
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
-    .gte('date', sStart)
-    .lt('date', sEnd)
     .neq('payment_status', 'BATAL')
 
-  // 2. Main Sales Orders Table Query
+  if (filterMonth) {
+    summaryQuery = summaryQuery.gte('date', startDate).lte('date', endDate)
+  }
+
+  // 3. Main Sales Orders Query
   let query = supabase
     .from('sales_orders')
     .select(`
       *,
-      customers!inner (name, type),
+      customers (name, type),
       sales_items (qty, unit_price)
     `, { count: 'exact' })
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
   if (search) {
-    query = query.or(`invoice_number.ilike.%${search}%,customers.name.ilike.%${search}%`)
-  }
-
-  if (filterCustomerType !== 'ALL') {
-    query = query.eq('customers.type', filterCustomerType)
+    query = query.or(`invoice_number.ilike.%${search}%`)
   }
 
   if (filterMonth) {
-    query = query.gte('date', sStart).lt('date', sEnd)
+    query = query.gte('date', startDate).lte('date', endDate)
   }
 
   if (filterStatus === 'BELUM_LUNAS') {
@@ -61,20 +62,16 @@ export default async function SalesData({ searchParams = {} }) {
   const end = start + pageSize - 1
   query = query.range(start, end)
 
-  // 3. Sales Items Query
+  // 4. Sales Items Query
   let itemsQuery = supabase
     .from('sales_items')
     .select(`
       id, qty, unit_price, total_price, product_name, item_name, status, mockup_url, order_type, unit_multiplier, product_code,
-      sales_orders!inner(invoice_number, date, payment_status, customers(name)),
+      sales_orders(invoice_number, date, payment_status, customers(name)),
       products(name)
     `)
-  
-  if (filterMonth) {
-    itemsQuery = itemsQuery.gte('sales_orders.date', sStart).lt('sales_orders.date', sEnd)
-  }
-
-  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(300)
+    .order('id', { ascending: false })
+    .limit(500)
 
   const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult] = await Promise.all([
     query,
@@ -93,7 +90,7 @@ export default async function SalesData({ searchParams = {} }) {
   const dropdownConfig = settingsResult.data?.value || {}
   const summaryOrders = summaryResult.data || []
 
-  // Compute server-side totals for the target month
+  // Calculate Omset & Piutang accurately from summary dataset
   const serverTotalOmset = summaryOrders.reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0)
   const serverTotalPiutang = summaryOrders
     .filter(o => o.payment_status !== 'LUNAS')
