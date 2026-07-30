@@ -220,12 +220,16 @@ export default function SalesClient({
 
       const invoiceNum = (so?.invoice_number || '').toLowerCase()
       const customerName = (cust?.name || '').toLowerCase()
-      const productName = (prod?.name || item.product_name || item.item_name || item.product_code || '').toLowerCase()
+      const productName = (prod?.name || item.product_name || item.item_name || '').toLowerCase()
+      const productCode = (item.product_code || '').toLowerCase()
+      const notesStr = (item.notes || '').toLowerCase()
 
       const matchSearch = !searchLower || 
         invoiceNum.includes(searchLower) ||
         customerName.includes(searchLower) ||
-        productName.includes(searchLower)
+        productName.includes(searchLower) ||
+        productCode.includes(searchLower) ||
+        notesStr.includes(searchLower)
       
       const rawDate = so?.date || ''
       let itemMonth = ''

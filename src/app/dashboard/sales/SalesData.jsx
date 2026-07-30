@@ -21,6 +21,23 @@ export default async function SalesData({ searchParams = {} }) {
     endDate = `${filterMonth}-${String(lastDay).padStart(2, '0')}`
   }
 
+  // Helper search lookup for customer & product codes
+  let matchedCustCodes = []
+  let matchedProductCodes = []
+  let matchedSoIds = []
+
+  if (search) {
+    const [custRes, prodRes, soRes] = await Promise.all([
+      supabase.from('customers').select('customer_code, id').ilike('name', `%${search}%`).limit(100),
+      supabase.from('products').select('product_code').ilike('name', `%${search}%`).limit(100),
+      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${search}%`).limit(100)
+    ])
+
+    matchedCustCodes = (custRes.data || []).map(c => c.customer_code || c.id).filter(Boolean)
+    matchedProductCodes = (prodRes.data || []).map(p => p.product_code).filter(Boolean)
+    matchedSoIds = (soRes.data || []).map(s => s.id).filter(Boolean)
+  }
+
   // 2. Summary KPI Query (Filtered by month if selected, or overall)
   let summaryQuery = supabase
     .from('sales_orders')
@@ -43,7 +60,11 @@ export default async function SalesData({ searchParams = {} }) {
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
   if (search) {
-    query = query.or(`invoice_number.ilike.%${search}%`)
+    if (matchedCustCodes.length > 0) {
+      query = query.or(`invoice_number.ilike.%${search}%,customer_code.in.(${matchedCustCodes.join(',')})`)
+    } else {
+      query = query.or(`invoice_number.ilike.%${search}%`)
+    }
   }
 
   if (filterMonth) {
@@ -70,8 +91,15 @@ export default async function SalesData({ searchParams = {} }) {
       sales_orders(invoice_number, date, status, payment_status, customers(name)),
       products(name)
     `)
-    .order('id', { ascending: false })
-    .limit(500)
+
+  if (search) {
+    const itemOrConditions = [`product_code.ilike.%${search}%`]
+    if (matchedProductCodes.length > 0) itemOrConditions.push(`product_code.in.(${matchedProductCodes.join(',')})`)
+    if (matchedSoIds.length > 0) itemOrConditions.push(`so_id.in.(${matchedSoIds.join(',')})`)
+    itemsQuery = itemsQuery.or(itemOrConditions.join(','))
+  }
+
+  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(500)
 
   const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult] = await Promise.all([
     query,

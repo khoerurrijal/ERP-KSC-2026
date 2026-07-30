@@ -126,6 +126,7 @@ export async function createSalesOrder(payload) {
         so_id: so.id,
         order_type: item.order_type,
         product_code: item.product_id,
+        status: 'BARU MASUK',
         mockup_url: item.mockup_url,
         qty: Number(item.qty),
         unit: item.unit || 'PCS',
@@ -145,6 +146,7 @@ export async function createSalesOrder(payload) {
           so_id: so.id,
           order_type: 'POLOS', // don't show in production
           product_code: 'SRV-FAST-TRACK',
+          status: 'BARU MASUK',
           qty: qtyFastTrack,
           unit: 'Layanan',
           unit_multiplier: 1,
@@ -164,6 +166,7 @@ export async function createSalesOrder(payload) {
           so_id: so.id,
           order_type: 'SABLON', // SHOW in production
           product_code: 'SRV-2-WARNA',
+          status: 'BARU MASUK',
           qty: actualQty,
           unit: 'Pcs',
           unit_multiplier: 1,
@@ -454,6 +457,7 @@ export async function updateSalesOrder(soId, payload) {
       } else {
         // Generate UUID for new items to prevent upsert null constraint error
         preparedItem.id = crypto.randomUUID();
+        preparedItem.status = 'BARU MASUK';
       }
 
       preparedItems.push(preparedItem)
@@ -465,6 +469,7 @@ export async function updateSalesOrder(soId, payload) {
           so_id: soId,
           order_type: 'POLOS', // don't show in production
           product_code: 'SRV-FAST-TRACK',
+          status: 'BARU MASUK',
           qty: qtyFastTrack,
           unit: 'Layanan',
           unit_multiplier: 1,
@@ -485,6 +490,7 @@ export async function updateSalesOrder(soId, payload) {
           so_id: soId,
           order_type: 'SABLON', // SHOW in production
           product_code: 'SRV-2-WARNA',
+          status: 'BARU MASUK',
           qty: actualQty,
           unit: 'Pcs',
           unit_multiplier: 1,
