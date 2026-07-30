@@ -19,7 +19,9 @@ export default function SalesClient({
   pageSize = 50,
   salesItems = [], 
   dropdownConfig = {},
-  searchParams: passedSearchParams = {}
+  searchParams: passedSearchParams = {},
+  serverTotalOmset,
+  serverTotalPiutang
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -68,7 +70,7 @@ export default function SalesClient({
     router.push(`${pathname}?${params.toString()}`)
   }, [searchParams, pathname, router])
 
-  // Debounce search input 300ms
+  // Debounce search input 350ms
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery)
@@ -148,23 +150,10 @@ export default function SalesClient({
     }
     
     setIsCorrecting(true);
-    // Kita panggil action updateSalesItemStatus untuk memaksa update status
-    // Tapi kita juga bisa panggil action baru untuk update qty dan status sekaligus
-    // Karena ini khusus SalesClient, kita bisa gunakan fungsi khusus atau fetch langsung
-    
     try {
       const supabase = await createClient();
-      
-      // Update Qty di production_logs (koreksi selisih)
-      // Daripada menghitung selisih ribet, kita insert log koreksi khusus jika butuh,
-      // Tapi updateSalesItemStatus akan memaksa status berubah.
-      // Kita panggil fungsi update status biasa DITAMBAH insert log koreksi (atau biarkan fungsi server yang handle)
-      
-      // Untuk mempermudah, kita panggil updateSalesItemStatus, lalu insert log koreksi manual
       await updateSalesItemStatus(correctionModal.itemId, correctionModal.targetStatus);
       
-      // Insert log untuk reset qty
-      // Ambil current qty
       const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', correctionModal.itemId);
       const currentTotal = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0);
       const adjustment = Number(correctionModal.targetQty) - currentTotal;
@@ -180,7 +169,7 @@ export default function SalesClient({
       }
       
       setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' });
-      window.location.reload(); // Reload untuk memperbarui data
+      window.location.reload();
     } catch (e) {
       alert("Terjadi kesalahan.");
     } finally {
@@ -192,7 +181,7 @@ export default function SalesClient({
     const confirm = window.confirm(`Peringatan: Anda akan membatalkan pesanan ${invoiceNumber}. Ini akan mengembalikan stok tersedia dan menghapus riwayat pembayaran. Lanjutkan?`);
     if (!confirm) return;
 
-    setUpdatingItem(soId); // Reuse updatingItem state for loading
+    setUpdatingItem(soId);
     const { success, error } = await cancelSalesOrder(soId);
     setUpdatingItem(null);
 
@@ -222,10 +211,17 @@ export default function SalesClient({
 
   // Memoized Item Data
   const filteredAndSortedItems = useMemo(() => {
+    const searchLower = (debouncedSearch || '').toLowerCase().trim()
+
     let filtered = salesItems.filter(item => {
-      const matchSearch = item.sales_orders?.invoice_number?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                          item.sales_orders?.customers?.name?.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
-                          item.products?.name?.toLowerCase().includes(debouncedSearch.toLowerCase())
+      const invoiceNum = (item.sales_orders?.invoice_number || '').toLowerCase()
+      const customerName = (item.sales_orders?.customers?.name || '').toLowerCase()
+      const productName = (item.products?.name || item.product_name || item.item_name || item.product_code || '').toLowerCase()
+
+      const matchSearch = !searchLower || 
+        invoiceNum.includes(searchLower) ||
+        customerName.includes(searchLower) ||
+        productName.includes(searchLower)
       
       const itemMonth = item.sales_orders?.date?.substring(0, 7)
       const matchMonth = filterMonth ? itemMonth === filterMonth : true
@@ -249,8 +245,8 @@ export default function SalesClient({
         aVal = a.sales_orders?.invoice_number || ''
         bVal = b.sales_orders?.invoice_number || ''
       } else if (itemSortConfig.key === 'product_name') {
-        aVal = a.products?.name || ''
-        bVal = b.products?.name || ''
+        aVal = a.products?.name || a.product_name || a.item_name || ''
+        bVal = b.products?.name || b.product_name || b.item_name || ''
       }
 
       if (aVal < bVal) return itemSortConfig.direction === 'asc' ? -1 : 1
@@ -268,8 +264,15 @@ export default function SalesClient({
     return filteredAndSortedItems.slice(start, start + itemPageSize)
   }, [filteredAndSortedItems, itemPage, itemPageSize])
 
-  const totalOmset = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0), [salesOrders, filterMonth])
-  const totalPiutang = useMemo(() => salesOrders.filter(o => o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0), [salesOrders, filterMonth])
+  const totalOmset = useMemo(() => {
+    if (serverTotalOmset !== undefined) return serverTotalOmset
+    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0)
+  }, [serverTotalOmset, salesOrders, filterMonth])
+
+  const totalPiutang = useMemo(() => {
+    if (serverTotalPiutang !== undefined) return serverTotalPiutang
+    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
+  }, [serverTotalPiutang, salesOrders, filterMonth])
 
   const renderSortIcon = (key, config) => {
     if (config.key !== key) return <span className="inline-block w-3 opacity-0">&#8597;</span>
@@ -368,7 +371,11 @@ export default function SalesClient({
                 <label className="text-xs text-foreground/60">Status Pembayaran</label>
                 <CustomSelect 
                   value={filterStatus} 
-                  onChange={e => setFilterStatus(e.target.value)} 
+                  onChange={e => {
+                    const val = e.target.value
+                    setFilterStatus(val)
+                    updateQueryParams({ status: val, page: '1' })
+                  }} 
                   options={[
                     { value: "ALL", label: "Semua Pembayaran" },
                     { value: "BELUM_LUNAS", label: "Belum Lunas / DP" },
@@ -380,7 +387,11 @@ export default function SalesClient({
                 <label className="text-xs text-foreground/60">Tipe Pelanggan</label>
                 <CustomSelect 
                   value={filterCustomerType} 
-                  onChange={e => setFilterCustomerType(e.target.value)} 
+                  onChange={e => {
+                    const val = e.target.value
+                    setFilterCustomerType(val)
+                    updateQueryParams({ customerType: val === 'ALL' ? '' : val, page: '1' })
+                  }} 
                   options={[
                     { value: "ALL", label: "Semua Tipe" },
                     ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
@@ -543,7 +554,7 @@ export default function SalesClient({
                           <span className="ml-2 text-[8px] font-bold bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
                       </td>
                       <td className="px-4 py-2 align-middle">
-                        <p className="text-xs text-white font-bold">{item.products?.name || item.product_code}</p>
+                        <p className="text-xs text-white font-bold">{item.products?.name || item.product_name || item.item_name || item.product_code || '-'}</p>
                         <p className="text-[9px] text-primary/80 mt-0.5"><span className="bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">{item.order_type}</span></p>
                       </td>
                       <td className="px-4 py-2 align-middle text-center">
