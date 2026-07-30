@@ -66,7 +66,7 @@ export default async function SalesData({ searchParams = {} }) {
   let itemsQuery = supabase
     .from('sales_items')
     .select(`
-      id, qty, unit_price, total_price, product_name, item_name, status, mockup_url, order_type, unit_multiplier, product_code,
+      id, qty, unit_price, total_price, status, mockup_url, order_type, unit_multiplier, product_code, notes,
       sales_orders(invoice_number, date, payment_status, customers(name)),
       products(name)
     `)

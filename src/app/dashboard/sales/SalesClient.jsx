@@ -577,7 +577,7 @@ export default function SalesClient({
                           <span className="ml-2 text-[8px] font-bold bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
                       </td>
                       <td className="px-4 py-2 align-middle">
-                        <p className="text-xs text-white font-bold">{prod?.name || item.product_name || item.item_name || item.product_code || '-'}</p>
+                        <p className="text-xs text-white font-bold">{prod?.name || item.product_code || '-'}</p>
                         <p className="text-[9px] text-primary/80 mt-0.5"><span className="bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">{item.order_type}</span></p>
                       </td>
                       <td className="px-4 py-2 align-middle text-center">
