@@ -240,7 +240,10 @@ export default function SalesClient({
 
       let matchStatus = true
       if (itemFilterStatus !== 'ALL') {
-        matchStatus = (item.status || 'BARU MASUK').toUpperCase() === itemFilterStatus
+        const rawItemStatus = item.status || so?.status || 'BARU MASUK'
+        const normItemStatus = rawItemStatus.toString().replace(/_/g, ' ').toUpperCase().trim()
+        const normFilterStatus = itemFilterStatus.toString().replace(/_/g, ' ').toUpperCase().trim()
+        matchStatus = normItemStatus === normFilterStatus
       }
 
       return matchSearch && matchMonth && matchStatus
@@ -546,7 +549,11 @@ export default function SalesClient({
                     </td>
                   </tr>
                 ) : paginatedItems.map((item) => {
-                  const currentStatus = (item.status || 'BARU MASUK').toUpperCase();
+                  const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
+                  const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
+                  const prod = Array.isArray(item.products) ? item.products[0] : item.products
+
+                  const currentStatus = (item.status || so?.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim();
                   const isUpdating = updatingItem === item.id;
                   
                   let itemStatuses = productionStatuses;
@@ -559,10 +566,6 @@ export default function SalesClient({
                   if (currentStatus === 'BATAL') {
                     itemStatuses = [...itemStatuses, 'BATAL'];
                   }
-                  
-                  const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
-                  const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
-                  const prod = Array.isArray(item.products) ? item.products[0] : item.products
 
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">

@@ -67,7 +67,7 @@ export default async function SalesData({ searchParams = {} }) {
     .from('sales_items')
     .select(`
       id, qty, unit_price, total_price, status, mockup_url, order_type, unit_multiplier, product_code, notes,
-      sales_orders(invoice_number, date, payment_status, customers(name)),
+      sales_orders(invoice_number, date, status, payment_status, customers(name)),
       products(name)
     `)
     .order('id', { ascending: false })
