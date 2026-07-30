@@ -24,7 +24,7 @@ export default async function SalesData({ searchParams = {} }) {
   // 2. Summary KPI Query (Filtered by month if selected, or overall)
   let summaryQuery = supabase
     .from('sales_orders')
-    .select('grand_total, total_amount, dp_amount, payment_status, date')
+    .select('total_amount, dp_amount, payment_status, date')
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
     .neq('payment_status', 'BATAL')
 
@@ -91,10 +91,10 @@ export default async function SalesData({ searchParams = {} }) {
   const summaryOrders = summaryResult.data || []
 
   // Calculate Omset & Piutang accurately from summary dataset
-  const serverTotalOmset = summaryOrders.reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0)
+  const serverTotalOmset = summaryOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
   const serverTotalPiutang = summaryOrders
     .filter(o => o.payment_status !== 'LUNAS')
-    .reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
+    .reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
 
   return (
     <SalesClient
