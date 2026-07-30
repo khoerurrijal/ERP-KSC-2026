@@ -214,16 +214,28 @@ export default function SalesClient({
     const searchLower = (debouncedSearch || '').toLowerCase().trim()
 
     let filtered = salesItems.filter(item => {
-      const invoiceNum = (item.sales_orders?.invoice_number || '').toLowerCase()
-      const customerName = (item.sales_orders?.customers?.name || '').toLowerCase()
-      const productName = (item.products?.name || item.product_name || item.item_name || item.product_code || '').toLowerCase()
+      const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
+      const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
+      const prod = Array.isArray(item.products) ? item.products[0] : item.products
+
+      const invoiceNum = (so?.invoice_number || '').toLowerCase()
+      const customerName = (cust?.name || '').toLowerCase()
+      const productName = (prod?.name || item.product_name || item.item_name || item.product_code || '').toLowerCase()
 
       const matchSearch = !searchLower || 
         invoiceNum.includes(searchLower) ||
         customerName.includes(searchLower) ||
         productName.includes(searchLower)
       
-      const itemMonth = item.sales_orders?.date?.substring(0, 7)
+      const rawDate = so?.date || ''
+      let itemMonth = ''
+      if (rawDate.includes('-')) {
+        itemMonth = rawDate.substring(0, 7)
+      } else if (rawDate.includes('/')) {
+        const parts = rawDate.split('/')
+        if (parts.length === 3) itemMonth = `${parts[2]}-${parts[1].padStart(2, '0')}`
+      }
+
       const matchMonth = filterMonth ? itemMonth === filterMonth : true
 
       let matchStatus = true
@@ -235,18 +247,25 @@ export default function SalesClient({
     })
 
     return filtered.sort((a, b) => {
+      const soA = Array.isArray(a.sales_orders) ? a.sales_orders[0] : a.sales_orders
+      const soB = Array.isArray(b.sales_orders) ? b.sales_orders[0] : b.sales_orders
+      const custA = Array.isArray(soA?.customers) ? soA?.customers[0] : soA?.customers
+      const custB = Array.isArray(soB?.customers) ? soB?.customers[0] : soB?.customers
+      const prodA = Array.isArray(a.products) ? a.products[0] : a.products
+      const prodB = Array.isArray(b.products) ? b.products[0] : b.products
+
       let aVal = a[itemSortConfig.key]
       let bVal = b[itemSortConfig.key]
 
       if (itemSortConfig.key === 'customers_name') {
-        aVal = a.sales_orders?.customers?.name || ''
-        bVal = b.sales_orders?.customers?.name || ''
+        aVal = custA?.name || ''
+        bVal = custB?.name || ''
       } else if (itemSortConfig.key === 'invoice_number') {
-        aVal = a.sales_orders?.invoice_number || ''
-        bVal = b.sales_orders?.invoice_number || ''
+        aVal = soA?.invoice_number || ''
+        bVal = soB?.invoice_number || ''
       } else if (itemSortConfig.key === 'product_name') {
-        aVal = a.products?.name || a.product_name || a.item_name || ''
-        bVal = b.products?.name || b.product_name || b.item_name || ''
+        aVal = prodA?.name || a.product_name || a.item_name || ''
+        bVal = prodB?.name || b.product_name || b.item_name || ''
       }
 
       if (aVal < bVal) return itemSortConfig.direction === 'asc' ? -1 : 1
@@ -541,20 +560,24 @@ export default function SalesClient({
                     itemStatuses = [...itemStatuses, 'BATAL'];
                   }
                   
+                  const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
+                  const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
+                  const prod = Array.isArray(item.products) ? item.products[0] : item.products
+
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-2 align-middle">
-                        <p className="text-xs text-foreground/80">{item.sales_orders?.date ? new Date(item.sales_orders.date).toLocaleDateString('id-ID') : '-'}</p>
-                        <p className="text-[9px] text-foreground/40 mt-0.5">{item.sales_orders?.invoice_number}</p>
+                        <p className="text-xs text-foreground/80">{so?.date ? new Date(so.date).toLocaleDateString('id-ID') : '-'}</p>
+                        <p className="text-[9px] text-foreground/40 mt-0.5">{so?.invoice_number || '-'}</p>
                       </td>
                       <td className="px-4 py-2 align-middle text-xs font-semibold text-white/90">
-                        {item.sales_orders?.customers?.name}
-                        {item.sales_orders?.payment_status === 'LUNAS' ? 
+                        {cust?.name || '-'}
+                        {so?.payment_status === 'LUNAS' ? 
                           <span className="ml-2 text-[8px] font-bold bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded">LUNAS</span> : 
                           <span className="ml-2 text-[8px] font-bold bg-yellow-500/10 text-yellow-400 px-1.5 py-0.5 rounded">DP/BL</span>}
                       </td>
                       <td className="px-4 py-2 align-middle">
-                        <p className="text-xs text-white font-bold">{item.products?.name || item.product_name || item.item_name || item.product_code || '-'}</p>
+                        <p className="text-xs text-white font-bold">{prod?.name || item.product_name || item.item_name || item.product_code || '-'}</p>
                         <p className="text-[9px] text-primary/80 mt-0.5"><span className="bg-primary/10 border border-primary/20 px-1.5 py-0.5 rounded uppercase">{item.order_type}</span></p>
                       </td>
                       <td className="px-4 py-2 align-middle text-center">
