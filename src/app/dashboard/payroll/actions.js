@@ -121,27 +121,35 @@ export async function savePayroll(payload) {
 
       activeLoans?.forEach(loan => {
         if (loan.type === 'PINJAMAN') {
-          const installment = Math.min(Number(loan.installment_amount || 0), Number(loan.remaining_amount || 0))
-          totalPinjamanWajib += installment
-          pinjamanLoans.push({ ...loan, currentInstallment: installment })
+          maxPinjamanAvailable += Number(loan.remaining_amount || 0)
+          pinjamanLoans.push(loan)
         } else if (loan.type === 'KASBON') {
           maxKasbonAvailable += Number(loan.remaining_amount || 0)
           kasbonLoans.push(loan)
         }
       })
 
+      // Porsi PINJAMAN murni = pinjaman_amount dari UI
+      const uiPinjamanAmount = item.pinjaman_amount !== undefined ? Number(item.pinjaman_amount) : maxPinjamanAvailable
+      let porsiPinjamanMurni = Math.min(uiPinjamanAmount, maxPinjamanAvailable)
+
       // Porsi KASBON murni = kasbon_amount dari UI (KASBON-only)
-      const uiKasbonAmount = Number(item.kasbon_amount || 0)
+      const uiKasbonAmount = item.kasbon_amount !== undefined ? Number(item.kasbon_amount) : 0
       let porsiKasbonMurni = Math.min(uiKasbonAmount, maxKasbonAvailable)
 
-      const totalPotonganAktual = totalPinjamanWajib + porsiKasbonMurni
+      const totalPotonganAktual = porsiPinjamanMurni + porsiKasbonMurni
 
 
       // Update remaining amounts & statuses in DB
-      // 2a. Potong PINJAMAN secara independen (wajib)
+      // 2a. Potong PINJAMAN (FIFO) berdasarkan input UI
+
+      let remainingPinjamanToDeduct = porsiPinjamanMurni
       for (const loan of pinjamanLoans) {
-        const deductAmount = loan.currentInstallment
+        if (remainingPinjamanToDeduct <= 0) break
+
+        const deductAmount = Math.min(Number(loan.remaining_amount || 0), remainingPinjamanToDeduct)
         if (deductAmount > 0) {
+          remainingPinjamanToDeduct -= deductAmount
           const newRemaining = Number(loan.remaining_amount || 0) - deductAmount
           const newStatus = newRemaining === 0 ? 'LUNAS' : 'BELUM LUNAS'
 

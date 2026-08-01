@@ -28,7 +28,7 @@ export default async function ProductionData() {
         products (name, workshop_code),
         production_logs (qty_processed)
       `)
-      .or('status.in.("BARU MASUK","SIAP PROSES","PROSES","SUDAH JADI","SIAP KIRIM","Proses"),status.is.null')
+      .in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
       .order('id', { ascending: false })
       .limit(500)
   ])

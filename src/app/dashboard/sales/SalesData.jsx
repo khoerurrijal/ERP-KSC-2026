@@ -26,16 +26,26 @@ export default async function SalesData({ searchParams = {} }) {
   let matchedProductCodes = []
   let matchedSoIds = []
 
-  if (search) {
+  let safeSearch = search ? search.replace(/,/g, ' ').trim() : ''
+
+  if (safeSearch) {
     const [custRes, prodRes, soRes] = await Promise.all([
-      supabase.from('customers').select('customer_code, id').ilike('name', `%${search}%`).limit(100),
-      supabase.from('products').select('product_code').ilike('name', `%${search}%`).limit(100),
-      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${search}%`).limit(100)
+      supabase.from('customers').select('customer_code, id').ilike('name', `%${safeSearch}%`).limit(100),
+      supabase.from('products').select('product_code').ilike('name', `%${safeSearch}%`).limit(100),
+      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${safeSearch}%`).limit(100)
     ])
 
     matchedCustCodes = (custRes.data || []).map(c => c.customer_code || c.id).filter(Boolean)
     matchedProductCodes = (prodRes.data || []).map(p => p.product_code).filter(Boolean)
-    matchedSoIds = (soRes.data || []).map(s => s.id).filter(Boolean)
+    
+    // Also fetch SO IDs that belong to the matched customers to ensure sales_items can be searched by customer name
+    let additionalSoIds = []
+    if (matchedCustCodes.length > 0) {
+      const { data: custSoRes } = await supabase.from('sales_orders').select('id').in('customer_code', matchedCustCodes).limit(200)
+      additionalSoIds = (custSoRes || []).map(s => s.id)
+    }
+    
+    matchedSoIds = [...(soRes.data || []).map(s => s.id), ...additionalSoIds].filter(Boolean)
   }
 
   // 2. Summary KPI Query (Filtered by month if selected, or overall)
@@ -59,11 +69,11 @@ export default async function SalesData({ searchParams = {} }) {
     `, { count: 'exact' })
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
-  if (search) {
+  if (safeSearch) {
     if (matchedCustCodes.length > 0) {
-      query = query.or(`invoice_number.ilike.%${search}%,customer_code.in.(${matchedCustCodes.join(',')})`)
+      query = query.or(`invoice_number.ilike.%${safeSearch}%,payment_status.ilike.%${safeSearch}%,customer_code.in.(${matchedCustCodes.join(',')})`)
     } else {
-      query = query.or(`invoice_number.ilike.%${search}%`)
+      query = query.or(`invoice_number.ilike.%${safeSearch}%,payment_status.ilike.%${safeSearch}%`)
     }
   }
 
@@ -88,18 +98,22 @@ export default async function SalesData({ searchParams = {} }) {
     .from('sales_items')
     .select(`
       id, qty, unit_price, total_price, status, mockup_url, order_type, unit_multiplier, product_code, notes,
-      sales_orders(invoice_number, date, status, payment_status, customers(name)),
+      sales_orders!inner(invoice_number, date, payment_status, marketplace_receipt, customers(name)),
       products(name)
     `)
 
-  if (search) {
-    const itemOrConditions = [`product_code.ilike.%${search}%`]
+  if (filterMonth) {
+    itemsQuery = itemsQuery.gte('sales_orders.date', startDate).lte('sales_orders.date', endDate)
+  }
+
+  if (safeSearch) {
+    const itemOrConditions = [`product_code.ilike.%${safeSearch}%`]
     if (matchedProductCodes.length > 0) itemOrConditions.push(`product_code.in.(${matchedProductCodes.join(',')})`)
     if (matchedSoIds.length > 0) itemOrConditions.push(`so_id.in.(${matchedSoIds.join(',')})`)
     itemsQuery = itemsQuery.or(itemOrConditions.join(','))
   }
 
-  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(500)
+  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(1000)
 
   const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult] = await Promise.all([
     query,

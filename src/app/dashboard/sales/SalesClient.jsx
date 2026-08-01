@@ -67,7 +67,7 @@ export default function SalesClient({
         params.delete(key)
       }
     })
-    router.push(`${pathname}?${params.toString()}`)
+    router.push(`${pathname}?${params.toString()}`, { scroll: false })
   }, [searchParams, pathname, router])
 
   // Debounce search input 350ms
@@ -75,6 +75,7 @@ export default function SalesClient({
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery)
       if ((passedSearchParams.search || '') !== searchQuery) {
+        setItemPage(1)
         updateQueryParams({ search: searchQuery, page: '1' })
       }
     }, 350)
@@ -250,7 +251,11 @@ export default function SalesClient({
         matchStatus = itemProdStatus === normFilterStatus
       }
 
-      return matchSearch && matchMonth && matchStatus
+      const paymentStatus = (so?.payment_status || '').toLowerCase()
+      const searchIncludesPayment = searchLower && paymentStatus.includes(searchLower)
+      const finalSearchMatch = matchSearch || searchIncludesPayment
+
+      return finalSearchMatch && matchMonth && matchStatus
     })
 
     return filtered.sort((a, b) => {

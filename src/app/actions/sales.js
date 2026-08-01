@@ -380,10 +380,10 @@ export async function updateSalesOrder(soId, payload) {
       return sum + itemTotal;
     }, 0)
 
-    // Baca dp_amount aktual dari DB — JANGAN overwrite dari payload UI
-    // dp_amount hanya boleh diubah oleh addSalesPayment()
-    const { data: existingSo } = await supabase.from('sales_orders').select('dp_amount').eq('id', soId).single()
+    const { data: existingSo } = await supabase.from('sales_orders').select('dp_amount, invoice_number, date').eq('id', soId).single()
     const currentDbDpAmount = Number(existingSo?.dp_amount || 0)
+    const invoiceNumber = existingSo?.invoice_number || `INV-${soId}`
+    const orderOriginalDate = existingSo?.date || orderDate
 
     // Recalculate payment_status berdasarkan paid aktual vs total baru
     // Jika paid > total baru (total diedit turun), status LUNAS tanpa buat refund/kredit
@@ -402,7 +402,7 @@ export async function updateSalesOrder(soId, payload) {
     const preparedItems = []
 
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single()
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single()
       
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0)
       
@@ -416,18 +416,18 @@ export async function updateSalesOrder(soId, payload) {
         profitGlobalPct
       });
 
-      if (product?.workshop_code === 'GUDANG') {
-        totalBeliGudang += snapshot.beliGudang
-      }
-      if (product?.workshop_code === 'GLOBAL') {
-        totalBeliGlobal += snapshot.beliGlobal - snapshot.royaltyFee
+      if (product) {
+        if (product.workshop_code === 'GUDANG') {
+          totalBeliGudang += snapshot.beliGudang
+        }
+        if (product.workshop_code === 'GLOBAL') {
+          totalBeliGlobal += snapshot.beliGlobal - snapshot.royaltyFee
+        }
       }
       virtualRoyaltyGlobal += snapshot.royaltyFee
 
-      let itemNotes = '';
-      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
-      
-      const productNameForNotes = item.product_search || product?.name || item.product_id;
+      let itemNotes = item.notes || '';
+      const productNameForNotes = product?.name || item.product_id;
 
       const isExisting = String(item.id).length > 20;
 
@@ -444,18 +444,13 @@ export async function updateSalesOrder(soId, payload) {
         hpp_price: dynamicHPP,
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
-        royalty_fee: snapshot.royaltyFee
+        royalty_fee: snapshot.royaltyFee,
+        notes: itemNotes.trim()
       }
-
-      
-      // Only set notes if there is something to set, 
-      // Actually we must always set it, so if they uncheck it, it gets cleared!
-      preparedItem.notes = itemNotes.trim();
 
       if (isExisting) {
         preparedItem.id = item.id;
       } else {
-        // Generate UUID for new items to prevent upsert null constraint error
         preparedItem.id = crypto.randomUUID();
         preparedItem.status = 'BARU MASUK';
       }
@@ -467,11 +462,11 @@ export async function updateSalesOrder(soId, payload) {
         preparedItems.push({
           id: crypto.randomUUID(),
           so_id: soId,
-          order_type: 'POLOS', // don't show in production
-          product_code: 'SRV-FAST-TRACK',
+          order_type: 'LAINNYA', 
+          product_code: 'FAST-TRACK',
           status: 'BARU MASUK',
           qty: qtyFastTrack,
-          unit: 'Layanan',
+          unit: 'SLOT',
           unit_multiplier: 1,
           unit_price: 100000,
           total_price: 100000 * qtyFastTrack,
@@ -479,7 +474,7 @@ export async function updateSalesOrder(soId, payload) {
           beli_gudang: 0,
           beli_global: 0,
           royalty_fee: 0,
-          notes: `Untuk ${productNameForNotes}`
+          notes: `Jalur Cepat untuk ${productNameForNotes}`
         });
       }
 
@@ -488,11 +483,11 @@ export async function updateSalesOrder(soId, payload) {
         preparedItems.push({
           id: crypto.randomUUID(),
           so_id: soId,
-          order_type: 'SABLON', // SHOW in production
-          product_code: 'SRV-2-WARNA',
+          order_type: 'LAINNYA',
+          product_code: 'BIAYA-WARNA',
           status: 'BARU MASUK',
           qty: actualQty,
-          unit: 'Pcs',
+          unit: 'PCS',
           unit_multiplier: 1,
           unit_price: 250,
           total_price: 250 * actualQty,
@@ -500,7 +495,7 @@ export async function updateSalesOrder(soId, payload) {
           beli_gudang: 0,
           beli_global: 0,
           royalty_fee: 0,
-          notes: `Untuk ${productNameForNotes} - Warna Ke-2`
+          notes: `Warna Ke-2 untuk ${productNameForNotes}`
         });
       }
     }
@@ -515,7 +510,6 @@ export async function updateSalesOrder(soId, payload) {
         customer_code: customerId,
         notes: notes,
         total_amount: grandTotal,
-        // dp_amount TIDAK disentuh — hanya addSalesPayment() yang boleh ubah dp_amount
         payment_method: paymentAccount,
         payment_status: paymentStatus
       })
@@ -523,10 +517,8 @@ export async function updateSalesOrder(soId, payload) {
 
     if (soError) throw new Error('Gagal update pesanan: ' + soError.message)
 
-    // Handle items safely without wiping production logs
     const existingItemIds = preparedItems.filter(i => String(i.id).length > 20).map(i => i.id);
 
-    // Delete items that were removed in the UI
     const { data: currentDbItems } = await supabase.from('sales_items').select('id').eq('so_id', soId);
     if (currentDbItems) {
       const idsToDelete = currentDbItems.map(i => i.id).filter(id => !existingItemIds.includes(id));
@@ -535,9 +527,26 @@ export async function updateSalesOrder(soId, payload) {
       }
     }
 
-    // Upsert the remaining items (inserts new ones, updates existing ones by id)
     const { error: itemsError } = await supabase.from('sales_items').upsert(preparedItems)
     if (itemsError) throw new Error('Gagal update item pesanan: ' + itemsError.message)
+
+    // RECREATE VIRTUAL TRANSACTIONS IF LUNAS TO PREVENT LEDGER LEAK
+    if (paymentStatus === 'LUNAS') {
+      await supabase.from('transactions').delete().eq('so_id', soId).eq('payment_method', 'Virtual');
+
+      if (totalBeliGudang > 0) {
+        await supabase.from('transactions').insert([
+          { date: orderOriginalDate, description: `Alokasi HPP Cup/Barang Gudang - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_in: totalBeliGudang, workshop_code: 'GUDANG', so_id: soId },
+          { date: orderOriginalDate, description: `Potongan HPP untuk Gudang - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_out: totalBeliGudang, workshop_code: 'KING', so_id: soId }
+        ]);
+      }
+      if (finalBeliGlobal > 0) {
+        await supabase.from('transactions').insert([
+          { date: orderOriginalDate, description: `Alokasi HPP Bahan & Royalty - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_in: finalBeliGlobal, workshop_code: 'GLOBAL', so_id: soId },
+          { date: orderOriginalDate, description: `Potongan HPP/Royalty untuk Global - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_out: finalBeliGlobal, workshop_code: 'KING', so_id: soId }
+        ]);
+      }
+    }
 
     const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', soId);
     if (soItemsForStatus) {
@@ -594,14 +603,8 @@ export async function updateSalesItemStatus(itemId, newStatus) {
       throw new Error("Item yang sudah dibatalkan tidak bisa diubah statusnya.")
     }
 
-    // Guard 2: Prevent illegal leaps from BARU MASUK to shipping/completion
-    if (oldStatus === 'BARU MASUK') {
-      const isPolos = item.order_type?.toUpperCase() === 'POLOS'
-      const allowedNext = isPolos ? ['BARU MASUK', 'SIAP KIRIM', 'BATAL'] : ['BARU MASUK', 'SIAP PROSES', 'BATAL']
-      if (!allowedNext.includes(targetStatus)) {
-        throw new Error(`Transisi status tidak valid: ${oldStatus} -> ${targetStatus}. Harus melewati status Siap Proses atau Siap Kirim.`)
-      }
-    }
+    // Relaxed guard: User can update to any valid status.
+    // If we want to enforce strict workflow, we can do it here, but for flexibility, we allow it.
 
     const { error } = await supabase
       .from('sales_items')
