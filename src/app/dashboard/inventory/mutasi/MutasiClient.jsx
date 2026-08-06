@@ -31,7 +31,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
       <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <Link href="/dashboard/inventory" className="btn-secondary h-8 px-3 text-xs flex items-center gap-1">
+            <Link href="/inventory" className="btn-secondary h-8 px-3 text-xs flex items-center gap-1">
               <ArrowLeft className="w-3 h-3" /> Kembali ke Inventory
             </Link>
           </div>

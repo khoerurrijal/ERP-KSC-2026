@@ -100,7 +100,10 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         qty: i.qty || 1,
         unit: i.unit || 'PCS',
         unit_multiplier: i.unit_multiplier || 1,
-        price: i.unit_price || 0
+        price: i.unit_price || 0,
+        isFastTrack: Boolean(i.is_fast_track || /fast\s*track/i.test(i.notes || '')),
+        isTwoColor: /2\s*warna|warna\s*ke-?2/i.test(i.notes || ''),
+        notes: i.notes || ''
       }))
     : [{ id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
   )
@@ -281,7 +284,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       
       if (result.success) {
         alert(initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
-        router.push('/dashboard/sales')
+        router.push('/sales')
       } else {
         setError(result.error || "Terjadi kesalahan saat menyimpan data.")
       }

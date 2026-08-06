@@ -1,8 +1,25 @@
 import { createClient } from '@/utils/supabase/server'
 import ProductionTable from '@/components/ProductionTable'
 
-export default async function ProductionData() {
+export default async function ProductionData({ mode = 'production', embedded = false } = {}) {
   const supabase = await createClient()
+
+  if (mode === 'status') {
+    const { data: paidDeliveryItems, error: paidItemsError } = await supabase
+      .from('sales_items')
+      .select('id, sales_orders!inner(payment_status)')
+      .eq('sales_orders.payment_status', 'LUNAS')
+      .in('status', ['DIKIRIM', 'SUDAH DIAMBIL'])
+      .in('order_type', ['SABLON', 'POLOS', 'PRINTING'])
+      .limit(10000)
+
+    if (!paidItemsError && paidDeliveryItems?.length) {
+      await supabase
+        .from('sales_items')
+        .update({ status: 'SELESAI' })
+        .in('id', paidDeliveryItems.map(item => item.id))
+    }
+  }
   
   const { data: { user } } = await supabase.auth.getUser()
   const userEmail = user?.email?.toLowerCase() || ''
@@ -24,7 +41,7 @@ export default async function ProductionData() {
         mockup_url,
         order_type,
         notes,
-        sales_orders (id, invoice_number, status, date, notes, customers (name)),
+        sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name)),
         products (name, workshop_code),
         production_logs (qty_processed)
       `)
@@ -58,11 +75,13 @@ export default async function ProductionData() {
     id: item.id,
     so_id: item.sales_orders?.id,
     order_type: item.order_type,
-    qty_target: item.qty * (item.unit_multiplier || 1),
+    qty_target: item.qty * (item.unit_multiplier || 1) * (/2\s*warna|warna\s*ke-?2/i.test(item.notes || '') ? 2 : 1),
     sales_order_items: {
       qty: item.qty,
       sales_orders: { 
         invoice_number: item.sales_orders?.invoice_number,
+        payment_status: item.sales_orders?.payment_status,
+        marketplace_receipt: item.sales_orders?.marketplace_receipt,
         customers: { name: item.sales_orders?.customers?.name }
       },
       products: { 
@@ -82,6 +101,7 @@ export default async function ProductionData() {
       return targetDate.toISOString()
     })(),
     is_fast_track: (item.sales_orders?.notes || '').toLowerCase().includes('fast track') || (item.notes || '').toLowerCase().includes('fast_track') || (item.notes || '').toLowerCase().includes('fast track'),
+    is_two_color: /2\s*warna|warna\s*ke-?2/i.test(item.notes || ''),
     notes: item.notes,
     status: item.status || 'BARU MASUK',
     item_status: item.status || 'BARU MASUK',
@@ -103,6 +123,10 @@ export default async function ProductionData() {
       currentUser={userEmail} 
       userRole={userRole} 
       currentUserName={currentUserName} 
+      initialTab={mode === 'status' ? 'SO' : 'PRODUKSI'}
+      hideTabs={mode === 'production' || embedded}
+      hideHeader={embedded}
+      title={mode === 'production' ? 'Produksi' : 'Status Pesanan'}
     />
   )
 }

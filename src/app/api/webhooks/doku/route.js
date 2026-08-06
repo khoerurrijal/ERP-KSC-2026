@@ -69,6 +69,15 @@ export async function POST(req) {
             payment_method: 'DOKU'
           })
           .eq('id', order.id);
+
+        if (newPaymentStatus === 'LUNAS' && order.payment_status !== 'LUNAS') {
+          await supabase
+            .from('sales_items')
+            .update({ status: 'SELESAI' })
+            .eq('so_id', order.id)
+            .in('order_type', ['SABLON', 'POLOS', 'PRINTING'])
+            .in('status', ['DIKIRIM', 'SUDAH DIAMBIL']);
+        }
       }
     }
 

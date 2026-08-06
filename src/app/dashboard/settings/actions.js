@@ -30,8 +30,8 @@ export async function getSettings() {
     }
   }
   const role_permissions = data.find(d => d.key === 'role_permissions')?.value || {
-    "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "pengaturan", "user_management"],
-    "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data"],
+    "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "audit", "pengaturan", "user_management"],
+    "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data", "audit"],
     "Operator": ["dashboard", "produksi"]
   }
   const user_roles = data.find(d => d.key === 'user_roles')?.value || []

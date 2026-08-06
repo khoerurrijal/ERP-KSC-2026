@@ -4,9 +4,81 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 
+async function requireMarketplaceAdmin(supabase) {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) throw new Error('Sesi login tidak ditemukan.')
+
+  const { data: rolesData, error: rolesError } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'user_roles')
+    .single()
+
+  if (rolesError) throw rolesError
+
+  const userEmail = user.email?.toLowerCase() || ''
+  const matchedUser = (rolesData?.value || []).find(role => {
+    const inputEmail = (role.email || '').trim().toLowerCase()
+    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+  })
+  const userRole = matchedUser?.role || 'Operator'
+
+  if (!['ADMIN', 'OWNER'].includes(String(userRole).toUpperCase())) {
+    throw new Error('Hanya Admin/Owner yang dapat memproses pencairan marketplace.')
+  }
+}
+
+async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') {
+  if (!cutoffDate) throw new Error('Tanggal batas order wajib diisi.')
+
+  const { data: orders, error } = await supabase
+    .from('sales_orders')
+    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, date, marketplace_receipt, customers(name)')
+    .not('marketplace_receipt', 'is', null)
+    .neq('marketplace_receipt', '')
+    .lte('date', cutoffDate)
+    .order('date', { ascending: true })
+    .limit(5000)
+
+  if (error) throw error
+
+  const selectedPlatform = String(platform || 'ALL').toUpperCase()
+  const candidateOrders = (orders || []).filter(order => {
+    const paymentStatus = String(order.payment_status || '').toUpperCase()
+    const payoutMissing = Number(order.marketplace_pencairan || 0) <= 0
+    const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+    const customerName = String(customer?.name || '').toLowerCase()
+    const isKnownPlatform = ['shopee', 'tokopedia', 'tiktok'].some(name => customerName.includes(name))
+    const needsReconciliation = paymentStatus !== 'BATAL' && (paymentStatus !== 'LUNAS' || payoutMissing)
+
+    if (!needsReconciliation || Number(order.total_amount || 0) <= 0) return false
+    if (selectedPlatform === 'ALL') return true
+    if (selectedPlatform === 'LAINNYA') return !isKnownPlatform
+    return customerName.includes(selectedPlatform.toLowerCase())
+  })
+
+  const receiptCounts = new Map()
+  candidateOrders.forEach(order => {
+    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    receiptCounts.set(receipt, (receiptCounts.get(receipt) || 0) + 1)
+  })
+
+  const ordersToProcess = candidateOrders.filter(order => {
+    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    return receiptCounts.get(receipt) === 1
+  })
+
+  return {
+    orders: ordersToProcess,
+    excludedDuplicateCount: candidateOrders.length - ordersToProcess.length
+  }
+}
+
 export async function processMarketplaceSettlement(settlementData, paymentMethod, settlementDate) {
   const supabase = await createClient()
   try {
+    await requireMarketplaceAdmin(supabase)
+
     const orderIds = settlementData.map(d => d.orderId)
 
     // 1. Fetch orders — termasuk payment_status untuk duplicate guard
@@ -161,6 +233,112 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     }
   } catch (err) {
     console.error(err)
+    return { success: false, error: err.message }
+  }
+}
+
+export async function previewQuickMarketplaceSettlement(cutoffDate, platform = 'ALL') {
+  const supabase = await createClient()
+
+  try {
+    await requireMarketplaceAdmin(supabase)
+    const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
+
+    return {
+      success: true,
+      count: orders.length,
+      total: orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
+      invoices: orders.slice(0, 10).map(order => order.invoice_number),
+      excludedDuplicateCount
+    }
+  } catch (err) {
+    console.error('Quick marketplace preview error:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+async function processMarketplacePayoutBackfill(supabase, orders, paymentMethod, settlementDate) {
+  if (orders.length === 0) return { processed: 0 }
+
+  const marketplaceNames = new Set()
+  orders.forEach(order => {
+    const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+    const customerName = String(customer?.name || '').toLowerCase()
+    if (customerName.includes('shopee')) marketplaceNames.add('Shopee')
+    else if (customerName.includes('tokopedia')) marketplaceNames.add('Tokopedia')
+    else if (customerName.includes('tiktok')) marketplaceNames.add('TikTok')
+    else marketplaceNames.add('Marketplace')
+  })
+
+  const totalPayout = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0)
+  const invoiceList = orders.map(order => order.invoice_number).join(', ')
+  const { error: transactionError } = await supabase.from('transactions').insert({
+    date: settlementDate,
+    reference: 'PENJUALAN',
+    description: `Backfill Pencairan ${Array.from(marketplaceNames).join(', ')} - ${invoiceList}`,
+    payment_method: paymentMethod,
+    amount_in: totalPayout,
+    amount_out: 0,
+    workshop_code: 'KING'
+  })
+
+  if (transactionError) throw transactionError
+
+  for (const order of orders) {
+    const { error: updateError } = await supabase
+      .from('sales_orders')
+      .update({ marketplace_pencairan: Number(order.total_amount || 0) })
+      .eq('id', order.id)
+
+    if (updateError) throw updateError
+  }
+
+  revalidatePath('/dashboard/marketplace')
+  revalidatePath('/dashboard/transactions')
+  revalidatePath('/dashboard/production')
+  revalidatePath('/dashboard/sales')
+  revalidatePath('/track')
+  return { processed: orders.length }
+}
+
+export async function processQuickMarketplaceSettlement(cutoffDate, platform, paymentMethod, settlementDate) {
+  const supabase = await createClient()
+
+  try {
+    await requireMarketplaceAdmin(supabase)
+    const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
+    if (orders.length === 0) throw new Error('Tidak ada pesanan marketplace yang memenuhi filter.')
+
+    const pendingOrders = orders.filter(order => String(order.payment_status || '').toUpperCase() !== 'LUNAS')
+    const alreadyLunasOrders = orders.filter(order => String(order.payment_status || '').toUpperCase() === 'LUNAS')
+    let processed = 0
+
+    if (pendingOrders.length > 0) {
+      const settlementData = pendingOrders.map(order => ({
+        orderId: order.id,
+        amount: Number(order.total_amount || 0),
+        invoice_number: order.invoice_number
+      }))
+
+      const settlementResult = await processMarketplaceSettlement(settlementData, paymentMethod, settlementDate)
+      if (!settlementResult.success) throw new Error(settlementResult.error)
+      processed += settlementResult.processed || 0
+    }
+
+    if (alreadyLunasOrders.length > 0) {
+      const backfillResult = await processMarketplacePayoutBackfill(supabase, alreadyLunasOrders, paymentMethod, settlementDate)
+      processed += backfillResult.processed || 0
+    }
+
+    return {
+      success: true,
+      processed,
+      pendingProcessed: pendingOrders.length,
+      payoutBackfilled: alreadyLunasOrders.length,
+      excludedDuplicateCount
+    }
+  } catch (err) {
+    console.error('Quick marketplace settlement error:', err)
     return { success: false, error: err.message }
   }
 }

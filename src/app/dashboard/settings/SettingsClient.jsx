@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon } from 'lucide-react'
 import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig } from './actions'
 
-export default function SettingsClient({ initialSettings }) {
-  const [activeTab, setActiveTab] = useState('dropdowns')
+export default function SettingsClient({ initialSettings, onlyAccess = false }) {
+  const [activeTab, setActiveTab] = useState(onlyAccess ? 'access' : 'dropdowns')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
   
@@ -89,6 +89,7 @@ export default function SettingsClient({ initialSettings }) {
     { key: 'keuangan', label: 'Keuangan (Kas, Payroll)' },
     { key: 'master_data', label: 'Master Data' },
     { key: 'laporan', label: 'Laporan' },
+    { key: 'audit', label: 'AI Audit' },
     { key: 'pengaturan', label: 'Pengaturan' }
   ]
   const ROLES = ['Owner', 'Admin', 'Operator']
@@ -240,8 +241,8 @@ export default function SettingsClient({ initialSettings }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-black tracking-tight text-foreground">Pengaturan Sistem</h1>
-          <p className="text-foreground/60 mt-1">Konfigurasi dinamis untuk dropdown form dan alur perhitungan kas.</p>
+          <h1 className="text-3xl font-black tracking-tight text-foreground">{onlyAccess ? 'Pengaturan' : 'Sistem Konfigurasi'}</h1>
+          <p className="text-foreground/60 mt-1">{onlyAccess ? 'Kelola akses pengguna dan hak akses menu aplikasi.' : 'Konfigurasi parameter operasional, keuangan, dan alur aplikasi.'}</p>
         </div>
       </div>
 
@@ -255,7 +256,7 @@ export default function SettingsClient({ initialSettings }) {
       <div className="flex space-x-2 border-b border-white/10 pb-px overflow-x-auto">
         <button
           onClick={() => setActiveTab('dropdowns')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'dropdowns' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -266,7 +267,7 @@ export default function SettingsClient({ initialSettings }) {
         </button>
         <button
           onClick={() => setActiveTab('cashflow')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'cashflow' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -277,7 +278,7 @@ export default function SettingsClient({ initialSettings }) {
         </button>
         <button
           onClick={() => setActiveTab('pricelist')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'pricelist' 
               ? 'border-yellow-400 text-yellow-400' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -288,7 +289,7 @@ export default function SettingsClient({ initialSettings }) {
         </button>
         <button
           onClick={() => setActiveTab('store')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'store' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -299,7 +300,7 @@ export default function SettingsClient({ initialSettings }) {
         </button>
         <button
           onClick={() => setActiveTab('category_images')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'category_images' 
               ? 'border-blue-400 text-blue-400' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -310,7 +311,7 @@ export default function SettingsClient({ initialSettings }) {
         </button>
         <button
           onClick={() => setActiveTab('access')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${
+          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${!onlyAccess ? 'hidden' : ''} ${
             activeTab === 'access' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'

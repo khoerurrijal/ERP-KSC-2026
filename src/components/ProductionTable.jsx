@@ -1,9 +1,9 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Camera, Send, Truck } from 'lucide-react'
+import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
 
-import { saveProductionProgress, updateSalesOrderStatus, correctProductionProgress } from '@/app/dashboard/production/actions'
+import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
@@ -27,13 +27,11 @@ const getStatusColor = (st) => {
   return 'bg-white/10 text-foreground border-white/20'
 }
 
-export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '' }) {
-  const [activeTab, setActiveTab] = useState(userRole === 'Operator' ? 'PRODUKSI' : 'SO') // 'SO' | 'PRODUKSI'
+export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, hideHeader = false, title = 'Produksi' }) {
+  const [activeTab, setActiveTab] = useState(initialTab || (userRole === 'Operator' ? 'PRODUKSI' : 'SO')) // 'SO' | 'PRODUKSI'
   
   const [selectedJob, setSelectedJob] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
-  const [selectedStatusJob, setSelectedStatusJob] = useState(null)
-  const [isStatusModalOpen, setIsStatusModalOpen] = useState(false)
   
   // Correction Modal
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false)
@@ -216,30 +214,13 @@ export default function ProductionTable({ productionJobs, operators = [], curren
     }
   }
 
-  const handleOpenStatusModal = (job) => {
-    setSelectedStatusJob(job)
-    setIsStatusModalOpen(true)
-  }
-
-  const updateStatus = async (newStatus) => {
-    setLoading(true)
-    try {
-      await updateSalesOrderStatus(selectedStatusJob.id, newStatus)
-      window.location.reload()
-    } catch (error) {
-      console.error(error)
-      alert('Gagal update status pesanan')
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      {!hideHeader && <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Factory className="w-6 h-6 text-purple-400" />
-            Tracking Produksi
+            {title}
           </h1>
           <p className="text-sm text-foreground/60 mt-1">Pantau status pengerjaan pesanan sablon dari hulu ke hilir.</p>
         </div>
@@ -255,10 +236,10 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             />
           </div>
         </div>
-      </header>
+      </header>}
 
       {/* Tabs */}
-      {userRole !== 'Operator' && (
+      {!hideTabs && userRole !== 'Operator' && (
         <div className="flex items-center gap-4 border-b border-white/10 pb-2">
           <button 
             onClick={() => setActiveTab('SO')} 
@@ -304,18 +285,6 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                     />
                   </div>
 
-                  {/* Bagian Kanan: Aksi (Sembunyikan Koreksi dari sini) */}
-                  <div className="w-full xl:w-auto shrink-0 flex justify-end">
-                     {getDisplayStatus(item.item_status) === 'SIAP KIRIM' && (
-                        <button 
-                          onClick={() => handleOpenStatusModal(item)}
-                          title="Konfirmasi Kirim"
-                          className="w-8 h-8 flex items-center justify-center bg-primary/20 text-primary hover:bg-primary/30 rounded-lg transition-all border border-primary/30 shadow-[0_0_15px_rgba(168,85,247,0.3)]"
-                        >
-                          <Send className="w-4 h-4" />
-                        </button>
-                     )}
-                  </div>
                 </div>
               )
             })
@@ -408,6 +377,9 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                         </div>
                         {item.is_fast_track && (
                           <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full w-fit">FAST TRACK</span>
+                        )}
+                        {item.is_two_color && (
+                          <span className="text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full w-fit">2 WARNA</span>
                         )}
                       </div>
                     </td>
@@ -574,49 +546,6 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                  <button disabled={loading} onClick={submitCorrection} className="px-4 h-10 text-sm font-bold bg-red-500/20 text-red-400 hover:bg-red-500/30 rounded-lg transition-all border border-red-500/30 disabled:opacity-50">
                    {loading ? 'Menyimpan...' : 'Terapkan Koreksi'}
                  </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Update Status Manual (Siap Kirim -> Dikirim/Diambil) */}
-      {isStatusModalOpen && selectedStatusJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h3 className="font-bold text-foreground">Konfirmasi Pengiriman</h3>
-              <button onClick={() => setIsStatusModalOpen(false)} className="text-foreground/50 hover:text-foreground">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <p className="text-sm text-foreground/80 mb-4">Pilih tindakan akhir untuk pesanan ini:</p>
-              
-              <div className="flex flex-col gap-3">
-                <button 
-                  disabled={loading}
-                  onClick={() => updateStatus('DIKIRIM')}
-                  className="w-full text-left px-4 py-4 bg-white/5 hover:bg-indigo-500/10 border border-white/10 hover:border-indigo-500/30 rounded-xl font-medium text-indigo-400 transition-all flex items-center gap-3"
-                >
-                  <Truck className="w-5 h-5" />
-                  <div>
-                    <p className="font-bold">Dikirim via Ekspedisi/Kurir</p>
-                    <p className="text-xs text-foreground/50 font-normal">Barang diserahkan ke pihak pengirim</p>
-                  </div>
-                </button>
-                <button 
-                  disabled={loading}
-                  onClick={() => updateStatus('SUDAH DIAMBIL')}
-                  className="w-full text-left px-4 py-4 bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/30 rounded-xl font-medium text-emerald-400 transition-all flex items-center gap-3"
-                >
-                  <CheckCircle2 className="w-5 h-5" />
-                  <div>
-                    <p className="font-bold">Diambil di Toko</p>
-                    <p className="text-xs text-foreground/50 font-normal">Konsumen mengambil langsung fisik barang</p>
-                  </div>
-                </button>
               </div>
             </div>
           </div>

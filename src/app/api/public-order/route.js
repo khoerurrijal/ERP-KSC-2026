@@ -132,45 +132,9 @@ export async function POST(req) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
+        is_fast_track: Boolean(item.isFastTrack),
         notes: itemNotes.trim()
       });
-
-
-      if (item.isFastTrack) {
-        soItems.push({
-          so_id: order.id,
-          order_type: 'POLOS',
-          product_code: 'SRV-FAST-TRACK',
-          qty: 1, 
-          unit: 'Layanan',
-          unit_multiplier: 1,
-          unit_price: 100000,
-          total_price: 100000,
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Fast Track untuk ${item.productName || item.productId}`
-        });
-      }
-
-      if (item.isTwoColor) {
-        soItems.push({
-          so_id: order.id,
-          order_type: 'SABLON',
-          product_code: 'SRV-2-WARNA',
-          qty: parseInt(item.qty),
-          unit: 'Pcs',
-          unit_multiplier: 1,
-          unit_price: 250,
-          total_price: 250 * parseInt(item.qty),
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Untuk ${item.productName} - Warna Ke-2`
-        });
-      }
     }
 
     const { error: itemError } = await supabase

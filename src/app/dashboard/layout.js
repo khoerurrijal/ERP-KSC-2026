@@ -15,8 +15,8 @@ export default async function DashboardLayout({ children }) {
   const { data: settingsData } = await supabase.from('system_settings').select('key, value').in('key', ['role_permissions', 'user_roles'])
   
   const defaultPermissions = {
-    "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "pengaturan", "user_management"],
-    "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data"],
+    "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "audit", "pengaturan", "user_management"],
+    "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data", "audit"],
     "Operator": ["dashboard", "produksi", "gudang"]
   }
 
@@ -31,7 +31,10 @@ export default async function DashboardLayout({ children }) {
   })
   const userRole = matchedUser ? matchedUser.role : 'Operator'
 
-  const allowedMenus = rolePermissions[userRole] || []
+  const configuredMenus = rolePermissions[userRole] || []
+  const allowedMenus = ['Admin', 'Owner'].includes(userRole)
+    ? Array.from(new Set([...configuredMenus, 'audit']))
+    : configuredMenus
 
   const isOperator = userRole === 'Operator'
 

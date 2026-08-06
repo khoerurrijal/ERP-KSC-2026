@@ -6,10 +6,11 @@ import { Settings, Wallet, Users } from 'lucide-react'
 
 export default function SettingsLayout({ children }) {
   const pathname = usePathname()
+  const isPengaturan = pathname.startsWith('/settings') || pathname.startsWith('/dashboard/settings/salary-schemas')
 
   const tabs = [
-    { name: 'Sistem Konfigurasi', path: '/dashboard/settings', icon: Settings, exact: true },
-    { name: 'Skema Gaji', path: '/dashboard/settings/salary-schemas', icon: Users, exact: false },
+    { name: 'Sistem Konfigurasi', path: '/system-config', icon: Settings, exact: true },
+    { name: 'Pengaturan', path: '/settings', icon: Users, exact: false },
   ]
 
   return (
@@ -18,9 +19,11 @@ export default function SettingsLayout({ children }) {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Settings className="w-6 h-6 text-primary" />
-            Pengaturan Aplikasi
+            {isPengaturan ? 'Pengaturan' : 'Sistem Konfigurasi'}
           </h1>
-          <p className="text-sm text-foreground/60 mt-1">Konfigurasi seluruh parameter, harga, dan skema aplikasi.</p>
+          <p className="text-sm text-foreground/60 mt-1">
+            {isPengaturan ? 'Kelola pengaturan pengguna dan skema gaji.' : 'Konfigurasi parameter operasional dan keuangan aplikasi.'}
+          </p>
         </div>
       </header>
 

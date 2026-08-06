@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, History, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
@@ -167,10 +167,7 @@ export default function InventoryClient({
           <p className="text-sm text-foreground/60 mt-1">Pantau stok gudang dan riwayat barang masuk/keluar.</p>
         </div>
         <div className="flex items-center gap-3">
-          <Link href="/dashboard/inventory/mutasi" className="btn-secondary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap bg-purple-500/10 text-purple-400 hover:bg-purple-500/20 border-purple-500/20">
-            <History className="w-4 h-4" /> Riwayat Mutasi
-          </Link>
-          <Link href="/dashboard/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap">
+          <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap">
             <Plus className="w-4 h-4" /> Restock (PO)
           </Link>
         </div>

@@ -1,7 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import SalesClient from './SalesClient'
 
-export default async function SalesData({ searchParams = {} }) {
+export default async function SalesData({ searchParams = {}, itemsOnly = false }) {
   const supabase = await createClient()
 
   const page = parseInt(searchParams.page || '1', 10)
@@ -149,6 +149,9 @@ export default async function SalesData({ searchParams = {} }) {
       searchParams={searchParams}
       serverTotalOmset={serverTotalOmset}
       serverTotalPiutang={serverTotalPiutang}
+      initialTab={itemsOnly ? 'ITEMS' : 'INVOICE'}
+      embedded={itemsOnly}
+      showItemsTab={false}
     />
   )
 }

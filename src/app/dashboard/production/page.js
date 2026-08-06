@@ -11,14 +11,14 @@ function ProductionSkeleton() {
         <div>
           <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
             <Factory className="w-6 h-6 text-purple-400" />
-            Produksi & Antrean SPK
+            Produksi
           </h1>
-          <p className="text-sm text-foreground/60 mt-1">Memuat antrean tugas produksi...</p>
+          <p className="text-sm text-foreground/60 mt-1">Memuat tracking produksi...</p>
         </div>
       </header>
       <div className="glass-card p-8 flex flex-col items-center justify-center gap-4 min-h-[400px]">
         <Loader2 className="w-10 h-10 text-purple-400 animate-spin" />
-        <p className="text-foreground/50 text-sm animate-pulse">Mengambil data pekerjaan produksi...</p>
+        <p className="text-foreground/50 text-sm animate-pulse">Mengambil data produksi...</p>
       </div>
     </div>
   )
@@ -31,4 +31,3 @@ export default function ProductionPage() {
     </Suspense>
   )
 }
-

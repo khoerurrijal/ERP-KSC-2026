@@ -116,11 +116,10 @@ export async function createSalesOrder(payload) {
 
       let itemNotes = '';
       if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      if (item.isTwoColor) itemNotes += '🎨 2 Warna\n';
       if (item.order_type?.toUpperCase() === 'PRINTING') {
         itemNotes += `🎨 Varian: ${item.printingColors || '3 Warna'}\n`;
       }
-      
-      const productNameForNotes = item.product_search || product?.name || item.product_id;
 
       soItems.push({
         so_id: so.id,
@@ -137,48 +136,9 @@ export async function createSalesOrder(payload) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
+        is_fast_track: Boolean(item.isFastTrack),
         notes: itemNotes.trim()
       });
-
-      if (item.isFastTrack) {
-        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
-        soItems.push({
-          so_id: so.id,
-          order_type: 'POLOS', // don't show in production
-          product_code: 'SRV-FAST-TRACK',
-          status: 'BARU MASUK',
-          qty: qtyFastTrack,
-          unit: 'Layanan',
-          unit_multiplier: 1,
-          unit_price: 100000,
-          total_price: 100000 * qtyFastTrack,
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Untuk ${productNameForNotes}`
-        });
-      }
-
-      if (item.isTwoColor) {
-        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
-        soItems.push({
-          so_id: so.id,
-          order_type: 'SABLON', // SHOW in production
-          product_code: 'SRV-2-WARNA',
-          status: 'BARU MASUK',
-          qty: actualQty,
-          unit: 'Pcs',
-          unit_multiplier: 1,
-          unit_price: 250,
-          total_price: 250 * actualQty,
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Untuk ${productNameForNotes} - Warna Ke-2`
-        });
-      }
     }
 
     const { error: itemsError } = await supabase.from('sales_items').insert(soItems)
@@ -400,8 +360,20 @@ export async function updateSalesOrder(soId, payload) {
     let virtualRoyaltyGlobal = 0
     
     const preparedItems = []
+    const legacyAddonCodes = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WARNA', 'BIAYA-WARNA'])
+    const legacyAddons = items.filter(item => legacyAddonCodes.has(String(item.product_id || '').toUpperCase()))
+    const baseItems = items.filter(item => !legacyAddonCodes.has(String(item.product_id || '').toUpperCase()))
+    const legacyAppliesToItem = (addon, product) => {
+      if (baseItems.length === 1) return true
+      const productName = (product?.name || '').toLowerCase()
+      const addonNotes = (addon.notes || '').toLowerCase()
+      return Boolean(productName && addonNotes.includes(productName))
+    }
 
     for (const item of items) {
+      const productCode = String(item.product_id || '').toUpperCase()
+      if (legacyAddonCodes.has(productCode)) continue
+
       const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single()
       
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0)
@@ -426,8 +398,18 @@ export async function updateSalesOrder(soId, payload) {
       }
       virtualRoyaltyGlobal += snapshot.royaltyFee
 
+      const legacyFastTrack = legacyAddons.some(addon => ['SRV-FAST-TRACK', 'FAST-TRACK'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
+      const legacyTwoColor = legacyAddons.some(addon => ['SRV-2-WARNA', 'BIAYA-WARNA'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
+      const isFastTrack = Boolean(item.isFastTrack) || legacyFastTrack
+      const isTwoColor = Boolean(item.isTwoColor) || legacyTwoColor
+
       let itemNotes = item.notes || '';
-      const productNameForNotes = product?.name || item.product_id;
+      itemNotes = itemNotes
+        .replace(/Fast Track\s*\n?/gi, '')
+        .replace(/2 Warna\s*\n?/gi, '')
+        .trim();
+      if (isFastTrack) itemNotes = `🔥 Fast Track\n${itemNotes}`.trim();
+      if (isTwoColor) itemNotes = `🎨 2 Warna\n${itemNotes}`.trim();
 
       const isExisting = String(item.id).length > 20;
 
@@ -445,6 +427,7 @@ export async function updateSalesOrder(soId, payload) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
+        is_fast_track: isFastTrack,
         notes: itemNotes.trim()
       }
 
@@ -456,48 +439,6 @@ export async function updateSalesOrder(soId, payload) {
       }
 
       preparedItems.push(preparedItem)
-
-      if (item.isFastTrack) {
-        const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
-        preparedItems.push({
-          id: crypto.randomUUID(),
-          so_id: soId,
-          order_type: 'LAINNYA', 
-          product_code: 'FAST-TRACK',
-          status: 'BARU MASUK',
-          qty: qtyFastTrack,
-          unit: 'SLOT',
-          unit_multiplier: 1,
-          unit_price: 100000,
-          total_price: 100000 * qtyFastTrack,
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Jalur Cepat untuk ${productNameForNotes}`
-        });
-      }
-
-      if (item.isTwoColor) {
-        const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
-        preparedItems.push({
-          id: crypto.randomUUID(),
-          so_id: soId,
-          order_type: 'LAINNYA',
-          product_code: 'BIAYA-WARNA',
-          status: 'BARU MASUK',
-          qty: actualQty,
-          unit: 'PCS',
-          unit_multiplier: 1,
-          unit_price: 250,
-          total_price: 250 * actualQty,
-          hpp_price: 0,
-          beli_gudang: 0,
-          beli_global: 0,
-          royalty_fee: 0,
-          notes: `Warna Ke-2 untuk ${productNameForNotes}`
-        });
-      }
     }
 
     const finalBeliGlobal = totalBeliGlobal + virtualRoyaltyGlobal
@@ -601,6 +542,10 @@ export async function updateSalesItemStatus(itemId, newStatus) {
     // Guard 1: Terminal BATAL state cannot be changed
     if (oldStatus === 'BATAL' && targetStatus !== 'BATAL') {
       throw new Error("Item yang sudah dibatalkan tidak bisa diubah statusnya.")
+    }
+
+    if (['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'].includes(targetStatus) && targetStatus !== oldStatus) {
+      throw new Error('Status pengiriman hanya dapat dikonfirmasi dari halaman Konfirmasi Pengiriman.')
     }
 
     // Relaxed guard: User can update to any valid status.

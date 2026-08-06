@@ -10,12 +10,12 @@ export default async function EditSalesOrderPage({ params }) {
   const { data: so, error: soErr } = await supabase.from('sales_orders').select('*').eq('id', resolvedParams.id).single()
   
   if (soErr || !so) {
-    redirect('/dashboard/sales')
+    redirect('/sales')
   }
 
   // Ensure only DP / BELUM LUNAS can be edited
   if (so.payment_status === 'LUNAS') {
-    redirect('/dashboard/sales') // Or display an error page
+    redirect('/sales') // Or display an error page
   }
 
   // 2. Fetch Items

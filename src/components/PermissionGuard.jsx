@@ -8,6 +8,21 @@ export default function PermissionGuard({ allowedMenus, userRole, children }) {
 
   // Map route prefixes to menu keys
   const routeMap = {
+    '/sales': 'penjualan',
+    '/marketplace': 'marketplace',
+    '/production': 'produksi',
+    '/status-pesanan': 'produksi',
+    '/shipping': 'produksi',
+    '/inventory': 'gudang',
+    '/purchases': 'gudang',
+    '/transactions': 'keuangan',
+    '/finance': 'keuangan',
+    '/payroll': 'keuangan',
+    '/master': 'master_data',
+    '/report': 'laporan',
+    '/audit': 'audit',
+    '/settings': 'pengaturan',
+    '/system-config': 'pengaturan',
     '/dashboard/sales': 'penjualan',
     '/dashboard/marketplace': 'marketplace',
     '/dashboard/production': 'produksi',
@@ -18,6 +33,7 @@ export default function PermissionGuard({ allowedMenus, userRole, children }) {
     '/dashboard/payroll': 'keuangan',
     '/dashboard/master': 'master_data',
     '/dashboard/report': 'laporan',
+    '/dashboard/audit': 'audit',
     '/dashboard/settings': 'pengaturan',
   }
 

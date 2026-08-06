@@ -2,8 +2,8 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, TrendingUp, Wallet, Save, X } from 'lucide-react'
-import { processMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
+import { ShoppingBag, TrendingUp, Wallet, Save, X, Zap } from 'lucide-react'
+import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
@@ -38,6 +38,14 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   const [isSettlementModalOpen, setIsSettlementModalOpen] = useState(false)
   const [settlementMethod, setSettlementMethod] = useState('BCA')
   const [settlementDate, setSettlementDate] = useState(new Date().toISOString().split('T')[0])
+
+  // Quick reconciliation for historical marketplace settlements
+  const [isQuickModalOpen, setIsQuickModalOpen] = useState(false)
+  const [quickCutoffDate, setQuickCutoffDate] = useState(new Date().toISOString().split('T')[0])
+  const [quickSettlementDate, setQuickSettlementDate] = useState(new Date().toISOString().split('T')[0])
+  const [quickPlatform, setQuickPlatform] = useState('ALL')
+  const [quickPreview, setQuickPreview] = useState(null)
+  const [isQuickLoading, setIsQuickLoading] = useState(false)
 
   const handleInputChange = (id, value) => {
     setInputPencairan(prev => ({
@@ -111,6 +119,47 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
     }
   }
 
+  const handleQuickPreview = async () => {
+    setIsQuickLoading(true)
+    try {
+      const res = await previewQuickMarketplaceSettlement(quickCutoffDate, quickPlatform)
+      if (res.success) {
+        setQuickPreview(res)
+      } else {
+        alert('Gagal mengambil preview: ' + res.error)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Terjadi kesalahan saat mengambil preview')
+    } finally {
+      setIsQuickLoading(false)
+    }
+  }
+
+  const handleQuickSettlement = async () => {
+    if (!quickPreview?.count) return
+    if (!window.confirm(`Tandai ${quickPreview.count} pesanan sebagai sudah cair dengan total Rp ${quickPreview.total.toLocaleString('id-ID')}?`)) return
+
+    setIsQuickLoading(true)
+    try {
+      const res = await processQuickMarketplaceSettlement(quickCutoffDate, quickPlatform, settlementMethod, quickSettlementDate)
+      if (res.success) {
+        const backfillNote = res.payoutBackfilled > 0 ? ` (${res.payoutBackfilled} payout lama dilengkapi)` : ''
+        alert(`Rekonsiliasi cepat berhasil untuk ${res.processed} pesanan${backfillNote}.`)
+        setIsQuickModalOpen(false)
+        setQuickPreview(null)
+        router.refresh()
+      } else {
+        alert('Gagal memproses rekonsiliasi: ' + res.error)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Terjadi kesalahan saat memproses rekonsiliasi')
+    } finally {
+      setIsQuickLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
       
@@ -124,6 +173,15 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
             Pantau pesanan Marketplace dan isi nominal untuk Pencairan Dana (Settlement).
           </p>
         </div>
+        <button
+          onClick={() => {
+            setQuickPreview(null)
+            setIsQuickModalOpen(true)
+          }}
+          className="btn-primary h-10 px-4 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none"
+        >
+          <Zap className="w-4 h-4" /> Rekonsiliasi Cepat
+        </button>
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -299,6 +357,91 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               <button onClick={handleProcessSettlement} disabled={isSaving} className="btn-primary px-4 h-10 text-sm flex items-center gap-2">
                 <Save className="w-4 h-4" /> {isSaving ? 'Memproses...' : 'Simpan & Lunas'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isQuickModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg overflow-visible">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+              <div>
+                <h3 className="font-bold text-foreground">Rekonsiliasi Cepat Marketplace</h3>
+                <p className="text-xs text-foreground/50 mt-1">Gunakan hanya untuk pencairan lama yang memang sudah masuk rekening.</p>
+              </div>
+              <button onClick={() => setIsQuickModalOpen(false)} className="text-foreground/50 hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Order sampai tanggal</label>
+                  <CustomDatePicker value={quickCutoffDate} onChange={setQuickCutoffDate} className="!h-10" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Platform</label>
+                  <CustomSelect
+                    value={quickPlatform}
+                    onChange={e => {
+                      setQuickPlatform(e.target.value)
+                      setQuickPreview(null)
+                    }}
+                    options={[
+                      { value: 'ALL', label: 'Semua Marketplace' },
+                      { value: 'SHOPEE', label: 'Shopee' },
+                      { value: 'TOKOPEDIA', label: 'Tokopedia' },
+                      { value: 'TIKTOK', label: 'TikTok' },
+                      { value: 'LAINNYA', label: 'Marketplace Lainnya' }
+                    ]}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Tanggal pencairan</label>
+                  <CustomDatePicker value={quickSettlementDate} onChange={setQuickSettlementDate} className="!h-10" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Masuk ke kas</label>
+                  <CustomSelect
+                    value={settlementMethod}
+                    onChange={e => setSettlementMethod(e.target.value)}
+                    options={(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(method => ({ value: method, label: method }))}
+                  />
+                </div>
+              </div>
+
+              {quickPreview && (
+                <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 space-y-2">
+                  <p className="text-sm font-bold text-amber-300">Preview pencairan</p>
+                  <p className="text-sm text-foreground/80">{quickPreview.count} pesanan</p>
+                  <p className="text-xl font-black text-amber-300">Rp {quickPreview.total.toLocaleString('id-ID')}</p>
+                  {quickPreview.invoices?.length > 0 && (
+                    <p className="text-xs text-foreground/50">Contoh invoice: {quickPreview.invoices.join(', ')}{quickPreview.count > quickPreview.invoices.length ? ' ...' : ''}</p>
+                  )}
+                  {quickPreview.excludedDuplicateCount > 0 && (
+                    <p className="text-xs text-amber-300">{quickPreview.excludedDuplicateCount} invoice ditunda karena nomor pesanan marketplace dipakai beberapa invoice.</p>
+                  )}
+                  <p className="text-xs text-red-300">Nominal memakai total invoice, bukan nominal bersih setelah potongan marketplace.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5">
+              <button onClick={() => setIsQuickModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
+              {!quickPreview ? (
+                <button onClick={handleQuickPreview} disabled={isQuickLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none">
+                  <Zap className="w-4 h-4" /> {isQuickLoading ? 'Memuat...' : 'Lihat Preview'}
+                </button>
+              ) : (
+                <button onClick={handleQuickSettlement} disabled={isQuickLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none">
+                  <Save className="w-4 h-4" /> {isQuickLoading ? 'Memproses...' : 'Konfirmasi & Lunas'}
+                </button>
+              )}
             </div>
           </div>
         </div>

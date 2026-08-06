@@ -1,10 +1,11 @@
 import { createClient } from '@/utils/supabase/server'
-import { Clock, CheckCircle, AlertTriangle, Activity, ShoppingBag, Package, Wallet, Building2, AlertOctagon, FileText } from 'lucide-react'
+import { Clock, CheckCircle, AlertTriangle, Activity, ShoppingBag, Package, Wallet, Building2, AlertOctagon, FileText, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import PriceCalculator from '@/components/PriceCalculator'
 import StockSearchWidget from '@/components/StockSearchWidget'
 import MonthFilter from '@/components/MonthFilter'
 import { redirect } from 'next/navigation'
+import { runAuditScan } from '@/app/dashboard/audit/audit'
 
 export const dynamic = 'force-dynamic'
 
@@ -35,7 +36,7 @@ export default async function DashboardPage({ searchParams }) {
 
   // If Operator hits this root dashboard page, redirect immediately
   if (userRole === 'Operator') {
-    redirect('/dashboard/production')
+    redirect('/production')
   }
 
   const user = { email: authUser.email, role: userRole }
@@ -49,6 +50,7 @@ export default async function DashboardPage({ searchParams }) {
   // Fetch orders for metrics
   const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
   const { data: marketplaceOrders } = await supabase.from('sales_orders').select('*, customers!inner(type)').limit(100000).in('customers.type', ['Marketplace', 'Shopee', 'Tokopedia', 'TikTok', 'MARKETPLACE', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK'])
+  const auditReport = await runAuditScan(supabase)
 
   const rawOrders = salesOrders || []
   
@@ -117,6 +119,21 @@ export default async function DashboardPage({ searchParams }) {
         </div>
       </div>
 
+      <div className="glass-card p-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
+            <ShieldCheck className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="font-bold text-foreground">AI Audit Center</p>
+            <p className="text-xs text-foreground/60 mt-1">{auditReport.summary.total === 0 ? 'Belum ada temuan audit.' : `${auditReport.summary.total} temuan perlu diperiksa (${auditReport.summary.critical} kritis).`}</p>
+          </div>
+        </div>
+          <Link href="/audit" className="btn-primary h-9 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
+          Periksa Sistem
+        </Link>
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
         
         {/* KALKULATOR HARGA */}
@@ -132,7 +149,7 @@ export default async function DashboardPage({ searchParams }) {
               <h2 className="font-bold text-foreground flex items-center gap-2">
                 <Package className="w-5 h-5 text-purple-400" /> Antrean Produksi
               </h2>
-              <Link href="/dashboard/production" className="text-xs text-primary hover:underline">Lihat Semua</Link>
+              <Link href="/production" className="text-xs text-primary hover:underline">Lihat Semua</Link>
             </div>
             <div className="p-4 flex-1 flex flex-col justify-center gap-3">
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
@@ -168,7 +185,7 @@ export default async function DashboardPage({ searchParams }) {
             <h2 className="font-bold text-foreground flex items-center gap-2">
               <FileText className="w-5 h-5 text-yellow-400" /> Pesanan Belum Lunas
             </h2>
-            <Link href="/dashboard/sales" className="text-xs text-primary hover:underline">Lihat SO</Link>
+            <Link href="/sales" className="text-xs text-primary hover:underline">Lihat SO</Link>
           </div>
              <div className="p-4 flex-1 overflow-y-auto max-h-[450px] space-y-3">
              {(() => {

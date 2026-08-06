@@ -1,6 +1,8 @@
 import { Suspense } from 'react'
 import { Boxes, Loader2 } from 'lucide-react'
 import InventoryData from './InventoryData'
+import MutasiPage from './mutasi/page'
+import InventoryTabsClient from './InventoryTabsClient'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,9 +28,16 @@ function InventorySkeleton() {
 
 export default async function InventoryPage({ searchParams }) {
   const resolvedSearchParams = await Promise.resolve(searchParams || {})
+  const activeTab = resolvedSearchParams.tab === 'mutations' ? 'mutations' : 'stock'
+  const content = activeTab === 'mutations'
+    ? await MutasiPage({ searchParams: resolvedSearchParams })
+    : (
+      <Suspense key={JSON.stringify(resolvedSearchParams)} fallback={<InventorySkeleton />}>
+        <InventoryData searchParams={resolvedSearchParams} />
+      </Suspense>
+    )
+
   return (
-    <Suspense key={JSON.stringify(resolvedSearchParams)} fallback={<InventorySkeleton />}>
-      <InventoryData searchParams={resolvedSearchParams} />
-    </Suspense>
+    <InventoryTabsClient activeTab={activeTab}>{content}</InventoryTabsClient>
   )
 }

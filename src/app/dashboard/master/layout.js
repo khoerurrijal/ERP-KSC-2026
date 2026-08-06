@@ -8,10 +8,10 @@ export default function MasterDataLayout({ children }) {
   const pathname = usePathname()
 
   const tabs = [
-    { name: 'Produk', path: '/dashboard/master/products', icon: Box },
-    { name: 'Pelanggan', path: '/dashboard/master/customers', icon: Users },
-    { name: 'Supplier', path: '/dashboard/master/suppliers', icon: Package },
-    { name: 'Karyawan', path: '/dashboard/master/employees', icon: Users },
+    { name: 'Produk', path: '/master/products', icon: Box },
+    { name: 'Pelanggan', path: '/master/customers', icon: Users },
+    { name: 'Supplier', path: '/master/suppliers', icon: Package },
+    { name: 'Karyawan', path: '/master/employees', icon: Users },
     { name: 'Public Pricelist', path: '/pricelist', icon: FileText, external: true },
   ]
 

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Sun, Moon } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 const MENU_GROUPS = [
@@ -18,9 +18,10 @@ const MENU_GROUPS = [
     name: 'Penjualan',
     icon: TrendingUp,
     subItems: [
-      { name: 'Sales Order', path: '/dashboard/sales', icon: FileText, key: 'penjualan' },
-      { name: 'Marketplace', path: '/dashboard/marketplace', icon: ShoppingBag, key: 'marketplace' },
-      { name: 'Produksi', path: '/dashboard/production', icon: Factory, key: 'produksi' },
+      { name: 'Sales Order', path: '/sales', icon: FileText, key: 'penjualan' },
+      { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag, key: 'marketplace' },
+      { name: 'Produksi', path: '/production', icon: Factory, key: 'produksi' },
+      { name: 'Status Pesanan', path: '/status-pesanan', icon: PackageCheck, key: 'produksi' },
     ]
   },
   {
@@ -28,8 +29,8 @@ const MENU_GROUPS = [
     icon: ShoppingCart,
     key: 'gudang', // Group level key
     subItems: [
-      { name: 'Inventory', path: '/dashboard/inventory', icon: Package },
-      { name: 'Purchase Order', path: '/dashboard/purchases', icon: ShoppingCart },
+      { name: 'Inventory', path: '/inventory', icon: Package },
+      { name: 'Purchase Order', path: '/purchases', icon: ShoppingCart },
     ]
   },
   {
@@ -37,34 +38,41 @@ const MENU_GROUPS = [
     icon: Wallet,
     key: 'keuangan', // Group level key
     subItems: [
-      { name: 'Buku Besar', path: '/dashboard/transactions', icon: TrendingUp },
-      { name: 'Kasbon & Pinjaman', path: '/dashboard/finance/loans', icon: Wallet },
-      { name: 'Rekap Gaji', path: '/dashboard/payroll', icon: Users },
+      { name: 'Buku Besar', path: '/transactions', icon: TrendingUp },
+      { name: 'Kasbon & Pinjaman', path: '/finance/loans', icon: Wallet },
+      { name: 'Rekap Gaji', path: '/payroll', icon: Users },
     ]
   },
   {
     name: 'Master Data',
-    path: '/dashboard/master/products',
     icon: Box,
-    exact: false,
-    key: 'master_data'
+    key: 'master_data',
+    subItems: [
+      { name: 'Produk', path: '/master/products', icon: Box },
+      { name: 'Pelanggan', path: '/master/customers', icon: Users },
+      { name: 'Supplier', path: '/master/suppliers', icon: Package },
+      { name: 'Karyawan', path: '/master/employees', icon: Users },
+    ]
   },
   {
     name: 'System',
     icon: Settings,
     subItems: [
-      { name: 'Laporan', path: '/dashboard/report', icon: FileText, key: 'laporan' },
-      { name: 'Pengaturan', path: '/dashboard/settings', icon: Settings, key: 'pengaturan' },
+      { name: 'Laporan', path: '/report', icon: FileText, key: 'laporan' },
+      { name: 'AI Audit', path: '/audit', icon: ShieldCheck, key: 'audit' },
+      { name: 'Pengaturan', path: '/settings', icon: Settings, key: 'pengaturan' },
+      { name: 'Sistem Konfigurasi', path: '/system-config', icon: Settings, key: 'pengaturan' },
     ]
   }
 ]
 
 export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false }) {
   const pathname = usePathname()
-  const [isOpen, setIsOpen] = useState(false)
+  const [isMobileOpen, setIsMobileOpen] = useState(false)
   
   // Filter menu based on allowedMenus
   const filteredMenus = MENU_GROUPS.map(group => {
+    if (group.roles && !group.roles.includes(userRole)) return null
     if (!group.subItems) {
       if (group.key && !allowedMenus.includes(group.key)) return null
       return group
@@ -73,12 +81,26 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
       return null
     }
     const filteredSubItems = group.subItems.filter(sub => {
+      if (sub.roles && !sub.roles.includes(userRole)) return false
       if (sub.key && !allowedMenus.includes(sub.key)) return false
       return true
     })
     if (filteredSubItems.length === 0) return null
     return { ...group, subItems: filteredSubItems }
   }).filter(Boolean)
+
+  const activeGroupName = filteredMenus.find(group =>
+    group.subItems?.some(sub => pathname === sub.path || pathname.startsWith(sub.path + '/'))
+  )?.name || null
+  const [openGroupKey, setOpenGroupKey] = useState(activeGroupName)
+
+  useEffect(() => {
+    if (activeGroupName) setOpenGroupKey(activeGroupName)
+  }, [activeGroupName])
+
+  const toggleGroup = (groupName) => {
+    setOpenGroupKey(current => current === groupName ? null : groupName)
+  }
 
   // (The isOperatorOnly block has been removed since Topbar handles it)
 
@@ -90,17 +112,17 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
             <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
             <img src="/logo-dark.png" alt="Logo Dark" className="h-8 object-contain drop-shadow-md hidden dark:block" />
           </div>
-          <button onClick={() => setIsOpen(!isOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
+          <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
             <div className="w-5 h-0.5 bg-current mb-1" />
             <div className="w-5 h-0.5 bg-current mb-1" />
             <div className="w-5 h-0.5 bg-current" />
           </button>
         </div>
-        {isOpen && (
+        {isMobileOpen && (
           <div className="absolute top-full left-0 w-full h-[calc(100vh-64px)] bg-background/95 backdrop-blur-2xl flex flex-col overflow-y-auto border-t border-white/10 animate-in slide-in-from-top-4 p-4">
             <div className="flex-1 space-y-2">
               {filteredMenus.map((group, idx) => (
-                <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => setIsOpen(false)} />
+                <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => setIsMobileOpen(false)} isOpen={openGroupKey === group.name} onToggle={() => toggleGroup(group.name)} />
               ))}
             </div>
              <div className="mt-8 pt-4 border-t border-white/10 pb-10 flex justify-center text-xs text-foreground/40">
@@ -131,7 +153,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
 
       <div className="flex-1 overflow-y-auto py-2 px-3 space-y-2">
         {filteredMenus.map((group, idx) => (
-          <MenuGroup key={idx} group={group} pathname={pathname} />
+          <MenuGroup key={idx} group={group} pathname={pathname} isOpen={openGroupKey === group.name} onToggle={() => toggleGroup(group.name)} />
         ))}
       </div>
 
@@ -166,15 +188,13 @@ function ThemeToggle() {
   )
 }
 
-function MenuGroup({ group, pathname, onClick }) {
+function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => {} }) {
   const hasSubItems = !!group.subItems
   
   // Check if any subitem is active
   const isAnySubActive = hasSubItems && group.subItems.some(sub => pathname === sub.path || pathname.startsWith(sub.path + '/'))
   const isDirectActive = !hasSubItems && (group.exact ? pathname === group.path : pathname.startsWith(group.path))
   
-  // By default, open if any subitem is active
-  const [isOpen, setIsOpen] = useState(isAnySubActive)
   const Icon = group.icon
 
   if (!hasSubItems) {
@@ -197,7 +217,7 @@ function MenuGroup({ group, pathname, onClick }) {
   return (
     <div className="space-y-1">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={onToggle}
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all ${
           isAnySubActive && !isOpen
             ? 'text-primary font-medium'

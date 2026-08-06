@@ -39,7 +39,7 @@ export async function handleAutoStatusUpdate(itemId) {
   const supabase = await createClient()
 
   // Ambil data item dan invoice
-  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, status, marketplace_receipt, customers(name))').eq('id', itemId).single()
+  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
   if (!item) return;
 
   const so = item.sales_orders;
@@ -74,7 +74,7 @@ export async function handleAutoStatusUpdate(itemId) {
   const oldStatus = newStatus;
 
   // Hitung target sebenarnya (memperhitungkan unit_multiplier misal jika beli per dus)
-  const targetQty = item.qty * (item.unit_multiplier || 1);
+  const targetQty = item.qty * (item.unit_multiplier || 1) * (/2\s*warna|warna\s*ke-?2/i.test(item.notes || '') ? 2 : 1);
 
   if (item.order_type?.toUpperCase() === 'PRINTING') {
     // RULE UNTUK PRINTING: Bypass otomatisasi, admin yang atur di menu Sales Item Status.
@@ -89,6 +89,9 @@ export async function handleAutoStatusUpdate(itemId) {
         newStatus = ST_SIAP_KIRIM;
       }
     }
+  } else if (item.order_type?.toUpperCase() === 'LAINNYA' || item.order_type?.toUpperCase() === 'JASA') {
+    // Layanan non-produksi seperti desain/ongkir tidak mengikuti alur produksi.
+    newStatus = oldStatus;
   } else {
     // RULE UNTUK SABLON
     // RULE 1: Jika Qty Dikerjakan > 0 tapi < Target
@@ -161,6 +164,94 @@ export async function updateSalesOrderStatus(itemId, status) {
     return { success: true }
   } catch (err) {
     console.error('Error updating status:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+const DELIVERY_ORDER_TYPES = new Set(['SABLON', 'POLOS', 'PRINTING'])
+const DELIVERY_READY_STATUSES = new Set(['SIAP KIRIM', 'SUDAH JADI', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'])
+const LEGACY_SERVICE_CODES = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WARNA', 'BIAYA-WARNA'])
+
+const normalizeRelation = (value) => Array.isArray(value) ? value[0] : value
+
+export async function confirmInvoiceDelivery(soId, deliveryStatus) {
+  const supabase = await createClient()
+
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('Sesi login tidak ditemukan.')
+
+    const { data: rolesData, error: rolesError } = await supabase
+      .from('system_settings')
+      .select('value')
+      .eq('key', 'user_roles')
+      .single()
+
+    if (rolesError) throw rolesError
+
+    const userEmail = user.email?.toLowerCase() || ''
+    const matchedUser = (rolesData?.value || []).find(role => {
+      const inputEmail = (role.email || '').trim().toLowerCase()
+      return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+    })
+    const userRole = matchedUser?.role || 'Operator'
+
+    if (!['ADMIN', 'OWNER'].includes(String(userRole).toUpperCase())) {
+      throw new Error('Hanya Admin/Owner yang dapat mengonfirmasi pengiriman.')
+    }
+
+    if (!soId || !['DIKIRIM', 'SUDAH DIAMBIL'].includes(String(deliveryStatus).toUpperCase())) {
+      throw new Error('Invoice atau jenis serah-terima tidak valid.')
+    }
+
+    const requestedStatus = String(deliveryStatus).toUpperCase()
+    const { data: items, error: itemsError } = await supabase
+      .from('sales_items')
+      .select('id, status, order_type, product_code, sales_orders(payment_status), products(category)')
+      .eq('so_id', soId)
+
+    if (itemsError) throw itemsError
+
+    const deliveryItems = (items || []).filter(item => {
+      const code = String(item.product_code || '').toUpperCase()
+      return !LEGACY_SERVICE_CODES.has(code) && DELIVERY_ORDER_TYPES.has(String(item.order_type || '').toUpperCase()) && String(item.status || '').toUpperCase() !== 'BATAL'
+    })
+
+    if (deliveryItems.length === 0) {
+      throw new Error('Invoice ini tidak memiliki item yang perlu diserah-terimakan.')
+    }
+
+    const notReady = deliveryItems.filter(item => !DELIVERY_READY_STATUSES.has(String(item.status || '').toUpperCase()))
+    if (notReady.length > 0) {
+      throw new Error('Belum semua item dalam invoice siap dikirim.')
+    }
+
+    const order = normalizeRelation(deliveryItems[0].sales_orders)
+    const isLunas = order?.payment_status === 'LUNAS'
+    const nextStatus = isLunas ? 'SELESAI' : requestedStatus
+    const pendingIds = deliveryItems
+      .filter(item => {
+        const status = String(item.status || '').toUpperCase()
+        return isLunas ? status !== 'SELESAI' : ['SIAP KIRIM', 'SUDAH JADI'].includes(status)
+      })
+      .map(item => item.id)
+
+    if (pendingIds.length > 0) {
+      const { error: updateError } = await supabase
+        .from('sales_items')
+        .update({ status: nextStatus })
+        .in('id', pendingIds)
+
+      if (updateError) throw updateError
+    }
+
+    revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/shipping')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
+    return { success: true, updatedCount: pendingIds.length, finalStatus: nextStatus }
+  } catch (err) {
+    console.error('Error confirming invoice delivery:', err)
     return { success: false, error: err.message }
   }
 }

@@ -168,7 +168,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
       
       if (result.success) {
         alert(initialData ? `Purchase Order berhasil diperbarui!` : `Purchase Order (Kulakan) dengan nomor ${result.po_number} berhasil dibuat!`)
-        router.push('/dashboard/purchases')
+        router.push('/purchases')
       } else {
         setError(result.error || "Gagal menyimpan PO.")
       }

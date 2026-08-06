@@ -251,7 +251,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
             />
           )}
         </div>
-        <Link href="/dashboard/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto justify-center">
+        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto justify-center">
           <Plus className="w-4 h-4" />
           Buat PO Baru
         </Link>
@@ -295,7 +295,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                           Pelunasan
                         </button>
                       )}
-                      <Link href={`/dashboard/purchases/${item.id}/edit`} className="text-accent hover:text-accent/80 font-medium text-xs">
+                      <Link href={`/purchases/${item.id}/edit`} className="text-accent hover:text-accent/80 font-medium text-xs">
                         Edit
                       </Link>
                       <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">

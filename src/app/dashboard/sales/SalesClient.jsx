@@ -21,7 +21,10 @@ export default function SalesClient({
   dropdownConfig = {},
   searchParams: passedSearchParams = {},
   serverTotalOmset,
-  serverTotalPiutang
+  serverTotalPiutang,
+  initialTab = 'INVOICE',
+  embedded = false,
+  showItemsTab = true
 }) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -32,7 +35,7 @@ export default function SalesClient({
   const productionStatuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
 
   // Tab State: 'INVOICE' | 'ITEMS'
-  const [activeTab, setActiveTab] = useState('INVOICE')
+  const [activeTab, setActiveTab] = useState(initialTab)
 
   const [searchQuery, setSearchQuery] = useState(passedSearchParams.search || '')
   const [debouncedSearch, setDebouncedSearch] = useState(passedSearchParams.search || '')
@@ -313,20 +316,20 @@ export default function SalesClient({
   return (
     <div className="space-y-6">
       {/* Header and KPI */}
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+      {!embedded && <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
             <TrendingUp className="w-6 h-6 text-primary" /> Transaksi Penjualan
           </h1>
           <p className="text-sm text-foreground/60 mt-1">Kelola invoice dan pelacakan status produksi barang.</p>
         </div>
-        <Link href="/dashboard/sales/new" className="btn-primary px-4 h-10 text-sm flex items-center gap-2 whitespace-nowrap">
+        <Link href="/sales/new" className="btn-primary px-4 h-10 text-sm flex items-center gap-2 whitespace-nowrap">
           <Plus className="w-4 h-4" /> Buat Sales Order Baru
         </Link>
-      </header>
+      </header>}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {!embedded && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         <div className="glass-card p-4 rounded-xl flex items-center gap-4">
           <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
             <TrendingUp className="w-6 h-6" />
@@ -345,23 +348,25 @@ export default function SalesClient({
             <p className="text-xl font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID')}</p>
           </div>
         </div>
-      </div>
+      </div>}
 
       {/* Tabs */}
-      <div className="flex bg-white/5 p-1 rounded-xl w-fit">
+      {!embedded && <div className="flex bg-white/5 p-1 rounded-xl w-fit">
         <button 
           onClick={() => setActiveTab('INVOICE')}
           className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'INVOICE' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
         >
           <FileText className="w-4 h-4" /> Data Invoice & Pembayaran
         </button>
-        <button 
-          onClick={() => setActiveTab('ITEMS')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'ITEMS' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
-        >
-          <Package className="w-4 h-4" /> Status Item Produksi
-        </button>
-      </div>
+        {showItemsTab && (
+          <button
+            onClick={() => setActiveTab('ITEMS')}
+            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'ITEMS' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
+          >
+            <Package className="w-4 h-4" /> Status Item Produksi
+          </button>
+        )}
+      </div>}
 
       {/* Filter Bar */}
       <div className="flex flex-col sm:flex-row items-center gap-3">
@@ -489,7 +494,7 @@ export default function SalesClient({
                         {item.payment_status !== 'BATAL' && (
                           <>
                             {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
-                              <Link href={`/dashboard/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                              <Link href={`/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
                                 <Edit3 className="w-3 h-3" /> Edit
                               </Link>
                             )}
@@ -499,7 +504,7 @@ export default function SalesClient({
                             <button onClick={() => handleCancelSalesOrder(item.id, item.invoice_number)} disabled={updatingItem === item.id} className="text-red-500 hover:text-red-400 font-medium text-xs flex items-center gap-1 transition-colors disabled:opacity-50">
                               <XCircle className="w-3 h-3" /> {updatingItem === item.id ? 'Loading...' : 'Batal'}
                             </button>
-                            <Link href={`/dashboard/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
+                            <Link href={`/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
                               <Printer className="w-3 h-3" /> Print
                             </Link>
                           </>
@@ -564,11 +569,14 @@ export default function SalesClient({
 
                   const currentStatus = (item.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim();
                   const isUpdating = updatingItem === item.id;
+                  const deliveryStatuses = ['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'];
+                  const isDeliveryStatus = deliveryStatuses.includes(currentStatus);
+                  const productionStatusChoices = productionStatuses.filter(status => !deliveryStatuses.includes(status.toUpperCase()));
                   
-                  let itemStatuses = productionStatuses;
+                  let itemStatuses = productionStatusChoices;
                   if (item.order_type?.toUpperCase() === 'POLOS') {
-                    const polosStatuses = ['BARU MASUK', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'];
-                    itemStatuses = productionStatuses.filter(s => polosStatuses.includes(s.toUpperCase()));
+                    const polosStatuses = ['BARU MASUK', 'SIAP KIRIM'];
+                    itemStatuses = productionStatusChoices.filter(s => polosStatuses.includes(s.toUpperCase()));
                     if (itemStatuses.length === 0) itemStatuses = polosStatuses;
                   }
                   
@@ -617,24 +625,31 @@ export default function SalesClient({
                             <Camera className="w-3.5 h-3.5" />
                           </button>
                           <div className="relative inline-block w-36 text-left">
-                            <select 
-                              value={currentStatus}
-                              disabled={isUpdating || currentStatus === 'BATAL'}
-                              onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
-                              className={`w-full appearance-none outline-none border rounded-md px-2.5 py-1 text-[11px] font-bold transition-all
-                                ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
-                                ${currentStatus === 'SELESAI' || currentStatus === 'DIKIRIM' || currentStatus === 'SUDAH DIAMBIL' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 
-                                  currentStatus === 'PROSES' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' : 
-                                  currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/10 text-blue-400 border-blue-500/20' : 
-                                  'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
-                            >
-                              {itemStatuses.map(statusOption => (
-                                <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
-                                  {statusOption}
-                                </option>
-                              ))}
-                            </select>
-                            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-current pointer-events-none opacity-50" />
+                            {isDeliveryStatus ? (
+                              <span className="block w-full rounded-md border border-green-500/20 bg-green-500/10 px-2.5 py-1 text-[11px] font-bold text-green-400">
+                                {currentStatus}
+                              </span>
+                            ) : (
+                              <>
+                                <select
+                                  value={currentStatus}
+                                  disabled={isUpdating || currentStatus === 'BATAL'}
+                                  onChange={(e) => handleItemStatusChange(item.id, currentStatus, e.target.value)}
+                                  className={`w-full appearance-none outline-none border rounded-md px-2.5 py-1 text-[11px] font-bold transition-all
+                                    ${isUpdating ? 'opacity-50 cursor-wait' : 'cursor-pointer'}
+                                    ${currentStatus === 'PROSES' ? 'bg-purple-500/10 text-purple-400 border-purple-500/20' :
+                                      currentStatus === 'SIAP KIRIM' ? 'bg-blue-500/10 text-blue-400 border-blue-400/20' :
+                                      'bg-white/5 text-foreground border-white/10 hover:border-white/20'}`}
+                                >
+                                  {itemStatuses.map(statusOption => (
+                                    <option key={statusOption} value={statusOption} className="bg-[#1a1f2e] text-white">
+                                      {statusOption}
+                                    </option>
+                                  ))}
+                                </select>
+                                <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-current pointer-events-none opacity-50" />
+                              </>
+                            )}
                           </div>
                         </div>
                       </td>
