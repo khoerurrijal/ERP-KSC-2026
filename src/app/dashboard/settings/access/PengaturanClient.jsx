@@ -10,13 +10,13 @@ export default function PengaturanClient({ activeTab = 'access', children }) {
   ]
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+    <div className="space-y-4">
+      <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
         {tabs.map(({ key, label, icon: Icon }) => (
           <Link
             key={key}
             href={`/settings?tab=${key}`}
-            className={`flex items-center gap-2 pb-2 px-4 text-sm font-bold transition-all border-b-2 ${
+            className={`flex items-center gap-2 pb-2 px-3 sm:px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
               activeTab === key
                 ? 'text-primary border-primary'
                 : 'text-foreground/50 border-transparent hover:text-foreground hover:border-white/20'

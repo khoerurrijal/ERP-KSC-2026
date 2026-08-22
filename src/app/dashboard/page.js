@@ -80,23 +80,16 @@ export default async function DashboardPage({ searchParams }) {
   const antreanSiapAmbil = items.filter(i => ['SUDAH JADI', 'DIKIRIM', 'SUDAH DIAMBIL'].includes(i.status)).length
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Activity className="w-6 h-6 text-primary" />
-            Dashboard Utama
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Selamat datang kembali, {user.email}</p>
-        </div>
-        <div className="flex items-center gap-4">
+      <div className="flex justify-end">
+        <div className="flex items-center gap-3">
           <MonthFilter />
           <form action="/auth/signout" method="post">
             <button type="submit" className="btn-secondary h-10 px-4 text-sm">Sign Out</button>
           </form>
         </div>
-      </header>
+      </div>
 
       {/* STATISTIK PENJUALAN */}
       <h2 className="text-lg font-bold text-foreground mt-8">Statistik Pesanan (Sales Order)</h2>
@@ -134,7 +127,7 @@ export default async function DashboardPage({ searchParams }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
         
         {/* KALKULATOR HARGA */}
         <div className="lg:col-span-1">
@@ -142,7 +135,7 @@ export default async function DashboardPage({ searchParams }) {
         </div>
 
         {/* TENGAH: Antrean & Stok */}
-        <div className="flex flex-col gap-6 lg:col-span-1">
+        <div className="flex flex-col gap-4 lg:col-span-1">
           {/* TRACKING PRODUKSI */}
           <div className="glass-card flex flex-col h-fit">
             <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">

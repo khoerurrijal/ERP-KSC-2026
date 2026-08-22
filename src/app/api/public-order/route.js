@@ -132,7 +132,6 @@ export async function POST(req) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
-        is_fast_track: Boolean(item.isFastTrack),
         notes: itemNotes.trim()
       });
     }

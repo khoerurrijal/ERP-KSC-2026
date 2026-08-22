@@ -136,7 +136,6 @@ export async function createSalesOrder(payload) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
-        is_fast_track: Boolean(item.isFastTrack),
         notes: itemNotes.trim()
       });
     }
@@ -427,7 +426,6 @@ export async function updateSalesOrder(soId, payload) {
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
-        is_fast_track: isFastTrack,
         notes: itemNotes.trim()
       }
 

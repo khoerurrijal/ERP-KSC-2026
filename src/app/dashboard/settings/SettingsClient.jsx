@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon } from 'lucide-react'
 import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig } from './actions'
 
-export default function SettingsClient({ initialSettings, onlyAccess = false }) {
+export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false }) {
   const [activeTab, setActiveTab] = useState(onlyAccess ? 'access' : 'dropdowns')
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
@@ -238,13 +238,13 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4">
+      {!hideHeader && <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">{onlyAccess ? 'Pengaturan' : 'Sistem Konfigurasi'}</h1>
           <p className="text-foreground/60 mt-1">{onlyAccess ? 'Kelola akses pengguna dan hak akses menu aplikasi.' : 'Konfigurasi parameter operasional, keuangan, dan alur aplikasi.'}</p>
         </div>
-      </div>
+      </div>}
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm">
@@ -253,10 +253,10 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
       )}
 
       {/* Tabs */}
-      <div className="flex space-x-2 border-b border-white/10 pb-px overflow-x-auto">
+      <div className="flex gap-1 border-b border-white/10 pb-px overflow-x-auto">
         <button
           onClick={() => setActiveTab('dropdowns')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'dropdowns' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -267,7 +267,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
         </button>
         <button
           onClick={() => setActiveTab('cashflow')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'cashflow' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -278,7 +278,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
         </button>
         <button
           onClick={() => setActiveTab('pricelist')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'pricelist' 
               ? 'border-yellow-400 text-yellow-400' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -289,7 +289,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
         </button>
         <button
           onClick={() => setActiveTab('store')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'store' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -300,7 +300,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
         </button>
         <button
           onClick={() => setActiveTab('category_images')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'category_images' 
               ? 'border-blue-400 text-blue-400' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -311,7 +311,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
         </button>
         <button
           onClick={() => setActiveTab('access')}
-          className={`flex items-center gap-2 px-6 py-3 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${!onlyAccess ? 'hidden' : ''} ${
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${!onlyAccess ? 'hidden' : ''} ${
             activeTab === 'access' 
               ? 'border-primary text-primary' 
               : 'border-transparent text-foreground/50 hover:text-foreground/80'
@@ -325,9 +325,9 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
       {/* Tab Content: Dropdowns */}
       {activeTab === 'dropdowns' && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {Object.keys(dropdowns).filter(k => k !== 'category_mapping').map(key => (
-              <div key={key} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all">
+              <div key={key} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-5 hover:border-white/20 transition-all">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-bold text-foreground/80 uppercase tracking-widest text-xs flex items-center gap-2">
                     <Settings className="w-3 h-3 text-primary" />
@@ -371,11 +371,11 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
               <ListPlus className="w-5 h-5 text-primary" />
               Filter Kategori Berdasarkan Jenis Pesanan
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
               {Array.from(new Set(dropdowns.order_type || [])).map(orderType => {
                 const mapList = (dropdowns.category_mapping || {})[orderType] || []
                 return (
-                  <div key={orderType} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-6 hover:border-white/20 transition-all">
+                  <div key={orderType} className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-2xl p-4 sm:p-5 hover:border-white/20 transition-all">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="font-bold text-foreground/80 tracking-widest text-xs flex items-center gap-2">
                         <Settings className="w-3 h-3 text-accent" />
@@ -432,14 +432,14 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
 
       {/* Tab Content: Cashflow */}
       {activeTab === 'cashflow' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl">
-          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-8">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6">
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
               <Banknote className="w-5 h-5 text-primary" />
               Pengaturan Nilai Tetap & Persentase
             </h3>
 
-            <div className="space-y-6">
+            <div className="space-y-4">
               {/* Gudang Profit */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center">
                 <div>
@@ -555,18 +555,18 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
 
       {/* Tab Content: Pricelist & Margin */}
       {activeTab === 'pricelist' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl">
-          <div className="grid grid-cols-1 xl:grid-cols-12 gap-6">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl">
+          <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
             
             {/* Kiri: Formula Jual Polos & Internal */}
-            <div className="xl:col-span-4 space-y-6">
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 h-full">
+            <div className="xl:col-span-4 space-y-4">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 h-full">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Percent className="w-5 h-5 text-yellow-400" />
                   Formula Margin & Profit
                 </h3>
                 
-                <div className="space-y-6">
+                <div className="space-y-4">
                   {/* Gudang Nominal */}
                   <div className="space-y-2">
                     <label className="text-sm font-bold text-foreground/80">Profit Gudang (Rp / Pcs)</label>
@@ -640,8 +640,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
             </div>
 
             {/* Kanan: Matrix Jasa Sablon */}
-            <div className="xl:col-span-8 space-y-6">
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 h-full overflow-hidden flex flex-col">
+            <div className="xl:col-span-8 space-y-4">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 h-full overflow-hidden flex flex-col">
                 <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                   <ListPlus className="w-5 h-5 text-yellow-400" />
                   Matrix Tarif Jasa Sablon (Per Pcs)
@@ -693,8 +693,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
             </div>
 
             {/* Kanan Bawah: Matrix Jasa Printing */}
-            <div className="xl:col-span-8 xl:col-start-5 space-y-6">
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 overflow-hidden flex flex-col">
+            <div className="xl:col-span-8 xl:col-start-5 space-y-4">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 overflow-hidden flex flex-col">
                 <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
                   <ListPlus className="w-5 h-5 text-blue-400" />
                   Matrix Tarif Jasa Printing (Per Pcs)
@@ -759,12 +759,12 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
 
       {/* Tab Content: Store & Invoice */}
       {activeTab === 'store' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
             {/* Kiri: Profil Utama */}
-            <div className="space-y-6">
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+            <div className="space-y-4">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Store className="w-5 h-5 text-primary" />
                   Profil Utama Toko
@@ -837,8 +837,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
             </div>
 
             {/* Kanan: Template WA & Bank */}
-            <div className="space-y-6">
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+            <div className="space-y-4">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
                 <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
                   <Banknote className="w-5 h-5 text-primary" />
                   Pengaturan Rekening Bank
@@ -890,7 +890,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
                 </div>
               </div>
 
-              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+              <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
                 <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
                   <ListPlus className="w-5 h-5 text-primary" />
                   Template Pesan WhatsApp
@@ -930,8 +930,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
 
       {/* Tab Content: Category Images */}
       {activeTab === 'category_images' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
-          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
             <div className="mb-6">
               <h2 className="text-xl font-bold flex items-center gap-2 text-blue-400">
                 <ImageIcon className="w-6 h-6" />
@@ -981,10 +981,10 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
 
       {/* Tab Content: Access & Users */}
       {activeTab === 'access' && (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           
           {/* Matrix Role & Permission */}
-          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8 overflow-hidden">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 overflow-hidden">
             <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-primary" />
               Matrix Hak Akses Menu
@@ -1028,7 +1028,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false }) 
           </div>
 
           {/* User Management */}
-          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6 md:p-8">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-lg font-bold flex items-center gap-2">
                 <Users className="w-5 h-5 text-accent" />

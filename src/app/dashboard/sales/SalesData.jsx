@@ -9,7 +9,9 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   const search = searchParams.search || ''
   const filterStatus = searchParams.status || 'BELUM_LUNAS'
   const filterCustomerType = searchParams.customerType || 'ALL'
-  const filterMonth = searchParams.month || ''
+  const now = new Date()
+  const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
+  const filterMonth = searchParams.month || defaultMonth
 
   // 1. Calculate Date Bounds for Filter Month
   let startDate = ''
@@ -48,16 +50,22 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     matchedSoIds = [...(soRes.data || []).map(s => s.id), ...additionalSoIds].filter(Boolean)
   }
 
-  // 2. Summary KPI Query (Filtered by month if selected, or overall)
+  // 2. Summary KPI Query untuk bulan terpilih
   let summaryQuery = supabase
     .from('sales_orders')
     .select('total_amount, dp_amount, payment_status, date')
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
     .neq('payment_status', 'BATAL')
 
-  if (filterMonth) {
-    summaryQuery = summaryQuery.gte('date', startDate).lte('date', endDate)
-  }
+  // Piutang berjalan selalu seluruh waktu; hanya transaksi marketplace,
+  // batal, dan yang sudah lunas dikeluarkan dari perhitungannya.
+  const piutangQuery = supabase
+    .from('sales_orders')
+    .select('total_amount, dp_amount, payment_status')
+    .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
+    .neq('payment_status', 'BATAL')
+
+  summaryQuery = summaryQuery.gte('date', startDate).lte('date', endDate)
 
   // 3. Main Sales Orders Query
   let query = supabase
@@ -115,7 +123,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
 
   itemsQuery = itemsQuery.order('id', { ascending: false }).limit(1000)
 
-  const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult] = await Promise.all([
+  const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult, piutangResult] = await Promise.all([
     query,
     itemsQuery,
     supabase
@@ -123,7 +131,8 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       .select('value')
       .eq('key', 'dropdown_config')
       .single(),
-    summaryQuery
+    summaryQuery,
+    piutangQuery
   ])
 
   const salesOrders = salesOrdersResult.data || []
@@ -131,10 +140,11 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   const salesItems = salesItemsResult.data || []
   const dropdownConfig = settingsResult.data?.value || {}
   const summaryOrders = summaryResult.data || []
+  const piutangOrders = piutangResult.data || []
 
   // Calculate Omset & Piutang accurately from summary dataset
   const serverTotalOmset = summaryOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
-  const serverTotalPiutang = summaryOrders
+  const serverTotalPiutang = piutangOrders
     .filter(o => o.payment_status !== 'LUNAS')
     .reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
 
@@ -146,7 +156,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       pageSize={pageSize}
       salesItems={salesItems}
       dropdownConfig={dropdownConfig}
-      searchParams={searchParams}
+      searchParams={{ ...searchParams, month: filterMonth }}
       serverTotalOmset={serverTotalOmset}
       serverTotalPiutang={serverTotalPiutang}
       initialTab={itemsOnly ? 'ITEMS' : 'INVOICE'}

@@ -11,20 +11,15 @@ const tabs = [
 
 export default function StatusPesananClient({ activeTab = 'orders', children }) {
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header>
-        <h1 className="text-2xl font-bold text-foreground">Status Pesanan</h1>
-        <p className="text-sm text-foreground/60 mt-1">Pantau dan perbarui status pesanan dari produksi sampai pengiriman.</p>
-      </header>
-
-      <nav className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <nav className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
         {tabs.map(tab => {
           const Icon = tab.icon
           return (
             <Link
               key={tab.key}
               href={`/status-pesanan?tab=${tab.key}`}
-              className={`flex items-center gap-2 px-4 py-2 text-sm font-bold border-b-2 transition-all ${activeTab === tab.key ? 'text-primary border-primary' : 'text-foreground/50 border-transparent hover:text-foreground'}`}
+              className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold border-b-2 transition-all whitespace-nowrap ${activeTab === tab.key ? 'text-primary border-primary' : 'text-foreground/50 border-transparent hover:text-foreground'}`}
             >
               <Icon className="w-4 h-4" />
               {tab.label}

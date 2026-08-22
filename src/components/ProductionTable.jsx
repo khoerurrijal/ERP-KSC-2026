@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import { Search, Factory, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
+import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
 
 import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
@@ -216,15 +216,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   return (
     <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      {!hideHeader && <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Factory className="w-6 h-6 text-purple-400" />
-            {title}
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Pantau status pengerjaan pesanan sablon dari hulu ke hilir.</p>
-        </div>
-        <div className="flex items-center gap-3">
+      {!hideHeader && <div className="flex justify-end">
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input 
@@ -236,20 +229,20 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             />
           </div>
         </div>
-      </header>}
+      </div>}
 
       {/* Tabs */}
       {!hideTabs && userRole !== 'Operator' && (
-        <div className="flex items-center gap-4 border-b border-white/10 pb-2">
+        <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
           <button 
             onClick={() => setActiveTab('SO')} 
-            className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+            className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
           >
             Tracking Sales Order
           </button>
           <button 
             onClick={() => setActiveTab('PRODUKSI')} 
-            className={`pb-2 px-2 text-sm font-bold transition-colors ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+            className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
           >
             Tracking Produksi
           </button>

@@ -30,22 +30,17 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
   const visibleOrders = orders.filter(order => !completedOrderIds.has(order.soId))
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      {!embedded && <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      {!embedded && <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <Link href="/production" className="text-xs text-foreground/50 hover:text-primary inline-flex items-center gap-1 mb-2">
             <ArrowLeft className="w-3 h-3" /> Kembali ke Produksi
           </Link>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <PackageCheck className="w-6 h-6 text-primary" />
-            Konfirmasi Pengiriman
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Konfirmasi serah-terima barang per invoice.</p>
         </div>
-        <div className="px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-sm text-primary font-bold">
+        <div className="px-3 py-2 rounded-lg bg-primary/10 border border-primary/20 text-xs text-primary font-bold">
           {visibleOrders.length} invoice siap diproses
         </div>
-      </header>}
+      </div>}
 
       {error && <div className="glass-card p-4 border border-red-500/30 text-red-400 text-sm">Gagal mengambil data: {error}</div>}
 

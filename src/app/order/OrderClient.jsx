@@ -237,13 +237,13 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
   return (
     <>
       {/* 1. FILTER TABS */}
-      <div className="flex justify-center gap-2 mb-8 sticky top-4 z-30">
+      <div className="flex justify-center gap-2 mb-6 sm:mb-8 sticky top-2 sm:top-4 z-30">
         <div className="bg-black/60 backdrop-blur-2xl p-1.5 rounded-full border border-white/10 shadow-xl inline-flex shadow-black/50 overflow-x-auto max-w-full custom-scrollbar">
           {orderTypeOptions.map(type => (
             <button
               key={type}
               onClick={() => setActiveFilter(type)}
-              className={`px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 whitespace-nowrap ${
+              className={`px-4 sm:px-6 py-2.5 rounded-full text-sm font-bold transition-all duration-300 whitespace-nowrap ${
                 activeFilter === type 
                   ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-100' 
                   : 'text-foreground/60 hover:text-foreground hover:bg-white/5 scale-95'
@@ -256,14 +256,14 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
       </div>
 
       {/* 2. CATEGORY GRID */}
-      <div className="mb-12">
+      <div className="mb-8 sm:mb-12">
         {displayedCategories.length === 0 ? (
           <div className="text-center py-20 bg-white/5 rounded-3xl border border-white/10">
             <ImageIcon className="w-12 h-12 mx-auto mb-4 text-foreground/20" />
             <p className="text-foreground/50 italic">Belum ada kategori untuk jenis ini.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-6">
             {displayedCategories.map(cat => {
               // Placeholder using local logo
               const fallbackImage = '/logo-dark.png'
@@ -273,14 +273,14 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                 <div 
                   key={cat}
                   onClick={() => handleOpenCategory(cat)}
-                  className="group bg-black/40 backdrop-blur-xl border border-white/10 rounded-3xl overflow-hidden cursor-pointer hover:border-primary/50 hover:shadow-[0_0_30px_rgba(var(--primary),0.15)] transition-all duration-300 active:scale-95 flex flex-col"
+                  className="group bg-black/40 backdrop-blur-xl border border-white/10 rounded-2xl sm:rounded-3xl overflow-hidden cursor-pointer hover:border-primary/50 hover:shadow-[0_0_30px_rgba(var(--primary),0.15)] transition-all duration-300 active:scale-95 flex flex-col"
                 >
                   {/* Aspect Square for thumbnail */}
                   <div className="w-full aspect-square relative bg-white/5 overflow-hidden">
                     <img 
                       src={imgUrl} 
                       alt={cat} 
-                      className="w-full h-full object-contain p-4 opacity-50 transition-transform duration-500 group-hover:scale-110" 
+                      className="w-full h-full object-contain p-3 sm:p-4 opacity-50 transition-transform duration-500 group-hover:scale-110"
                       onError={(e) => { 
                         e.currentTarget.onerror = null; 
                         e.currentTarget.src = fallbackImage; 
@@ -288,7 +288,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
                   </div>
-                  <div className="p-4 flex-1 flex flex-col justify-end text-center relative -mt-12">
+                  <div className="p-3 sm:p-4 flex-1 flex flex-col justify-end text-center relative -mt-10 sm:-mt-12">
                     <h3 className="font-black text-sm sm:text-base text-white drop-shadow-md truncate">{cat}</h3>
                     <p className="text-[10px] sm:text-xs text-primary font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">PILIH SEKARANG &rarr;</p>
                   </div>
@@ -312,7 +312,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
               <button onClick={() => setShowProductModal(false)} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center font-bold">✕</button>
             </div>
             
-            <div className="p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar">
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar">
               
               <div className="animate-in slide-in-from-top-2 space-y-2">
                 <label className="block text-sm font-bold text-foreground/80">Pilih Ukuran / Produk</label>
@@ -459,7 +459,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
             </div>
 
             {/* Cart Items */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4 custom-scrollbar">
               {cart.length === 0 ? (
                 <div className="text-center text-foreground/50 py-10">Keranjang kosong.</div>
               ) : (
@@ -510,7 +510,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
             {/* Footer / Checkout */}
             {cart.length > 0 && (
-              <div className="p-6 bg-black/80 border-t border-white/10 backdrop-blur-xl">
+              <div className="p-4 sm:p-6 bg-black/80 border-t border-white/10 backdrop-blur-xl">
                 <div className="flex justify-between items-center mb-4">
                   <span className="text-foreground/60 text-sm font-bold">Subtotal</span>
                   <span className="text-2xl font-black text-primary">{formatRp(totals.grandTotal)}</span>
@@ -531,7 +531,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
       {/* 6. MODAL CHECKOUT */}
       {showCheckoutModal && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-black/90 backdrop-blur-3xl border border-white/10 w-full max-w-md rounded-3xl shadow-2xl p-8 relative animate-in zoom-in-95 duration-200">
+          <div className="bg-black/90 backdrop-blur-3xl border border-white/10 w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-8 relative animate-in zoom-in-95 duration-200">
             <button onClick={() => setShowCheckoutModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20">✕</button>
             
             <h2 className="text-2xl font-black mb-1">Data Pemesan</h2>

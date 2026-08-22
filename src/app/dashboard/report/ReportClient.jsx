@@ -110,34 +110,25 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
   }
 
   return (
-    <div className="space-y-12 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20 max-w-7xl mx-auto">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12 max-w-7xl mx-auto">
       
-      <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
-        <div>
-          <h1 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-yellow-200 flex items-center gap-3">
-            <ShieldCheck className="w-8 h-8 text-primary" />
-            Laporan Eksekutif (Owner)
-          </h1>
-          <p className="text-sm text-foreground/60 mt-2 max-w-xl leading-relaxed">
-            Ringkasan posisi keuangan, mutasi kas, dan performa setiap lini usaha (Workshop & Gudang) yang disajikan secara terintegrasi.
-          </p>
-        </div>
+      <div className="flex justify-end">
         <div className="flex shadow-2xl rounded-xl">
           <MonthFilter />
         </div>
-      </header>
+      </div>
 
       {/* TABS Navigation */}
-      <div className="flex bg-white/5 p-1 rounded-2xl w-full sm:w-fit border border-white/10 mt-6">
+      <div className="flex items-center gap-1 border-b border-white/10 w-full overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setActiveTab('buku_besar')}
-          className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'buku_besar' ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/20' : 'text-foreground/60 hover:text-foreground hover:bg-white/5'}`}
+          className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center justify-center gap-2 ${activeTab === 'buku_besar' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <Wallet className="w-4 h-4" /> Kas & Buku Besar
         </button>
         <button 
           onClick={() => setActiveTab('analisa_laba')}
-          className={`flex-1 sm:flex-none px-6 py-3 rounded-xl text-sm font-bold transition-all flex items-center justify-center gap-2 ${activeTab === 'analisa_laba' ? 'bg-purple-500 text-white shadow-lg shadow-purple-500/20' : 'text-foreground/60 hover:text-foreground hover:bg-white/5'}`}
+          className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center justify-center gap-2 ${activeTab === 'analisa_laba' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <PieChart className="w-4 h-4" /> Analisa Penjualan
         </button>
@@ -146,7 +137,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       {activeTab === 'buku_besar' ? (
         <>
           {/* 1. BREAKDOWN MUTASI KHUSUS KING */}
-          <section className="space-y-6">
+          <section className="space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
             <FileText className="w-5 h-5 text-yellow-500" />
@@ -154,7 +145,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           <h2 className="text-xl font-bold text-foreground">Ringkasan Mutasi KING</h2>
         </div>
         
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 gap-4">
           <MetricCard 
             title="Pendapatan Masuk"
             value={summary.king?.pendapatan}
@@ -201,7 +192,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             glow="bg-orange-500/20"
           />
           
-          <div className="rounded-3xl p-8 flex flex-col justify-center border border-yellow-500/40 bg-gradient-to-br from-yellow-500/20 to-transparent relative overflow-hidden group hover:scale-[1.02] transition-transform shadow-2xl shadow-yellow-500/10">
+          <div className="rounded-3xl p-6 flex flex-col justify-center border border-yellow-500/40 bg-gradient-to-br from-yellow-500/20 to-transparent relative overflow-hidden group hover:scale-[1.02] transition-transform shadow-2xl shadow-yellow-500/10">
             <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/20 blur-3xl rounded-full" />
             <span className="text-sm font-black text-yellow-400 uppercase tracking-widest relative z-10">Saldo Real (Kas KING)</span>
             <span className={`text-4xl font-black mt-3 relative z-10 ${summary.king?.saldo_bersih < 0 ? 'text-red-400' : 'text-green-400'}`}>
@@ -213,7 +204,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       </section>
 
       {/* 2. BREAKDOWN MASING-MASING WORKSHOP */}
-      <section className="space-y-6 pt-6 border-t border-white/5">
+      <section className="space-y-4 pt-4 border-t border-white/5">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center border border-primary/30">
             <Building2 className="w-5 h-5 text-primary" />
@@ -221,7 +212,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           <h2 className="text-xl font-bold text-foreground">Pos Saldo Divisi & Tabungan</h2>
         </div>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <WorkshopCard 
              title="GUDANG"
              masuk={summary.gudang?.masuk}
@@ -250,7 +241,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       </section>
 
       {/* 3. DETAIL MUTASI KING */}
-      <section className="space-y-6 pt-6 border-t border-white/5">
+      <section className="space-y-4 pt-4 border-t border-white/5">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center">
@@ -273,10 +264,10 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           />
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* GRAND TOTAL KESELURUHAN */}
           <div className="col-span-full mb-2">
-            <div className="glass-card p-6 border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-transparent">
+            <div className="glass-card p-5 border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-transparent">
               <span className="text-xs font-black text-yellow-500 uppercase tracking-widest">GRAND TOTAL SEMUA REFERENSI (KING)</span>
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex gap-8">
@@ -343,7 +334,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       </section>
 
       {/* 4. SALDO & BALANCE */}
-      <section className="space-y-6 pt-10 border-t border-white/10">
+      <section className="space-y-4 pt-6 border-t border-white/10">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
             <Wallet className="w-5 h-5 text-blue-400" />
@@ -351,7 +342,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           <h2 className="text-xl font-bold text-foreground">Buku Besar & Kas Realtime</h2>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* BUKU BESAR */}
           <div className="glass-card flex flex-col p-6 border-white/5">
             <h3 className="font-bold text-foreground/80 flex items-center gap-2 mb-6">
@@ -505,9 +496,9 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       </>
       ) : (
         /* TAB 2: ANALISA PENJUALAN & LABA */
-        <div className="space-y-12 animate-in fade-in slide-in-from-bottom-8 duration-500">
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-8 duration-500">
           
-          <section className="space-y-6">
+          <section className="space-y-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
                 <BarChart3 className="w-5 h-5 text-purple-400" />
@@ -515,7 +506,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
               <h2 className="text-xl font-bold text-foreground">Pemecahan Omset Penjualan</h2>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <MetricCard 
                 title="Gelas Sablon & Printing"
                 value={analytics.omset_sablon}
@@ -553,9 +544,9 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
                 glow="bg-pink-500/20"
               />
               <div className="col-span-full">
-                <div className="rounded-3xl p-8 flex flex-col justify-center border border-green-500/40 bg-gradient-to-br from-green-500/10 to-transparent relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-2xl shadow-green-500/10">
+                <div className="rounded-3xl p-6 flex flex-col justify-center border border-green-500/40 bg-gradient-to-br from-green-500/10 to-transparent relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-2xl shadow-green-500/10">
                   <div className="absolute -right-10 -top-10 w-40 h-40 bg-green-500/20 blur-3xl rounded-full" />
-                  <span className="text-sm font-black text-green-400 uppercase tracking-widest relative z-10">Total Omset Bulan Ini</span>
+                  <span className="text-sm font-black text-green-400 uppercase tracking-widest relative z-10">Total Omset Bulan Terpilih</span>
                   <span className="text-5xl font-black mt-3 text-green-400 relative z-10">
                     Rp {Number(analytics.total_omset || 0).toLocaleString('id-ID')}
                   </span>
@@ -567,7 +558,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             </div>
           </section>
 
-          <section className="space-y-6 pt-6 border-t border-white/5">
+          <section className="space-y-4 pt-4 border-t border-white/5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
                 <PieChart className="w-5 h-5 text-green-400" />
@@ -575,9 +566,9 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
               <h2 className="text-xl font-bold text-foreground">Bagi Hasil & Royalty (HPP Lunas)</h2>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* KOTAK GLOBAL */}
-              <div className="rounded-3xl p-8 border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent relative overflow-hidden group">
+              <div className="rounded-3xl p-6 border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent relative overflow-hidden group">
                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/20 blur-3xl rounded-full" />
                 <h3 className="font-black text-blue-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GLOBAL</h3>
                 
@@ -610,7 +601,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
               </div>
 
               {/* KOTAK GUDANG */}
-              <div className="rounded-3xl p-8 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent relative overflow-hidden group">
+              <div className="rounded-3xl p-6 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent relative overflow-hidden group">
                 <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 blur-3xl rounded-full" />
                 <h3 className="font-black text-purple-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GUDANG</h3>
                 
@@ -673,7 +664,7 @@ function WorkshopCard({ title, masuk, keluar, akhir, colorTheme, details = [] })
   const t = themes[colorTheme]
 
   return (
-    <div className={`rounded-3xl p-8 border ${t.border} ${t.bg} hover:shadow-2xl transition-all duration-500 relative overflow-hidden group flex flex-col`}>
+    <div className={`rounded-3xl p-6 md:p-8 border ${t.border} ${t.bg} hover:shadow-2xl transition-all duration-500 relative overflow-hidden group flex flex-col`}>
       <div className={`absolute -right-10 -bottom-10 w-40 h-40 rounded-full ${t.glow} blur-3xl opacity-50 group-hover:opacity-100 transition-opacity`} />
       <h3 className={`font-black ${t.text} text-xl tracking-widest mb-8 relative z-10`}>{title}</h3>
       

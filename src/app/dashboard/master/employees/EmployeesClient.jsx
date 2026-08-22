@@ -114,12 +114,8 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
   const paginatedEmployees = employees.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Data Karyawan</h1>
-          <p className="text-foreground/60 text-sm mt-1">Kelola daftar karyawan, akses login, dan posisinya.</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex justify-end">
         <button onClick={handleAddNew} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Tambah Karyawan
         </button>

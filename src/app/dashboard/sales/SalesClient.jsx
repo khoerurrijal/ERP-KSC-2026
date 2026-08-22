@@ -314,19 +314,16 @@ export default function SalesClient({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* Header and KPI */}
-      {!embedded && <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-black text-white uppercase tracking-tight flex items-center gap-2">
-            <TrendingUp className="w-6 h-6 text-primary" /> Transaksi Penjualan
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kelola invoice dan pelacakan status produksi barang.</p>
+      {!embedded && <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+        <div className="hidden sm:block">
+          <MonthFilter />
         </div>
-        <Link href="/sales/new" className="btn-primary px-4 h-10 text-sm flex items-center gap-2 whitespace-nowrap">
+        <Link href="/sales/new" className="btn-primary h-10 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
           <Plus className="w-4 h-4" /> Buat Sales Order Baru
         </Link>
-      </header>}
+      </div>}
 
       {/* KPI Cards */}
       {!embedded && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -335,7 +332,7 @@ export default function SalesClient({
             <TrendingUp className="w-6 h-6" />
           </div>
           <div>
-            <p className="text-sm text-foreground/60 font-medium">Total Omset (Bulan Ini)</p>
+            <p className="text-sm text-foreground/60 font-medium">Total Omset (Bulan Terpilih)</p>
             <p className="text-xl font-bold text-white">Rp {totalOmset.toLocaleString('id-ID')}</p>
           </div>
         </div>
@@ -351,17 +348,17 @@ export default function SalesClient({
       </div>}
 
       {/* Tabs */}
-      {!embedded && <div className="flex bg-white/5 p-1 rounded-xl w-fit">
+      {!embedded && showItemsTab && <div className="flex items-center gap-1 border-b border-white/10 overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setActiveTab('INVOICE')}
-          className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'INVOICE' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
+          className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all ${activeTab === 'INVOICE' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <FileText className="w-4 h-4" /> Data Invoice & Pembayaran
         </button>
         {showItemsTab && (
           <button
             onClick={() => setActiveTab('ITEMS')}
-            className={`flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-bold transition-all ${activeTab === 'ITEMS' ? 'bg-primary text-white shadow-lg' : 'text-foreground/60 hover:text-white'}`}
+            className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all ${activeTab === 'ITEMS' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
           >
             <Package className="w-4 h-4" /> Status Item Produksi
           </button>
@@ -379,10 +376,6 @@ export default function SalesClient({
             onChange={(e) => setSearchQuery(e.target.value)}
             className="glass-input pl-9 w-full h-10"
           />
-        </div>
-        
-        <div className="hidden sm:block">
-          <MonthFilter />
         </div>
         
         <button 
@@ -455,7 +448,7 @@ export default function SalesClient({
       <div className="glass-card overflow-hidden">
         {activeTab === 'INVOICE' ? (
           /* TAB 1: INVOICES */
-          <div className="overflow-x-auto min-h-[400px]">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
@@ -544,7 +537,7 @@ export default function SalesClient({
           </div>
         ) : (
           /* TAB 2: ITEMS */
-          <div className="overflow-x-auto min-h-[400px]">
+          <div className="overflow-x-auto min-h-[300px]">
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>

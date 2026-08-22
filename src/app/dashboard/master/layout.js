@@ -16,9 +16,9 @@ export default function MasterDataLayout({ children }) {
   ]
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+      <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
         {tabs.map(tab => {
           const isActive = pathname.startsWith(tab.path)
           const Icon = tab.icon
@@ -28,7 +28,7 @@ export default function MasterDataLayout({ children }) {
               href={tab.path}
               target={tab.external ? "_blank" : undefined}
               rel={tab.external ? "noopener noreferrer" : undefined}
-              className={`flex items-center gap-2 pb-2 px-4 text-sm font-bold transition-all border-b-2 ${
+              className={`flex items-center gap-2 pb-2 px-3 sm:px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
                 isActive 
                   ? 'text-primary border-primary' 
                   : 'text-foreground/50 border-transparent hover:text-foreground hover:border-white/20'
@@ -41,7 +41,7 @@ export default function MasterDataLayout({ children }) {
         })}
       </div>
 
-      <div className="pt-2">
+      <div>
         {children}
       </div>
     </div>

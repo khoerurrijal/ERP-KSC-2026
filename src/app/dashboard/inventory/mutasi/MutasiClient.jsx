@@ -1,8 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
-import Link from 'next/link'
-import { ArrowLeft, Search, ArrowDownToLine, ArrowUpFromLine, Filter, History } from 'lucide-react'
+import { Search, ArrowDownToLine, ArrowUpFromLine, Filter } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 
@@ -27,24 +26,10 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
   const totalKeluar = filteredMutations.reduce((sum, m) => sum + Number(m.qty_out || 0), 0)
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <div className="flex items-center gap-3 mb-2">
-            <Link href="/inventory" className="btn-secondary h-8 px-3 text-xs flex items-center gap-1">
-              <ArrowLeft className="w-3 h-3" /> Kembali ke Inventory
-            </Link>
-          </div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <History className="w-6 h-6 text-purple-400" />
-            Buku Mutasi Stok
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Lacak riwayat lengkap barang masuk dan keluar.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <MonthFilter />
-        </div>
-      </header>
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="flex justify-end">
+        <MonthFilter />
+      </div>
 
       {error && (
         <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-xl text-sm">
@@ -54,7 +39,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
       )}
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
         <div className="glass-card p-4 border-l-4 border-green-500 flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Barang Masuk</p>

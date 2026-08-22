@@ -56,37 +56,30 @@ export default function AuditClient({ initialReport }) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <ShieldCheck className="w-6 h-6 text-primary" />
-            AI Audit Center
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Pemeriksaan data dan kesehatan alur aplikasi King Sablon.</p>
-        </div>
-        <button onClick={() => router.refresh()} className="btn-secondary h-10 px-4 text-sm flex items-center gap-2">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="flex justify-end">
+        <button onClick={() => router.refresh()} className="btn-secondary h-9 px-3 text-xs flex items-center gap-2">
           <RefreshCw className="w-4 h-4" /> Jalankan Audit Ulang
         </button>
-      </header>
+      </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="glass-card p-5 border-l-4 border-red-500">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <div className="glass-card p-4 border-l-4 border-red-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Kritis</p>
           <p className="text-3xl font-black text-red-400 mt-2">{report.summary.critical}</p>
         </div>
-        <div className="glass-card p-5 border-l-4 border-amber-500">
+        <div className="glass-card p-4 border-l-4 border-amber-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Perlu Ditinjau</p>
           <p className="text-3xl font-black text-amber-400 mt-2">{report.summary.warning}</p>
         </div>
-        <div className="glass-card p-5 border-l-4 border-primary">
+        <div className="glass-card p-4 border-l-4 border-primary">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Total Temuan</p>
           <p className="text-3xl font-black text-primary mt-2">{report.summary.total}</p>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-        <section className="glass-card p-5 xl:col-span-2 space-y-4">
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <section className="glass-card p-4 xl:col-span-2 space-y-3">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-foreground flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-400" /> Temuan Audit</h2>
@@ -149,7 +142,7 @@ export default function AuditClient({ initialReport }) {
           )}
         </section>
 
-        <section className="glass-card p-5 flex flex-col min-h-[420px]">
+        <section className="glass-card p-4 flex flex-col min-h-[360px]">
           <div className="flex items-center gap-2 mb-4">
             <Bot className="w-5 h-5 text-primary" />
             <div>
@@ -157,7 +150,7 @@ export default function AuditClient({ initialReport }) {
               <p className="text-xs text-foreground/50">Membantu membaca temuan, tidak mengubah data otomatis.</p>
             </div>
           </div>
-          <div className="flex-1 space-y-3 overflow-y-auto max-h-[310px] pr-1">
+          <div className="flex-1 space-y-2 overflow-y-auto max-h-[260px] pr-1">
             {messages.map((message, index) => (
               <div key={`${message.role}-${index}`} className={`rounded-xl p-3 text-sm whitespace-pre-line ${message.role === 'user' ? 'bg-primary/15 text-foreground ml-6' : 'bg-white/5 text-foreground/80 mr-3'}`}>
                 {message.text}

@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Search, Plus, ShoppingCart, Filter, ChevronUp, ChevronDown } from 'lucide-react'
+import { Search, Plus, Filter, ChevronUp, ChevronDown } from 'lucide-react'
 import { deletePurchaseOrder, payPurchaseOrder } from './new/actions'
 
 import MonthFilter from '@/components/MonthFilter'
@@ -177,33 +177,28 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   }, [filteredAndSortedItems, itemPage, pageSize])
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <ShoppingCart className="w-6 h-6 text-blue-400" />
-            Daftar Purchase Order (PO)
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kelola kulakan bahan baku ke supplier.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-4">
-          <MonthFilter />
-        </div>
-      </header>
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
+        <MonthFilter />
+        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto">
+          <Plus className="w-4 h-4" />
+          Buat PO Baru
+        </Link>
+      </div>
 
       {/* SUMMARY CARDS */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="glass-card p-4 border-l-4 border-green-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Gudang</p>
-          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGudang || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Ini</span></p>
+          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGudang || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-blue-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Global</p>
-          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Ini</span></p>
+          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-green-400">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Lunas</p>
-          <p className="text-2xl font-bold text-green-400 mt-2">Rp {(summary.lunas || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Ini</span></p>
+          <p className="text-2xl font-bold text-green-400 mt-2">Rp {(summary.lunas || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-yellow-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Tempo Aktif</p>
@@ -212,22 +207,22 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
       </div>
 
       {/* TABS */}
-      <div className="flex gap-4 border-b border-white/10 mb-6">
+      <div className="flex items-center gap-1 border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setActiveTab('PO')}
-          className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'PO' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+          className={`pb-2 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'PO' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
         >
           Invoice PO
         </button>
         <button 
           onClick={() => setActiveTab('ITEMS')}
-          className={`pb-2 px-1 text-sm font-medium border-b-2 transition-colors ${activeTab === 'ITEMS' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+          className={`pb-2 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'ITEMS' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
         >
           Purchase Items
         </button>
       </div>
 
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mt-6">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
           <div className="relative w-full sm:w-64">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
@@ -251,10 +246,6 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
             />
           )}
         </div>
-        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto justify-center">
-          <Plus className="w-4 h-4" />
-          Buat PO Baru
-        </Link>
       </div>
 
       <div className="glass-card overflow-hidden">

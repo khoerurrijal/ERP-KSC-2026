@@ -31,7 +31,7 @@ export default async function PengaturanPage({ searchParams }) {
 
   return (
     <PengaturanClient activeTab={activeTab}>
-      <SettingsClient initialSettings={settings} onlyAccess />
+      <SettingsClient initialSettings={settings} onlyAccess hideHeader />
     </PengaturanClient>
   )
 }

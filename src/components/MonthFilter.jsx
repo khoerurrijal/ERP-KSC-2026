@@ -60,7 +60,7 @@ export default function MonthFilter({ value, onChange }) {
       // Update URL
       const params = new URLSearchParams(searchParams)
       params.set('month', newMonth)
-      window.location.href = `${pathname}?${params.toString()}`
+      router.push(`${pathname}?${params.toString()}`)
     }
   }
 

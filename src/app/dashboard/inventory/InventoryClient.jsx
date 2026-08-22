@@ -2,7 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { PackageSearch, Boxes, Plus, Filter, ChevronUp, ChevronDown, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { PackageSearch, Plus, Filter, ChevronUp, ChevronDown, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
@@ -15,13 +15,13 @@ export default function InventoryClient({
   pipelineData = [], 
   workshops = [],
   categories: passedCategories = [],
-  searchParams = {}
+  searchParams = {},
+  activeTab = 'table'
 }) {
   const router = useRouter()
   const pathname = usePathname()
   const currentSearchParams = useSearchParams()
 
-  const [activeTab, setActiveTab] = useState('tabel')
   const [products, setProducts] = useState(initialProducts)
   const [searchQuery, setSearchQuery] = useState(searchParams.search || '')
   const [showFilters, setShowFilters] = useState(Boolean(searchParams.category || searchParams.workshop))
@@ -157,33 +157,15 @@ export default function InventoryClient({
   }, [filteredPipelineData, pipelinePage, pipelinePageSize])
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Boxes className="w-6 h-6 text-green-400" />
-            Inventory
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Pantau stok gudang dan riwayat barang masuk/keluar.</p>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center gap-2 text-sm whitespace-nowrap">
-            <Plus className="w-4 h-4" /> Restock (PO)
-          </Link>
-        </div>
-      </header>
-
-      <div className="flex items-center gap-4 mb-6 border-b border-white/10 pb-4 overflow-x-auto hide-scrollbar">
-        <button onClick={() => setActiveTab('tabel')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${activeTab === 'tabel' ? 'bg-primary text-background' : 'bg-white/5 text-foreground/60 hover:text-foreground hover:bg-white/10'}`}>
-          <PackageSearch className="w-4 h-4" /> Tabel Stok
-        </button>
-        <button onClick={() => setActiveTab('pipeline')} className={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium text-sm transition-all whitespace-nowrap ${activeTab === 'pipeline' ? 'bg-primary text-background' : 'bg-white/5 text-foreground/60 hover:text-foreground hover:bg-white/10'}`}>
-          <Kanban className="w-4 h-4" /> Live Tracking (Pipeline)
-        </button>
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex justify-end">
+        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
+          <Plus className="w-4 h-4" /> Restock (PO)
+        </Link>
       </div>
 
-      {activeTab === 'tabel' && (
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      {activeTab === 'table' && (
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         
         <div className="md:col-span-4 glass-card overflow-hidden flex flex-col">
           <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">

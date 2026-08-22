@@ -441,7 +441,7 @@ export async function POST(req) {
         }
 
         const model = genAI.getGenerativeModel({
-          model: "gemini-3.6-flash",
+          model: "gemini-3.7-flash",
           systemInstruction: SYSTEM_PROMPT(pushname),
           tools: [{
             functionDeclarations: [{
@@ -500,12 +500,11 @@ export async function POST(req) {
           }
 
           try {
-            result = await runWithTimeout(chat.sendMessage([{
-              functionResponse: {
-                name: "cek_pesanan",
-                response: functionResponseData
-              }
-            }]), 55000);
+            // Keep the tool result as normal user context instead of replaying
+            // the legacy functionResponse role through this SDK.
+            result = await runWithTimeout(chat.sendMessage(
+              `Hasil alat cek_pesanan (gunakan data ini untuk menjawab pelanggan, jangan panggil alat lagi):\n${JSON.stringify(functionResponseData)}`
+            ), 55000);
           } catch (error) {
             if (error.message === 'TIMEOUT') {
               const fallbackMsg = "Maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";

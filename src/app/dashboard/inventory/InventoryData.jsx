@@ -3,7 +3,7 @@ import InventoryClient from './InventoryClient'
 
 // Komponen server ini di-render di dalam Suspense boundary di page.js
 // sehingga UI halaman bisa langsung tampil, dan data dimuat secara streaming
-export default async function InventoryData({ searchParams = {} }) {
+export default async function InventoryData({ searchParams = {}, activeTab = 'table' }) {
   const supabase = await createClient()
 
   const page = parseInt(searchParams.page || '1', 10)
@@ -75,6 +75,7 @@ export default async function InventoryData({ searchParams = {} }) {
       workshops={workshops || []}
       categories={categories}
       searchParams={searchParams}
+      activeTab={activeTab}
     />
   )
 }

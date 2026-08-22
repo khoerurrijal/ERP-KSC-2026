@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, CheckCircle2, Wallet, X, Loader2, Trash2 } from 'lucide-react'
+import { Plus, CheckCircle2, X, Loader2, Trash2 } from 'lucide-react'
 import { createLoan, deleteLoan } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 
@@ -66,19 +66,12 @@ export default function LoansClient({ employees = [], initialLoans = [], error =
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Wallet className="w-6 h-6 text-purple-400" />
-            Kasbon & Pinjaman
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kelola hutang karyawan. Pencairan akan otomatis mengurangi Buku Besar/Tabungan.</p>
-        </div>
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="flex justify-end">
         <button onClick={handleAddNew} className="btn-primary h-10 px-4 flex items-center gap-2 text-sm">
           <Plus className="w-4 h-4" /> Tambah Baru
         </button>
-      </header>
+      </div>
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">

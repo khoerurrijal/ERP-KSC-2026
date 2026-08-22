@@ -88,12 +88,8 @@ export default function SalarySchemaClient({ initialSchemas }) {
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-white">Skema Gaji (Jabatan)</h1>
-          <p className="text-foreground/60 text-sm mt-1">Kelola komponen gaji untuk masing-masing jabatan.</p>
-        </div>
+    <div className="space-y-4">
+      <div className="flex justify-end">
         <button onClick={handleAddNew} className="btn-primary flex items-center gap-2">
           <Plus className="w-4 h-4" /> Tambah Jabatan
         </button>
@@ -103,31 +99,31 @@ export default function SalarySchemaClient({ initialSchemas }) {
         <table className="w-full text-sm text-left">
           <thead className="text-xs uppercase bg-white/5 text-foreground/60">
             <tr>
-              <th className="px-4 py-4 rounded-tl-xl">Jabatan</th>
-              <th className="px-4 py-4">Bonus Mingguan</th>
-              <th className="px-4 py-4">Borongan (Sendiri/Bawahan)</th>
-              <th className="px-4 py-4">Bonus Harian & Lainnya</th>
-              <th className="px-4 py-4 text-center rounded-tr-xl">Aksi</th>
+              <th className="px-4 py-3 rounded-tl-xl">Jabatan</th>
+              <th className="px-4 py-3">Bonus Mingguan</th>
+              <th className="px-4 py-3">Borongan (Sendiri/Bawahan)</th>
+              <th className="px-4 py-3">Bonus Harian & Lainnya</th>
+              <th className="px-4 py-3 text-center rounded-tr-xl">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
             {schemas.map(schema => (
               <tr key={schema.id} className="hover:bg-white/5 transition-colors">
-                <td className="px-4 py-4 font-bold text-primary">{schema.role_name}</td>
-                <td className="px-4 py-4 text-xs">
+                <td className="px-4 py-3 font-bold text-primary">{schema.role_name}</td>
+                <td className="px-4 py-3 text-xs">
                   {schema.bonus_mingguan > 0 ? `Rp ${schema.bonus_mingguan.toLocaleString('id-ID')}` : '-'}
                 </td>
-                <td className="px-4 py-4 text-xs text-foreground/80">
+                <td className="px-4 py-3 text-xs text-foreground/80">
                   {schema.rate_borongan_sendiri > 0 && <div>Sendiri: Rp {schema.rate_borongan_sendiri.toLocaleString('id-ID')}</div>}
                   {schema.rate_produksi_bawahan > 0 && <div>Bawahan: Rp {schema.rate_produksi_bawahan.toLocaleString('id-ID')}</div>}
                   {schema.rate_borongan_sendiri === 0 && schema.rate_produksi_bawahan === 0 && <span className="text-foreground/40 italic">-</span>}
                 </td>
-                <td className="px-4 py-4 text-xs text-foreground/60">
+                <td className="px-4 py-3 text-xs text-foreground/60">
                   {schema.bonus_harian_dibawah_target > 0 && <div>Bns Qty {'<'}{schema.batas_qty_bonus_harian}: Rp {schema.bonus_harian_dibawah_target.toLocaleString('id-ID')}</div>}
                   {schema.bonus_target_harian > 0 && <div>Bns Qty {'>'}={schema.batas_qty_target_harian}: Rp {schema.bonus_target_harian.toLocaleString('id-ID')}</div>}
                   {schema.fee_2_warna > 0 && <div>Fee 2 Warna: Rp {schema.fee_2_warna.toLocaleString('id-ID')}</div>}
                 </td>
-                <td className="px-4 py-4">
+                <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-2">
                     <button onClick={() => handleEdit(schema)} className="p-2 text-blue-400 hover:bg-blue-400/10 rounded-lg transition-colors">
                       <Edit2 className="w-4 h-4" />

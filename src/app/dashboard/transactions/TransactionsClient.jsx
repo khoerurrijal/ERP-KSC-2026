@@ -176,16 +176,9 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <BookOpen className="w-6 h-6 text-primary" />
-            Buku Besar / Transaksi
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kelola mutasi kas masuk dan keluar seluruh workshop.</p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-center gap-3">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto md:ml-auto">
           <div className="flex gap-2 w-full sm:w-auto">
             <div className="relative w-full sm:w-64">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
@@ -208,19 +201,19 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
             <Plus className="w-4 h-4" /> Tambah Manual
           </button>
         </div>
-      </header>
+      </div>
 
       {/* Tabs */}
-      <div className="flex items-center gap-4 border-b border-white/10 pb-2">
+      <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
         <button 
           onClick={() => setCurrentTab('UTAMA')} 
-          className={`pb-2 px-2 text-sm font-bold transition-colors ${currentTab === 'UTAMA' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+          className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${currentTab === 'UTAMA' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
         >
           Kas Utama
         </button>
         <button 
           onClick={() => setCurrentTab('VIRTUAL')} 
-          className={`pb-2 px-2 text-sm font-bold transition-colors ${currentTab === 'VIRTUAL' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+          className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${currentTab === 'VIRTUAL' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
         >
           Mutasi Virtual (HPP)
         </button>
@@ -269,7 +262,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="glass-card p-4 flex items-center gap-4 border-l-4 border-green-500">
           <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
             <ArrowDownRight className="w-6 h-6" />

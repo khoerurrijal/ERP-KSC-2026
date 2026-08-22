@@ -39,16 +39,16 @@ export default async function OrderPage() {
 
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
-      <div className="relative pt-8 pb-6 px-4 text-center">
+      <div className="relative pt-6 sm:pt-8 pb-4 sm:pb-6 px-4 text-center">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full h-full bg-primary/10 rounded-b-[3rem] blur-[80px] pointer-events-none -z-10" />
-        <img src="/logo-dark.png" alt="King Sablon Logo" className="h-20 mx-auto mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] object-contain" />
+        <img src="/logo-dark.png" alt="King Sablon Logo" className="h-16 sm:h-20 mx-auto mb-3 drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] object-contain" />
         <h1 className="text-2xl font-black tracking-tight mb-1">Order Cepat</h1>
         <p className="text-foreground/60 text-xs max-w-xs mx-auto">
           Kalkulator harga otomatis. Pilih produk, tentukan jumlah, dan dapatkan invoice Anda.
         </p>
       </div>
 
-      <div className="max-w-md mx-auto px-3 relative z-10">
+      <div className="max-w-md mx-auto px-3 sm:px-4 relative z-10">
         <OrderClient 
           products={products || []} 
           matrix={matrix} 

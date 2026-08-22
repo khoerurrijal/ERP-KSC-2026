@@ -119,16 +119,9 @@ export default function CustomersClient({
   const filteredCustomers = customers
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Users className="w-6 h-6 text-green-400" />
-            Pelanggan (Customers)
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Daftar klien dan pelanggan toko maupun marketplace.</p>
-        </div>
-        <div className="flex items-center gap-3">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+      <div className="flex flex-col md:flex-row md:items-center justify-end gap-3">
+        <div className="flex items-center gap-3 w-full md:w-auto">
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input 
@@ -144,7 +137,7 @@ export default function CustomersClient({
             Tambah Pelanggan
           </button>
         </div>
-      </header>
+      </div>
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">

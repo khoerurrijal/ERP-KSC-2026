@@ -80,7 +80,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
         </div>
       )}
 
-      <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20 pt-8 print:pb-0 print:pt-0 print:space-y-0 print:w-full print:max-w-none print:m-0">
+      <div className="max-w-4xl mx-auto space-y-4 sm:space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-8 sm:pb-20 pt-4 sm:pt-8 px-2 sm:px-0 print:pb-0 print:pt-0 print:space-y-0 print:w-full print:max-w-none print:m-0 print:px-0">
 
       {/* Tombol Aksi - Disembunyikan saat di-print */}
       <style dangerouslySetInnerHTML={{
@@ -99,28 +99,28 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
         }
       `}} />
 
-      <div className="flex flex-col sm:flex-row items-center justify-between mb-8 no-print gap-4 px-4 sm:px-0">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between mb-4 sm:mb-8 no-print gap-3 sm:gap-4 px-1 sm:px-0">
         <div className="flex items-center gap-2">
            <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-8 w-auto object-contain" />
            <span className="font-black text-xl tracking-wider text-primary">{store.store_name}</span>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <button onClick={() => router.push(`/track/${invoiceId}`)} className="bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20 h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors">
+        <div className="flex flex-col sm:flex-row items-stretch gap-2 sm:gap-3">
+          <button onClick={() => router.push(`/track/${invoiceId}`)} className="bg-blue-500/10 text-blue-500 border border-blue-500/20 hover:bg-blue-500/20 h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors">
             <Navigation className="w-4 h-4" /> Lacak Pesanan
           </button>
-          <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
+          <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-primary/20">
             <Download className="w-4 h-4" /> Unduh PDF
           </button>
         </div>
       </div>
 
       {/* KERTAS INVOICE */}
-      <div className="glass-card bg-white text-black p-5 sm:p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none rounded-3xl shadow-2xl mx-4 sm:mx-0" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
+      <div className="glass-card bg-white text-black p-4 sm:p-8 md:p-12 relative overflow-hidden print:overflow-visible print:m-0 print:border-none rounded-2xl sm:rounded-3xl shadow-2xl mx-0 sm:mx-0" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
 
         {/* Dekorasi Pojok */}
         <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
 
-        <div className="flex flex-col md:flex-row justify-between items-start gap-6 md:gap-8 border-b border-gray-200 pb-6 md:pb-8 print:flex-row">
+        <div className="flex flex-col md:flex-row justify-between items-start gap-4 md:gap-8 border-b border-gray-200 pb-5 md:pb-8 print:flex-row">
           <div>
             <div className="mb-2">
               <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-12 sm:h-16 md:h-20 w-auto object-contain bg-transparent" />
@@ -147,7 +147,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8 mb-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row">
+        <div className="mt-6 mb-6 sm:mt-8 sm:mb-8 flex flex-col md:flex-row justify-between items-start gap-5 md:gap-8 print:flex-row">
           <div>
             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Ditagihkan Kepada:</p>
             <h3 className="text-lg font-bold text-gray-900">{order.customers?.name || 'Customer'}</h3>
@@ -164,7 +164,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8">
+        <div className="mt-6 sm:mt-8">
           {/* Mobile View */}
           <div className="md:hidden space-y-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-900 pb-2 mb-4">Detail Pesanan</h3>
@@ -212,7 +212,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
           </div>
         </div>
 
-        <div className="mt-8 flex flex-col md:flex-row justify-between items-start gap-8 print:flex-row print:gap-4">
+        <div className="mt-6 sm:mt-8 flex flex-col md:flex-row justify-between items-start gap-5 md:gap-8 print:flex-row print:gap-4">
           <div className="w-full md:w-1/2 p-5 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
             <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Metode Pembayaran</h4>
             

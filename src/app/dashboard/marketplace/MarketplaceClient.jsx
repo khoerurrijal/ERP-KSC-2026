@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { ShoppingBag, TrendingUp, Wallet, Save, X, Zap } from 'lucide-react'
+import { TrendingUp, Wallet, Save, X, Zap } from 'lucide-react'
 import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
@@ -161,18 +161,9 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <ShoppingBag className="w-6 h-6 text-primary" />
-            Marketplace & Keuangan
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">
-            Pantau pesanan Marketplace dan isi nominal untuk Pencairan Dana (Settlement).
-          </p>
-        </div>
+      <div className="flex justify-end">
         <button
           onClick={() => {
             setQuickPreview(null)
@@ -182,18 +173,18 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
         >
           <Zap className="w-4 h-4" /> Rekonsiliasi Cepat
         </button>
-      </header>
+      </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="glass-card p-6 border-l-4 border-orange-500">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <div className="glass-card p-4 border-l-4 border-orange-500">
           <p className="text-xs font-bold text-orange-400 uppercase tracking-wider">Shopee</p>
           <p className="text-2xl font-black text-foreground mt-2">{shopeeCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>
-        <div className="glass-card p-6 border-l-4 border-green-500">
+        <div className="glass-card p-4 border-l-4 border-green-500">
           <p className="text-xs font-bold text-green-400 uppercase tracking-wider">Tokopedia</p>
           <p className="text-2xl font-black text-foreground mt-2">{topedCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>
-        <div className="glass-card p-6 border-l-4 border-black/50 dark:border-white/50 bg-white/5">
+        <div className="glass-card p-4 border-l-4 border-black/50 dark:border-white/50 bg-white/5">
           <p className="text-xs font-bold text-foreground uppercase tracking-wider">TikTok Shop</p>
           <p className="text-2xl font-black text-foreground mt-2">{tiktokCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>

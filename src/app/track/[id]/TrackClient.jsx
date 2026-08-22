@@ -166,6 +166,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
       {/* Print styles */}
       <style dangerouslySetInnerHTML={{
         __html: `
+        @media screen and (max-width: 767px) {
+          .invoice-scaled-wrapper {
+            height: auto !important;
+            overflow: visible !important;
+          }
+          .invoice-scaled-element {
+            position: static !important;
+            transform: none !important;
+            width: 100% !important;
+          }
+        }
+
         @media print {
           @page { size: A4 portrait; margin: 10mm; }
           .no-print, aside, nav, header { display: none !important; }
@@ -194,8 +206,8 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
         <div className="w-full max-w-md bg-black/40 backdrop-blur-3xl min-h-screen shadow-2xl relative flex flex-col border-x border-white/10 print:border-none print:bg-white print:max-w-none print:shadow-none print:min-h-0 overflow-x-hidden">
           
           {/* Header */}
-          <div className="p-8 bg-gradient-to-b from-primary/10 to-transparent flex flex-col items-center justify-center text-center no-print">
-            <div className="w-32 h-32 mb-2 flex items-center justify-center">
+          <div className="p-5 sm:p-8 bg-gradient-to-b from-primary/10 to-transparent flex flex-col items-center justify-center text-center no-print">
+            <div className="w-24 h-24 sm:w-32 sm:h-32 mb-2 flex items-center justify-center">
               <img 
                 src="/logo.png" 
                 alt="Logo" 
@@ -207,7 +219,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex border-b border-white/10 px-6 mb-6 no-print">
+          <div className="flex border-b border-white/10 px-4 sm:px-6 mb-5 sm:mb-6 no-print">
             <button 
               onClick={() => setActiveTab('tracking')}
               className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'tracking' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
@@ -223,10 +235,10 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
           </div>
 
           {activeTab === 'tracking' ? (
-            <div className="px-6 -mt-4 relative z-10 space-y-4 no-print">
+            <div className="px-4 sm:px-6 -mt-3 sm:-mt-4 relative z-10 space-y-4 no-print">
               
               {/* Card Info Utama */}
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md">
+              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md">
                 <div className="flex justify-between items-start mb-4">
                   <div>
                     <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-1">Nomor Pesanan</p>
@@ -277,7 +289,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                   }
 
                   return (
-                    <div key={item.id} className="bg-white/5 border border-white/10 rounded-2xl p-5 backdrop-blur-md transition-all">
+                    <div key={item.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md transition-all">
                       {/* Card Header (Clickable if items > 1) */}
                       <div 
                         className={`flex items-start justify-between ${items.length > 1 ? 'cursor-pointer group' : ''}`}
@@ -405,10 +417,10 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
             </div>
           ) : (
             /* Tab Invoice View */
-            <div className="space-y-6 px-4 sm:px-6">
+            <div className="space-y-4 px-3 sm:px-6">
               
               <div className="flex justify-end mb-4 no-print">
-                <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center gap-2 transition-colors shadow-lg shadow-primary/20">
+                <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-primary/20 w-full sm:w-auto">
                   <Printer className="w-4 h-4" /> Unduh PDF
                 </button>
               </div>
@@ -430,7 +442,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                 >
                   
                   {/* KERTAS INVOICE */}
-                  <div className="glass-card bg-white text-black p-8 relative overflow-hidden rounded-3xl shadow-2xl" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
+                  <div className="glass-card bg-white text-black p-4 sm:p-8 relative overflow-hidden rounded-2xl sm:rounded-3xl shadow-2xl" style={{ background: '#ffffff', color: '#1a202c', minHeight: 'auto' }}>
 
                     {/* Dekorasi Pojok */}
                     <div className="absolute -top-24 -right-24 w-64 h-64 bg-primary/10 rounded-full blur-3xl no-print" />
@@ -462,7 +474,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       </div>
                     </div>
 
-                    <div className="mt-8 mb-8 flex flex-col md:flex-row justify-between items-start gap-8">
+                    <div className="mt-6 sm:mt-8 mb-6 sm:mb-8 flex flex-col md:flex-row justify-between items-start gap-5 md:gap-8">
                       <div>
                         <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Ditagihkan Kepada:</p>
                         <h3 className="text-lg font-bold text-gray-900">{order.customers?.name || 'Customer'}</h3>
@@ -479,9 +491,24 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       </div>
                     </div>
 
-                    <div className="mt-8">
-                      {/* Desktop Table View (Scaled proportionally on screen) */}
-                      <div className="overflow-x-auto">
+                    <div className="mt-6 sm:mt-8">
+                      {/* Mobile item cards */}
+                      <div className="md:hidden space-y-3">
+                        <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-900 pb-2 mb-3">Detail Pesanan</h3>
+                        {items.map((item, idx) => (
+                          <div key={idx} className="flex justify-between items-start gap-3 pb-3 border-b border-gray-100 last:border-0">
+                            <div className="min-w-0">
+                              <p className="font-bold text-gray-900 text-sm leading-tight break-words">{item.products?.name || item.product_code}</p>
+                              <p className="text-xs text-gray-500 mt-1">{item.order_type} · {(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')} Pcs</p>
+                              <p className="text-xs text-gray-400 mt-1">Rp {Number(item.unit_price).toLocaleString('id-ID')} / Pcs</p>
+                            </div>
+                            <p className="font-bold text-gray-900 text-sm text-right shrink-0">Rp {Number(item.total_price).toLocaleString('id-ID')}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Desktop table */}
+                      <div className="hidden md:block overflow-x-auto">
                         <table className="w-full text-left border-collapse min-w-[500px]">
                           <thead>
                             <tr className="border-b-2 border-gray-900">

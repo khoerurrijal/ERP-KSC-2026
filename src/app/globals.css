@@ -63,6 +63,12 @@ body {
   overflow-x: hidden;
 }
 
+/* Halaman dashboard tidak perlu menunggu animasi besar saat berpindah route. */
+.dashboard-content > .animate-in {
+  animation-duration: 160ms !important;
+  animation-delay: 0ms !important;
+}
+
 /* Aurora & Logo Background Setup */
 body::before, body::after {
   content: "";

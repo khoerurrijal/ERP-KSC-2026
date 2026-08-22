@@ -45,7 +45,7 @@ export async function POST(request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.7-flash',
       systemInstruction: 'Kamu adalah Audit Assistant internal King Sablon. Jawab dalam bahasa Indonesia yang singkat dan jelas. Gunakan hanya data audit yang diberikan. Jangan mengarang data, jangan mengubah data, dan jangan menyarankan penghapusan tanpa verifikasi Admin. Jika perlu tindakan, arahkan Admin membuka temuan terkait dan melakukan konfirmasi manual.'
     })
     try {

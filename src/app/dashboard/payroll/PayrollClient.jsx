@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Calendar, CheckCircle2, Loader2, Calculator, Receipt } from 'lucide-react'
+import { Calendar, CheckCircle2, Loader2, Calculator } from 'lucide-react'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CustomSelect from '@/components/CustomSelect'
 import { calculatePayroll, savePayroll } from './actions'
@@ -190,18 +190,8 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Receipt className="w-6 h-6 text-green-400" />
-            Rekap Gaji & Borongan
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">Kalkulasi otomatis berdasarkan absensi produksi dan skema jabatan.</p>
-        </div>
-      </header>
-
-      <div className="glass-card p-6">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="glass-card p-4">
         <h2 className="text-lg font-bold text-foreground mb-4 flex items-center gap-2">
           <Calendar className="w-5 h-5 text-primary" /> Filter Periode
         </h2>

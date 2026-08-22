@@ -1,11 +1,13 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 import { LogOut, Sun, Moon, User, Menu, MessageCircle, Check, X } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { getWaBotStatus, toggleWaBotStatus } from '@/app/dashboard/settings/actions'
 
 export default function Topbar({ userRole = '', onToggleSidebar }) {
+  const pathname = usePathname()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isWaBotActive, setIsWaBotActive] = useState(true)
   const [isToggling, setIsToggling] = useState(false)
@@ -38,11 +40,41 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
 
   const isDark = theme === 'dark' || (!theme && typeof window !== 'undefined' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
+  // Navigasi lama masih bisa membuka route internal `/dashboard/...`,
+  // sementara rewrite baru memakai URL pendek. Samakan keduanya sebelum
+  // mencari judul halaman agar top bar selalu terisi.
+  const displayPathname = pathname === '/dashboard'
+    ? pathname
+    : pathname.replace(/^\/dashboard(?=\/)/, '')
+
+  const pageMeta = [
+    ['/dashboard', 'Dashboard', 'Ringkasan operasional King Sablon'],
+    ['/sales', 'Sales Order', 'Kelola invoice, pembayaran, dan pesanan'],
+    ['/marketplace', 'Marketplace', 'Rekonsiliasi pesanan dan pencairan'],
+    ['/production/status', 'Status Pesanan', 'Ubah status dan konfirmasi pengiriman'],
+    ['/production/shipping', 'Konfirmasi Pengiriman', 'Konfirmasi pesanan yang siap dikirim atau diambil'],
+    ['/production', 'Produksi', 'Pantau proses produksi per item'],
+    ['/status-pesanan', 'Status Pesanan', 'Ubah status dan konfirmasi pengiriman'],
+    ['/inventory', 'Inventory', 'Pantau stok dan mutasi barang'],
+    ['/purchases', 'Purchase Order', 'Kelola pembelian dan penerimaan'],
+    ['/transactions', 'Transaksi', 'Buku besar dan mutasi keuangan'],
+    ['/finance/loans', 'Kasbon & Pinjaman', 'Kelola pinjaman dan kasbon karyawan'],
+    ['/payroll', 'Rekap Gaji', 'Kelola rekap dan pembayaran gaji'],
+    ['/master/products', 'Produk', 'Kelola master produk dan harga'],
+    ['/master/customers', 'Pelanggan', 'Kelola data pelanggan'],
+    ['/master/suppliers', 'Supplier', 'Kelola data pemasok'],
+    ['/master/employees', 'Karyawan', 'Kelola data karyawan'],
+    ['/report', 'Laporan', 'Ringkasan keuangan dan performa usaha'],
+    ['/audit', 'AI Audit', 'Pemeriksaan data dan kesehatan alur aplikasi'],
+    ['/settings', 'Pengaturan', 'Kelola akses pengguna dan hak akses'],
+    ['/system-config', 'Sistem Konfigurasi', 'Konfigurasi parameter operasional aplikasi'],
+  ].find(([path]) => displayPathname === path || displayPathname.startsWith(`${path}/`)) || ['/', 'King Sablon ERP', '']
+
   return (
-    <div className="w-full h-16 bg-background/80 backdrop-blur-xl border-b border-white/10 sticky top-0 z-40 flex items-center justify-between px-4 lg:px-6">
+    <div className="w-full h-14 sm:h-16 bg-white/[0.04] backdrop-blur-xl border-b border-white/10 sticky top-0 z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
       
       {/* Left: Mobile Hamburger & Logo */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger - Only visible on md:hidden */}
         <button 
           onClick={onToggleSidebar} 
@@ -51,10 +83,9 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
           <Menu className="w-5 h-5" />
         </button>
         
-        {/* Logo - Visible on Mobile, Hidden on Desktop (handled by Sidebar) */}
-        <div className="flex shrink-0 md:hidden">
-          <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
-          <img src="/logo-dark.png" alt="Logo Dark" className="h-8 object-contain drop-shadow-md hidden dark:block" />
+        <div className="flex flex-col min-w-0">
+          <h1 className="text-sm sm:text-base font-bold text-foreground truncate">{pageMeta[1]}</h1>
+          <p className="text-[10px] sm:text-xs text-foreground/50 truncate">{pageMeta[2]}</p>
         </div>
       </div>
 
@@ -63,7 +94,7 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
         
         {/* WA Bot Toggle Switch */}
         {(userRole === 'Owner' || userRole === 'Admin') && (
-          <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-full relative z-50">
+          <div className="flex items-center gap-1.5 sm:gap-2 bg-white/5 border border-white/10 px-2 sm:px-3 py-1.5 rounded-full relative z-50">
             <MessageCircle className={`w-4 h-4 ${isWaBotActive ? 'text-green-400' : 'text-foreground/40'}`} />
             <span className="text-xs font-bold hidden sm:block text-foreground/80 cursor-default">WA Bot</span>
             <button

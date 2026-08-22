@@ -2,33 +2,18 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Settings, Wallet, Users } from 'lucide-react'
+import { Settings, Users } from 'lucide-react'
 
 export default function SettingsLayout({ children }) {
   const pathname = usePathname()
-  const isPengaturan = pathname.startsWith('/settings') || pathname.startsWith('/dashboard/settings/salary-schemas')
-
   const tabs = [
     { name: 'Sistem Konfigurasi', path: '/system-config', icon: Settings, exact: true },
     { name: 'Pengaturan', path: '/settings', icon: Users, exact: false },
   ]
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-            <Settings className="w-6 h-6 text-primary" />
-            {isPengaturan ? 'Pengaturan' : 'Sistem Konfigurasi'}
-          </h1>
-          <p className="text-sm text-foreground/60 mt-1">
-            {isPengaturan ? 'Kelola pengaturan pengguna dan skema gaji.' : 'Konfigurasi parameter operasional dan keuangan aplikasi.'}
-          </p>
-        </div>
-      </header>
-
-      {/* Tabs */}
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 pb-2">
+    <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
+      <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
         {tabs.map(tab => {
           const isActive = tab.exact ? pathname === tab.path : pathname.startsWith(tab.path)
           const Icon = tab.icon
@@ -36,7 +21,7 @@ export default function SettingsLayout({ children }) {
             <Link
               key={tab.path}
               href={tab.path}
-              className={`flex items-center gap-2 pb-2 px-4 text-sm font-bold transition-all border-b-2 ${
+              className={`flex items-center gap-2 pb-2 px-3 sm:px-4 text-xs sm:text-sm font-bold whitespace-nowrap transition-all border-b-2 ${
                 isActive 
                   ? 'text-primary border-primary' 
                   : 'text-foreground/50 border-transparent hover:text-foreground hover:border-white/20'
@@ -49,7 +34,7 @@ export default function SettingsLayout({ children }) {
         })}
       </div>
 
-      <div className="pt-2">
+      <div>
         {children}
       </div>
     </div>
