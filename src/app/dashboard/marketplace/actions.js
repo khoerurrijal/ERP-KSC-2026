@@ -28,6 +28,10 @@ async function requireMarketplaceAdmin(supabase) {
   }
 }
 
+function normalizeMarketplaceReceipt(value) {
+  return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
+}
+
 async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') {
   if (!cutoffDate) throw new Error('Tanggal batas order wajib diisi.')
 
@@ -59,12 +63,12 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
 
   const receiptCounts = new Map()
   candidateOrders.forEach(order => {
-    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     receiptCounts.set(receipt, (receiptCounts.get(receipt) || 0) + 1)
   })
 
   const ordersToProcess = candidateOrders.filter(order => {
-    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     return receiptCounts.get(receipt) === 1
   })
 
@@ -390,7 +394,7 @@ async function buildBulkSettlementPreview(supabase, rawText) {
 
   const orderIndex = new Map()
   for (const order of orders || []) {
-    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     if (!receipt) continue
     const existing = orderIndex.get(receipt) || []
     existing.push(order)
@@ -399,12 +403,12 @@ async function buildBulkSettlementPreview(supabase, rawText) {
 
   const inputCounts = new Map()
   parsedRows.forEach(row => {
-    const receipt = row.receipt.toUpperCase()
+    const receipt = normalizeMarketplaceReceipt(row.receipt)
     inputCounts.set(receipt, (inputCounts.get(receipt) || 0) + 1)
   })
 
   const rows = parsedRows.map(row => {
-    const receipt = row.receipt.toUpperCase()
+    const receipt = normalizeMarketplaceReceipt(row.receipt)
     const matches = orderIndex.get(receipt) || []
     const customer = matches.length === 1
       ? (Array.isArray(matches[0].customers) ? matches[0].customers[0] : matches[0].customers)

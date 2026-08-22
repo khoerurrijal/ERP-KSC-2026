@@ -4,19 +4,35 @@ import MarketplaceClient from './MarketplaceClient'
 export default async function MarketplacePage() {
   const supabase = await createClient()
 
-  // Fetch sales orders where marketplace_receipt is not null
-  const { data: rawOrders } = await supabase
-    .from('sales_orders')
-    .select(`
-      *,
-      customers (name, type),
-      sales_items (qty, unit_price)
-    `)
-    .not('marketplace_receipt', 'is', null)
-    .neq('marketplace_receipt', '')
-    .order('date', { ascending: false })
-    .order('created_at', { ascending: false })
-    .limit(1000)
+  // Include marketplace orders even when the marketplace receipt is still empty,
+  // so an operator can repair missing order numbers from this screen.
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('customer_code, type')
+
+  const marketplaceCustomerCodes = (customers || [])
+    .filter(customer => {
+      const type = String(customer.type || '').toUpperCase()
+      return type.includes('MARKETPLACE') || ['SHOPEE', 'TOKOPEDIA', 'TIKTOK'].some(platform => type.includes(platform))
+    })
+    .map(customer => customer.customer_code)
+    .filter(Boolean)
+
+  let rawOrders = []
+  if (marketplaceCustomerCodes.length > 0) {
+    const { data } = await supabase
+      .from('sales_orders')
+      .select(`
+        *,
+        customers (name, type),
+        sales_items (qty, unit_price)
+      `)
+      .in('customer_code', marketplaceCustomerCodes)
+      .order('date', { ascending: false })
+      .order('created_at', { ascending: false })
+      .limit(1000)
+    rawOrders = data || []
+  }
 
   const validOrders = rawOrders || []
 

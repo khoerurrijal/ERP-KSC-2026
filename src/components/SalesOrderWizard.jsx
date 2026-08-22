@@ -5,6 +5,11 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+
+const isMarketplaceCustomerType = (type) => {
+  const normalizedType = String(type || '').toUpperCase()
+  return normalizedType.includes('MARKETPLACE') || ['SHOPEE', 'TOKOPEDIA', 'TIKTOK'].some(platform => normalizedType.includes(platform))
+}
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
@@ -31,7 +36,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setCustomerId(val)
     const cust = localCustomers.find(c => c.customer_code === val || c.name === val)
     const ctype = (cust?.type || '').toUpperCase()
-    if (cust && (ctype === 'MARKETPLACE' || ctype === 'SHOPEE' || ctype === 'TOKOPEDIA')) {
+    if (cust && isMarketplaceCustomerType(ctype)) {
       setIsMarketplace(true)
       setDpAmount(0)
     } else {
@@ -78,7 +83,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setNewCustomerName('')
 
     const ctype = (res.customer?.type || newCustomerType || '').toUpperCase()
-    if (ctype === 'MARKETPLACE' || ctype === 'SHOPEE' || ctype === 'TOKOPEDIA') {
+    if (isMarketplaceCustomerType(ctype)) {
       setIsMarketplace(true)
       setDpAmount(0)
     } else {

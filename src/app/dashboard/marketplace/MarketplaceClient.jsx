@@ -296,7 +296,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                     <div className="relative flex items-center">
                       <input 
                         type="text" 
-                        placeholder={item.invoice_number}
+                        placeholder={item.marketplace_receipt ? '' : 'Isi No. Pesanan'}
                         className="glass-input w-40 h-8 text-xs px-2 focus:ring-primary focus:border-primary border-transparent hover:border-white/20 bg-transparent hover:bg-white/5 transition-colors"
                         value={inputReceipts[item.id] !== undefined ? inputReceipts[item.id] : (item.marketplace_receipt || '')}
                         onChange={e => handleReceiptChange(item.id, e.target.value)}
@@ -420,7 +420,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       {isBulkModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 sticky top-0 z-10">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-background/95 backdrop-blur-xl sticky top-0 z-20">
               <div>
                 <h3 className="font-bold text-foreground flex items-center gap-2"><ClipboardPaste className="w-4 h-4 text-green-400" /> Pencairan Massal Marketplace</h3>
                 <p className="text-xs text-foreground/50 mt-1">Paste tabel dua kolom: total pencairan dan nomor pesanan marketplace.</p>
