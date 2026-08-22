@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail, CreditCard } from 'lucide-react'
 import { useState, useMemo } from 'react'
+import { getInvoiceAdditionalCharges, getInvoiceBaseItems } from '@/utils/invoiceTotals'
 
 export default function InvoiceClient({ order, storeConfig }) {
   const router = useRouter()
@@ -20,6 +21,8 @@ export default function InvoiceClient({ order, storeConfig }) {
   const invoiceId = order.invoice_number
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
+  const invoiceItems = getInvoiceBaseItems(order.sales_items)
+  const additionalCharges = getInvoiceAdditionalCharges(order.sales_items)
 
 
 
@@ -176,7 +179,7 @@ export default function InvoiceClient({ order, storeConfig }) {
           {/* Mobile View */}
           <div className="md:hidden space-y-4">
             <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest border-b border-gray-900 pb-2 mb-4">Detail Pesanan</h3>
-            {(order.sales_items || []).map((item, idx) => (
+            {invoiceItems.map((item, idx) => (
               <div key={idx} className="flex justify-between items-start pb-4 border-b border-gray-100 last:border-0">
                 <div className="pr-4">
                   <p className="font-bold text-gray-900 text-sm leading-tight">{item.products?.name || item.product_code}</p>
@@ -186,6 +189,15 @@ export default function InvoiceClient({ order, storeConfig }) {
                 <div className="text-right shrink-0">
                   <p className="font-bold text-gray-900 text-sm">Rp {Number(item.total_price).toLocaleString('id-ID')}</p>
                 </div>
+              </div>
+            ))}
+            {additionalCharges.map((charge) => (
+              <div key={charge.key} className="flex justify-between items-start pb-4 border-b border-gray-100">
+                <div>
+                  <p className="font-bold text-gray-900 text-sm">{charge.label}</p>
+                  <p className="text-xs text-gray-500 mt-1">Biaya tambahan pesanan</p>
+                </div>
+                <p className="font-bold text-gray-900 text-sm">Rp {charge.amount.toLocaleString('id-ID')}</p>
               </div>
             ))}
           </div>
@@ -203,7 +215,7 @@ export default function InvoiceClient({ order, storeConfig }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {(order.sales_items || []).map((item, idx) => (
+                {invoiceItems.map((item, idx) => (
                   <tr key={idx}>
                     <td className="py-4">
                       <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
@@ -213,6 +225,12 @@ export default function InvoiceClient({ order, storeConfig }) {
                     <td className="py-4 text-center text-gray-600">Pcs</td>
                     <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
                     <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+                  </tr>
+                ))}
+                {additionalCharges.map((charge) => (
+                  <tr key={charge.key}>
+                    <td colSpan={4} className="py-3 text-right font-bold text-gray-900">{charge.label}</td>
+                    <td className="py-3 text-right font-bold text-gray-900">{charge.amount.toLocaleString('id-ID')}</td>
                   </tr>
                 ))}
               </tbody>
