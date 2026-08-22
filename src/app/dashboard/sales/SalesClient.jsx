@@ -300,12 +300,12 @@ export default function SalesClient({
 
   const totalOmset = useMemo(() => {
     if (serverTotalOmset !== undefined) return serverTotalOmset
-    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.grand_total || o.total_amount || 0), 0)
+    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
   }, [serverTotalOmset, salesOrders, filterMonth])
 
   const totalPiutang = useMemo(() => {
     if (serverTotalPiutang !== undefined) return serverTotalPiutang
-    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.grand_total || o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
+    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
   }, [serverTotalPiutang, salesOrders, filterMonth])
 
   const renderSortIcon = (key, config) => {
@@ -461,7 +461,7 @@ export default function SalesClient({
                 <tr>
                   <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date', sortConfig)}</th>
                   <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', sortConfig)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('grand_total')}>Total Nominal {renderSortIcon('grand_total', sortConfig)}</th>
+                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('total_amount')}>Total Nominal {renderSortIcon('total_amount', sortConfig)}</th>
                   <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_status')}>Status Bayar {renderSortIcon('payment_status', sortConfig)}</th>
                   <th className="px-6 py-4 font-medium text-right">Aksi</th>
                 </tr>
@@ -481,7 +481,7 @@ export default function SalesClient({
                         {item.customers?.name}
                         <br/><span className="text-[10px] text-foreground/50">{item.invoice_number}</span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.grand_total || item.total_amount || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
                       <td className="px-6 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'BATAL' ? 'bg-red-500/20 text-red-500' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                           {item.payment_status}
