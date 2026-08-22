@@ -2,8 +2,9 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { TrendingUp, Wallet, Save, X, Zap } from 'lucide-react'
+import { TrendingUp, Wallet, Save, X, Zap, ClipboardPaste } from 'lucide-react'
 import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
+import { previewBulkMarketplaceSettlement, processBulkMarketplaceSettlement } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
@@ -46,6 +47,13 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   const [quickPlatform, setQuickPlatform] = useState('ALL')
   const [quickPreview, setQuickPreview] = useState(null)
   const [isQuickLoading, setIsQuickLoading] = useState(false)
+
+  // Bulk settlement paste/import
+  const [isBulkModalOpen, setIsBulkModalOpen] = useState(false)
+  const [bulkText, setBulkText] = useState('')
+  const [bulkPreview, setBulkPreview] = useState(null)
+  const [isBulkLoading, setIsBulkLoading] = useState(false)
+  const [bulkSettlementDate, setBulkSettlementDate] = useState(new Date().toISOString().split('T')[0])
 
   const handleInputChange = (id, value) => {
     setInputPencairan(prev => ({
@@ -160,10 +168,66 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
     }
   }
 
+  const handleBulkPreview = async () => {
+    if (!bulkText.trim()) return alert('Paste data pencairan terlebih dahulu.')
+
+    setIsBulkLoading(true)
+    try {
+      const res = await previewBulkMarketplaceSettlement(bulkText)
+      if (res.success) {
+        setBulkPreview(res)
+      } else {
+        alert('Gagal membaca data pencairan: ' + res.error)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Terjadi kesalahan saat membaca data pencairan')
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }
+
+  const handleBulkSettlement = async () => {
+    const matchedCount = bulkPreview?.summary?.matchedCount || 0
+    if (!matchedCount) return alert('Tidak ada data yang cocok untuk diproses.')
+
+    const skippedCount = (bulkPreview?.summary?.inputCount || 0) - matchedCount
+    const skipMessage = skippedCount > 0 ? ` ${skippedCount} baris tidak cocok akan dilewati.` : ''
+    if (!window.confirm(`Proses ${matchedCount} pesanan dengan total Rp ${(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID')}?${skipMessage}`)) return
+
+    setIsBulkLoading(true)
+    try {
+      const res = await processBulkMarketplaceSettlement(bulkText, settlementMethod, bulkSettlementDate)
+      if (res.success) {
+        alert(`Pencairan massal berhasil untuk ${res.processed} pesanan.`)
+        setIsBulkModalOpen(false)
+        setBulkText('')
+        setBulkPreview(null)
+        router.refresh()
+      } else {
+        alert('Gagal memproses pencairan massal: ' + res.error)
+      }
+    } catch (e) {
+      console.error(e)
+      alert('Terjadi kesalahan saat memproses pencairan massal')
+    } finally {
+      setIsBulkLoading(false)
+    }
+  }
+
   return (
     <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-12">
       
-      <div className="flex justify-end">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={() => {
+            setBulkPreview(null)
+            setIsBulkModalOpen(true)
+          }}
+          className="btn-primary h-10 px-4 text-sm flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black border-none"
+        >
+          <ClipboardPaste className="w-4 h-4" /> Pencairan Massal
+        </button>
         <button
           onClick={() => {
             setQuickPreview(null)
@@ -348,6 +412,112 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               <button onClick={handleProcessSettlement} disabled={isSaving} className="btn-primary px-4 h-10 text-sm flex items-center gap-2">
                 <Save className="w-4 h-4" /> {isSaving ? 'Memproses...' : 'Simpan & Lunas'}
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isBulkModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 sticky top-0 z-10">
+              <div>
+                <h3 className="font-bold text-foreground flex items-center gap-2"><ClipboardPaste className="w-4 h-4 text-green-400" /> Pencairan Massal Marketplace</h3>
+                <p className="text-xs text-foreground/50 mt-1">Paste tabel dua kolom: total pencairan dan nomor pesanan marketplace.</p>
+              </div>
+              <button onClick={() => setIsBulkModalOpen(false)} className="text-foreground/50 hover:text-foreground">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <textarea
+                value={bulkText}
+                onChange={e => {
+                  setBulkText(e.target.value)
+                  setBulkPreview(null)
+                }}
+                rows={8}
+                className="glass-input w-full text-xs font-mono leading-relaxed resize-y"
+                placeholder={'Paste dari Excel/Google Sheets/WhatsApp, contoh:\n781857\t26072909NKX8UC\n499661\t260726M71C3BVG'}
+              />
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Tanggal pencairan</label>
+                  <CustomDatePicker value={bulkSettlementDate} onChange={setBulkSettlementDate} className="!h-10" />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-foreground/80">Masuk ke kas</label>
+                  <CustomSelect
+                    value={settlementMethod}
+                    onChange={e => setSettlementMethod(e.target.value)}
+                    options={(dropdownConfig.payment_method || ['BCA', 'MANDIRI', 'CASH']).map(method => ({ value: method, label: method }))}
+                  />
+                </div>
+              </div>
+
+              {bulkPreview && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
+                      <p className="text-[10px] text-green-300 uppercase font-bold">Cocok</p>
+                      <p className="text-xl font-black text-green-400">{bulkPreview.summary.matchedCount}</p>
+                    </div>
+                    <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
+                      <p className="text-[10px] text-red-300 uppercase font-bold">Tidak ditemukan</p>
+                      <p className="text-xl font-black text-red-400">{bulkPreview.summary.notFoundCount}</p>
+                    </div>
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
+                      <p className="text-[10px] text-amber-300 uppercase font-bold">Duplikat/sudah cair</p>
+                      <p className="text-xl font-black text-amber-300">{bulkPreview.summary.duplicateCount + bulkPreview.summary.settledCount}</p>
+                    </div>
+                    <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
+                      <p className="text-[10px] text-primary uppercase font-bold">Total cocok</p>
+                      <p className="text-lg font-black text-primary">Rp {(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID')}</p>
+                    </div>
+                  </div>
+
+                  <div className="overflow-x-auto border border-white/10 rounded-xl">
+                    <table className="w-full text-xs text-left">
+                      <thead className="bg-white/5 text-foreground/60 uppercase">
+                        <tr>
+                          <th className="px-3 py-2">No Pesanan</th>
+                          <th className="px-3 py-2">Nominal</th>
+                          <th className="px-3 py-2">Invoice</th>
+                          <th className="px-3 py-2">Pelanggan</th>
+                          <th className="px-3 py-2">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-white/5">
+                        {bulkPreview.rows.map((row, index) => (
+                          <tr key={`${row.receipt}-${row.line}-${index}`}>
+                            <td className="px-3 py-2 font-mono">{row.receipt || '-'}</td>
+                            <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID')}</td>
+                            <td className="px-3 py-2">{row.invoiceNumber || '-'}</td>
+                            <td className="px-3 py-2">{row.customerName || '-'}</td>
+                            <td className={`px-3 py-2 font-bold ${row.status === 'COCOK' ? 'text-green-400' : row.status === 'SUDAH CAIR' ? 'text-amber-300' : 'text-red-400'}`}>{row.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  <p className="text-xs text-foreground/50">Hanya baris berstatus COCOK yang akan diproses. Baris bermasalah tetap aman dan tidak diubah.</p>
+                </div>
+              )}
+            </div>
+
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 sticky bottom-0">
+              <button onClick={() => setIsBulkModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
+              {!bulkPreview ? (
+                <button onClick={handleBulkPreview} disabled={isBulkLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black border-none">
+                  <ClipboardPaste className="w-4 h-4" /> {isBulkLoading ? 'Membaca...' : 'Preview Data'}
+                </button>
+              ) : (
+                <button onClick={handleBulkSettlement} disabled={isBulkLoading || !bulkPreview.summary.matchedCount} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black border-none">
+                  <Save className="w-4 h-4" /> {isBulkLoading ? 'Memproses...' : `Simpan ${bulkPreview.summary.matchedCount} yang Cocok`}
+                </button>
+              )}
             </div>
           </div>
         </div>

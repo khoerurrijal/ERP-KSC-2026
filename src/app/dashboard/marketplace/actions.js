@@ -343,6 +343,149 @@ export async function processQuickMarketplaceSettlement(cutoffDate, platform, pa
   }
 }
 
+function parseBulkSettlementText(rawText) {
+  return String(rawText || '')
+    .split(/\r?\n/)
+    .map((line, index) => {
+      const trimmed = line.trim()
+      if (!trimmed || /^\|?\s*:?-{2,}/.test(trimmed)) return null
+
+      const cells = trimmed.includes('|')
+        ? trimmed.replace(/^\|\s*/, '').replace(/\s*\|$/, '').split('|').map(cell => cell.trim())
+        : trimmed.split('\t').map(cell => cell.trim())
+      if (cells.length < 2) return null
+
+      const cleanCell = cell => String(cell || '').replace(/\*\*/g, '').replace(/`/g, '').trim()
+      const cleanAmount = cell => {
+        const digits = cleanCell(cell).replace(/[^\d]/g, '')
+        return digits ? Number(digits) : null
+      }
+
+      const firstAmount = cleanAmount(cells[0])
+      const secondAmount = cleanAmount(cells[1])
+      const headerText = cells.join(' ').toLowerCase()
+      if (firstAmount === null && secondAmount === null && /pencair|pesanan|marketplace/.test(headerText)) return null
+      const amount = firstAmount !== null ? firstAmount : secondAmount
+      const receipt = cleanCell(firstAmount !== null ? cells[1] : cells[0]).replace(/\s+/g, '')
+
+      if (!amount && !receipt) return null
+      return { line: index + 1, receipt, amount }
+    })
+    .filter(Boolean)
+}
+
+async function buildBulkSettlementPreview(supabase, rawText) {
+  const parsedRows = parseBulkSettlementText(rawText)
+  if (parsedRows.length === 0) throw new Error('Tidak ada baris pencairan yang bisa dibaca.')
+  if (parsedRows.length > 500) throw new Error('Maksimal 500 pesanan per batch.')
+
+  const { data: orders, error } = await supabase
+    .from('sales_orders')
+    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, marketplace_receipt, customers(name)')
+    .not('marketplace_receipt', 'is', null)
+    .neq('marketplace_receipt', '')
+    .limit(5000)
+
+  if (error) throw error
+
+  const orderIndex = new Map()
+  for (const order of orders || []) {
+    const receipt = String(order.marketplace_receipt || '').trim().toUpperCase()
+    if (!receipt) continue
+    const existing = orderIndex.get(receipt) || []
+    existing.push(order)
+    orderIndex.set(receipt, existing)
+  }
+
+  const inputCounts = new Map()
+  parsedRows.forEach(row => {
+    const receipt = row.receipt.toUpperCase()
+    inputCounts.set(receipt, (inputCounts.get(receipt) || 0) + 1)
+  })
+
+  const rows = parsedRows.map(row => {
+    const receipt = row.receipt.toUpperCase()
+    const matches = orderIndex.get(receipt) || []
+    const customer = matches.length === 1
+      ? (Array.isArray(matches[0].customers) ? matches[0].customers[0] : matches[0].customers)
+      : null
+    let status = 'COCOK'
+
+    if (!row.receipt || !row.amount || row.amount <= 0) status = 'NOMINAL INVALID'
+    else if ((inputCounts.get(receipt) || 0) > 1) status = 'DUPLIKAT INPUT'
+    else if (matches.length === 0) status = 'TIDAK DITEMUKAN'
+    else if (matches.length > 1) status = 'DUPLIKAT DATABASE'
+    else if (String(matches[0].payment_status || '').toUpperCase() === 'LUNAS' || Number(matches[0].marketplace_pencairan || 0) > 0) status = 'SUDAH CAIR'
+    else if (row.amount > Number(matches[0].total_amount || 0)) status = 'NOMINAL > TAGIHAN'
+
+    return {
+      line: row.line,
+      receipt: row.receipt,
+      amount: row.amount,
+      status,
+      orderId: status === 'COCOK' ? matches[0]?.id : null,
+      invoiceNumber: matches.length === 1 ? matches[0].invoice_number : null,
+      customerName: customer?.name || null,
+      invoiceTotal: matches.length === 1 ? Number(matches[0].total_amount || 0) : null
+    }
+  })
+
+  const matchedRows = rows.filter(row => row.status === 'COCOK')
+  const countByStatus = status => rows.filter(row => row.status === status).length
+  return {
+    rows,
+    summary: {
+      inputCount: rows.length,
+      matchedCount: matchedRows.length,
+      matchedTotal: matchedRows.reduce((sum, row) => sum + Number(row.amount || 0), 0),
+      invalidCount: countByStatus('NOMINAL INVALID'),
+      notFoundCount: countByStatus('TIDAK DITEMUKAN'),
+      duplicateCount: countByStatus('DUPLIKAT INPUT') + countByStatus('DUPLIKAT DATABASE'),
+      settledCount: countByStatus('SUDAH CAIR'),
+      overTotalCount: countByStatus('NOMINAL > TAGIHAN')
+    }
+  }
+}
+
+export async function previewBulkMarketplaceSettlement(rawText) {
+  const supabase = await createClient()
+  try {
+    await requireMarketplaceAdmin(supabase)
+    const preview = await buildBulkSettlementPreview(supabase, rawText)
+    return { success: true, ...preview }
+  } catch (err) {
+    console.error('Bulk marketplace preview error:', err)
+    return { success: false, error: err.message }
+  }
+}
+
+export async function processBulkMarketplaceSettlement(rawText, paymentMethod, settlementDate) {
+  const supabase = await createClient()
+  try {
+    await requireMarketplaceAdmin(supabase)
+    const preview = await buildBulkSettlementPreview(supabase, rawText)
+    const matchedRows = preview.rows.filter(row => row.status === 'COCOK')
+    if (matchedRows.length === 0) throw new Error('Tidak ada baris yang cocok untuk diproses.')
+
+    const settlementResult = await processMarketplaceSettlement(
+      matchedRows.map(row => ({ orderId: row.orderId, amount: row.amount, invoice_number: row.invoiceNumber })),
+      paymentMethod,
+      settlementDate
+    )
+    if (!settlementResult.success) throw new Error(settlementResult.error)
+
+    return {
+      success: true,
+      processed: settlementResult.processed,
+      skipped: settlementResult.skipped,
+      summary: preview.summary
+    }
+  } catch (err) {
+    console.error('Bulk marketplace settlement error:', err)
+    return { success: false, error: err.message }
+  }
+}
+
 export async function updateMarketplaceReceipt(orderId, receipt) {
   const supabase = await createClient();
   const { error } = await supabase.from('sales_orders').update({ marketplace_receipt: receipt }).eq('id', orderId);
