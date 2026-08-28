@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X } from 'lucide-react'
+import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X, Copy, Check } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { approveCustomerOrderRequest } from '@/app/actions/orderRequests'
@@ -192,6 +192,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [dpAmount, setDpAmount] = useState(Number(initialData?.dp_amount || 0))
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
   const [designService, setDesignService] = useState(Boolean(initialData?.designService))
+  const [copiedTrackingLink, setCopiedTrackingLink] = useState(false)
 
   const handleClose = () => {
     if (onClose) {
@@ -207,6 +208,32 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       return
     }
     router.push('/sales')
+  }
+
+  const handleCopyTrackingLink = async () => {
+    if (!initialData?.id) return
+    const trackingPath = `/track/${initialData.invoice_number || initialData.id}`
+    const trackingUrl = typeof window === 'undefined' ? trackingPath : new URL(trackingPath, window.location.origin).toString()
+
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(trackingUrl)
+      } else {
+        const helper = document.createElement('textarea')
+        helper.value = trackingUrl
+        helper.style.position = 'fixed'
+        helper.style.opacity = '0'
+        document.body.appendChild(helper)
+        helper.select()
+        document.execCommand('copy')
+        helper.remove()
+      }
+      setCopiedTrackingLink(true)
+      window.setTimeout(() => setCopiedTrackingLink(false), 1800)
+    } catch (copyError) {
+      console.error('Gagal menyalin link tracking:', copyError)
+      alert('Link tracking gagal disalin.')
+    }
   }
 
   const formatRp = (val) => {
@@ -675,24 +702,27 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
             </div>
           </div>
 
-          <footer className="flex items-center justify-between gap-3 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
-            <div className="flex items-center gap-2">
+          <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
+            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
               {initialData?.id && (
                 <>
-                  <a href={`/track/${initialData.invoice_number || initialData.id}`} target="_blank" rel="noreferrer" className="rounded-lg px-2 py-2 text-xs text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">Track</a>
-                  <a href={`/sales/${initialData.id}/invoice`} target="_blank" rel="noreferrer" className="rounded-lg px-2 py-2 text-xs text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">Print</a>
+                  <button type="button" onClick={handleCopyTrackingLink} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground" title="Salin link tracking untuk dikirim ke konsumen">
+                    {copiedTrackingLink ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedTrackingLink ? 'Tersalin' : 'Salin Link'}
+                  </button>
+                  <a href={`/sales/${initialData.id}/invoice`} target="_blank" rel="noreferrer" className="flex h-9 items-center whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground">Print</a>
                 </>
               )}
               {initialData?.id && initialData.payment_status !== 'BATAL' && onCancel && (
-                <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="rounded-lg border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10">
+                <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="flex h-9 items-center whitespace-nowrap rounded-lg bg-red-500 px-2.5 text-[11px] font-bold text-white transition-colors hover:bg-red-400">
                   Batal Pesanan
                 </button>
               )}
-              <button type="button" onClick={handleClose} className="btn-secondary px-4 text-sm">Batal</button>
+              <button type="button" onClick={handleClose} className="btn-secondary h-9 whitespace-nowrap px-2.5 text-[11px]">Batal</button>
             </div>
-            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex items-center gap-2 px-5 text-sm">
+            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs">
               {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {loading ? 'Memproses...' : requestId ? 'Konfirmasi SO' : initialData ? 'Simpan Perubahan' : 'Simpan SO'}
+              {loading ? 'Memproses...' : requestId ? 'Konfirmasi' : initialData ? 'Simpan' : 'Simpan SO'}
             </button>
           </footer>
         </aside>
