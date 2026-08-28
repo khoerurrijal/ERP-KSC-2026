@@ -470,7 +470,7 @@ export default function SalesClient({
       <div className="glass-card overflow-hidden">
         {activeTab === 'INVOICE' ? (
           /* TAB 1: INVOICES */
-          <div className="overflow-x-auto min-h-[300px]">
+          <div className="overflow-x-auto min-h-[180px]">
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
@@ -549,7 +549,7 @@ export default function SalesClient({
           </div>
         ) : (
           /* TAB 2: ITEMS */
-          <div className="overflow-x-auto min-h-[300px]">
+          <div className="overflow-x-auto min-h-[180px]">
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
