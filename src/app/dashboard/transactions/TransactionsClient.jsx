@@ -1,7 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { createManualTransaction, updateTransaction, deleteTransaction } from './actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
@@ -9,6 +10,7 @@ import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 
 export default function TransactionsClient({ transactions = [], dropdownConfig = {} }) {
+  const router = useRouter()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [searchQuery, setSearchQuery] = useState('')
@@ -69,6 +71,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       const res = await deleteTransaction(id)
       if (res.success) {
         alert('Transaksi berhasil dihapus!')
+        router.refresh()
       } else {
         alert('Gagal menghapus: ' + res.error)
       }
@@ -102,6 +105,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
         setIsModalOpen(false)
         setFormAmount('')
         setFormDesc('')
+        router.refresh()
       } else {
         alert('Gagal menambahkan transaksi: ' + res.error)
       }
@@ -302,6 +306,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                 <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('description')}>Keterangan / Pelanggan {renderSortIcon('description')}</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop_code')}>Workshop {renderSortIcon('workshop_code')}</th>
                 <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_method')}>Metode {renderSortIcon('payment_method')}</th>
+                <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('amount_in')}>Kas Masuk {renderSortIcon('amount_in')}</th>
                 <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('amount_out')}>Kas Keluar {renderSortIcon('amount_out')}</th>
                 <th className="px-4 py-3 font-medium text-right">Aksi</th>
               </tr>
@@ -309,10 +314,10 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
             <tbody className="divide-y divide-white/5">
               {paginatedTransactions.length === 0 ? (
                  <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-foreground/40">Belum ada data transaksi.</td>
+                    <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">Belum ada data transaksi.</td>
                  </tr>
               ) : paginatedTransactions.map((trx) => (
-                <tr key={trx.id} className="hover:bg-white/5 transition-colors">
+                <tr key={trx.id} onClick={() => handleEditTransaction(trx)} className="cursor-pointer transition-colors hover:bg-white/5">
                   <td className="px-4 py-3 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
                   <td className="px-4 py-3 font-medium text-foreground/90">
                     {trx.description && trx.description !== '-' 
@@ -328,8 +333,8 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                     {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID')}` : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <button onClick={() => handleEditTransaction(trx)} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>
-                    <button onClick={() => handleDeleteTransaction(trx.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
+                    <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>
+                    <button onClick={event => { event.stopPropagation(); handleDeleteTransaction(trx.id) }} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
                   </td>
                 </tr>
               ))}
@@ -366,13 +371,15 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
       {/* Modal Input Transaksi */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setIsModalOpen(false)}>
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-4 border-b border-white/10 bg-white/5">
-              <h3 className="font-bold text-foreground">{editId ? 'Edit Transaksi' : 'Tambah Transaksi Manual'}</h3>
+        <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-[2px]">
+          <button type="button" aria-label="Tutup drawer transaksi" onClick={() => setIsModalOpen(false)} className="absolute inset-0 cursor-default" />
+          <aside role="dialog" aria-modal="true" aria-labelledby="transaction-drawer-title" className="po-drawer-enter relative ml-auto flex h-full w-[92%] max-w-md flex-col border-l border-white/10 bg-background shadow-2xl will-change-transform sm:w-[80%] lg:w-[72%]">
+            <div className="flex items-center justify-between gap-3 border-b border-white/10 bg-white/5 px-3 py-2.5 md:px-4">
+              <h3 id="transaction-drawer-title" className="font-bold text-foreground">{editId ? 'Edit Transaksi' : 'Tambah Transaksi Manual'}</h3>
+              <button type="button" onClick={() => setIsModalOpen(false)} aria-label="Tutup" className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground"><X className="h-5 w-5" /></button>
             </div>
-            
-            <div className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+            <div className="flex-1 space-y-3 overflow-y-auto p-3 md:p-4">
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground/60 mb-1 block">Tanggal</label>
@@ -460,14 +467,14 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
               </div>
             </div>
 
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5">
-              <button onClick={() => setIsModalOpen(false)} className="btn-secondary px-4 h-10 text-sm" disabled={isSubmitting}>Batal</button>
-              <button onClick={handleSubmit} className="btn-primary px-4 h-10 text-sm flex items-center gap-2" disabled={isSubmitting}>
+            <div className="flex items-center justify-between gap-3 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
+              <button onClick={() => setIsModalOpen(false)} className="btn-secondary h-10 px-4 text-sm" disabled={isSubmitting}>Batal</button>
+              <button onClick={handleSubmit} className="btn-primary flex h-10 items-center gap-2 px-4 text-sm" disabled={isSubmitting}>
                 {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
                 Simpan Transaksi
               </button>
             </div>
-          </div>
+          </aside>
         </div>
       )}
 
