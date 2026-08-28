@@ -2,8 +2,7 @@
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
-import Link from 'next/link'
-import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, Edit, X, Save, Clock, Edit3, Package, FileText, ExternalLink, Printer, XCircle, Camera, Navigation, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, X, Save, Clock, Package, FileText, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/actions/sales'
 import MonthFilter from '@/components/MonthFilter'
@@ -12,6 +11,7 @@ import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
+import SalesOrderWizard from '@/components/SalesOrderWizard'
 
 export default function SalesClient({ 
   salesOrders = [], 
@@ -23,6 +23,10 @@ export default function SalesClient({
   searchParams: passedSearchParams = {},
   serverTotalOmset,
   serverTotalPiutang,
+  customers = [],
+  products = [],
+  workshops = [],
+  pricelistConfig = {},
   initialTab = 'INVOICE',
   embedded = false,
   showItemsTab = true
@@ -62,6 +66,21 @@ export default function SalesClient({
   const [isCorrecting, setIsCorrecting] = useState(false)
   const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
   const [zoomImage, setZoomImage] = useState(null)
+  const [salesOrderDrawer, setSalesOrderDrawer] = useState(null)
+
+  const openSalesOrderDrawer = (order = null) => {
+    setSalesOrderDrawer(order ? {
+      ...order,
+      items: order.sales_items || []
+    } : { items: [] })
+  }
+
+  const closeSalesOrderDrawer = () => setSalesOrderDrawer(null)
+
+  const refreshSalesOrderList = () => {
+    setSalesOrderDrawer(null)
+    router.refresh()
+  }
   const updateQueryParams = useCallback((newParams) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()))
     Object.entries(newParams).forEach(([key, val]) => {
@@ -194,6 +213,8 @@ export default function SalesClient({
       alert(error || 'Gagal membatalkan pesanan');
     } else {
       alert(`Pesanan ${invoiceNumber} berhasil dibatalkan.`);
+      setSalesOrderDrawer(null)
+      router.refresh()
     }
   }
 
@@ -321,9 +342,9 @@ export default function SalesClient({
         <div className="hidden sm:block">
           <MonthFilter />
         </div>
-        <Link href="/sales/new" className="btn-primary h-10 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
+        <button type="button" onClick={() => openSalesOrderDrawer()} className="btn-primary h-10 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
           <Plus className="w-4 h-4" /> Buat Sales Order Baru
-        </Link>
+        </button>
       </div>}
 
       {/* KPI Cards */}
@@ -469,7 +490,11 @@ export default function SalesClient({
                   </tr>
                 ) : filteredAndSortedOrders.map((item) => {
                   return (
-                    <tr key={item.id} className="hover:bg-white/5 transition-colors group">
+                    <tr
+                      key={item.id}
+                      onClick={() => openSalesOrderDrawer(item)}
+                      className="cursor-pointer transition-colors group hover:bg-white/5"
+                    >
                       <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                       <td className="px-4 py-3 text-foreground/90 font-medium">
                         {item.customers?.name}
@@ -484,35 +509,10 @@ export default function SalesClient({
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
                           {item.payment_status !== 'BATAL' && (
-                            <button onClick={() => handleEditClick(item)} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1 transition-colors">
-                              <Clock className="w-3 h-3" /> Bayar
+                            <button onClick={(event) => { event.stopPropagation(); handleEditClick(item) }} className="flex items-center gap-1 rounded-full bg-green-500 px-3 py-1.5 text-[11px] font-bold text-black transition-colors hover:bg-green-400">
+                              <Clock className="w-3 h-3" /> Pelunasan
                             </button>
                           )}
-                          <details className="relative">
-                            <summary className="list-none cursor-pointer text-foreground/60 hover:text-foreground font-medium text-xs inline-flex items-center gap-1 select-none">
-                              Lainnya <ChevronDown className="w-3 h-3" />
-                            </summary>
-                            <div className="absolute right-0 top-full mt-1 z-20 min-w-28 rounded-lg border border-white/10 bg-background p-1 shadow-xl text-left">
-                              <a href={`/track/${item.invoice_number || item.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-foreground/70 hover:bg-white/10 hover:text-foreground">
-                                <Navigation className="w-3 h-3" /> Track
-                              </a>
-                              {item.payment_status !== 'BATAL' && (
-                                <>
-                                  {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
-                                    <Link href={`/sales/edit/${item.id}`} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-blue-400 hover:bg-white/10 hover:text-blue-300">
-                                      <Edit3 className="w-3 h-3" /> Edit
-                                    </Link>
-                                  )}
-                                  <button onClick={() => handleCancelSalesOrder(item.id, item.invoice_number)} disabled={updatingItem === item.id} className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-red-400 hover:bg-white/10 hover:text-red-300 disabled:opacity-50">
-                                    <XCircle className="w-3 h-3" /> {updatingItem === item.id ? 'Loading...' : 'Batal'}
-                                  </button>
-                                  <Link href={`/sales/${item.id}/invoice`} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-purple-400 hover:bg-white/10 hover:text-purple-300">
-                                    <Printer className="w-3 h-3" /> Print
-                                  </Link>
-                                </>
-                              )}
-                            </div>
-                          </details>
                         </div>
                       </td>
                     </tr>
@@ -692,6 +692,20 @@ export default function SalesClient({
           </div>
         )}
       </div>
+
+      {salesOrderDrawer && (
+        <SalesOrderWizard
+          customers={customers}
+          products={products}
+          workshops={workshops}
+          dropdownConfig={dropdownConfig}
+          pricelistConfig={pricelistConfig}
+          initialData={salesOrderDrawer.id ? salesOrderDrawer : undefined}
+          onClose={closeSalesOrderDrawer}
+          onSaved={refreshSalesOrderList}
+          onCancel={handleCancelSalesOrder}
+        />
+      )}
 
       {/* Modal Edit Pembayaran (Unchanged) */}
       {editingOrder && (

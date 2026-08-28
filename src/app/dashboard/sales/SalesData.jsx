@@ -73,7 +73,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     .select(`
       *,
       customers (name, type),
-      sales_items (qty, unit_price)
+      sales_items (id, order_type, product_code, qty, unit, unit_multiplier, unit_price, mockup_url, notes, status)
     `, { count: 'exact' })
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
@@ -123,22 +123,23 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
 
   itemsQuery = itemsQuery.order('id', { ascending: false }).limit(1000)
 
-  const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult, piutangResult] = await Promise.all([
+  const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult, piutangResult, customersResult, productsResult, workshopsResult] = await Promise.all([
     query,
     itemsQuery,
-    supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'dropdown_config')
-      .single(),
+    supabase.from('system_settings').select('key, value').in('key', ['dropdown_config', 'pricelist_config']),
     summaryQuery,
-    piutangQuery
+    piutangQuery,
+    supabase.from('customers').select('*').order('name'),
+    supabase.from('products').select('*, product_units(id, unit_name, multiplier)').order('name'),
+    supabase.from('workshops').select('*').order('name')
   ])
 
   const salesOrders = salesOrdersResult.data || []
   const totalCount = salesOrdersResult.count || 0
   const salesItems = salesItemsResult.data || []
-  const dropdownConfig = settingsResult.data?.value || {}
+  const settings = settingsResult.data || []
+  const dropdownConfig = settings.find(setting => setting.key === 'dropdown_config')?.value || {}
+  const pricelistConfig = settings.find(setting => setting.key === 'pricelist_config')?.value || {}
   const summaryOrders = summaryResult.data || []
   const piutangOrders = piutangResult.data || []
 
@@ -156,6 +157,10 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       pageSize={pageSize}
       salesItems={salesItems}
       dropdownConfig={dropdownConfig}
+      pricelistConfig={pricelistConfig}
+      customers={customersResult.data || []}
+      products={productsResult.data || []}
+      workshops={workshopsResult.data || []}
       searchParams={{ ...searchParams, month: filterMonth }}
       serverTotalOmset={serverTotalOmset}
       serverTotalPiutang={serverTotalPiutang}

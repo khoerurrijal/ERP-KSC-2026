@@ -1,8 +1,8 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save } from 'lucide-react'
+import { useEffect, useId, useRef, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { approveCustomerOrderRequest } from '@/app/actions/orderRequests'
@@ -11,12 +11,85 @@ const isMarketplaceCustomerType = (type) => {
   const normalizedType = String(type || '').toUpperCase()
   return normalizedType.includes('MARKETPLACE') || ['SHOPEE', 'TOKOPEDIA', 'TIKTOK'].some(platform => normalizedType.includes(platform))
 }
+
+function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disabled = false, allowCustom = false }) {
+  const [isOpen, setIsOpen] = useState(false)
+  const [query, setQuery] = useState('')
+  const fieldRef = useRef(null)
+  const listboxId = useId()
+  const selectedOption = options.find(option => String(option.value) === String(value) && option.value !== '')
+
+  useEffect(() => {
+    const handleClickOutside = event => {
+      if (fieldRef.current && !fieldRef.current.contains(event.target)) setIsOpen(false)
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleFocus = () => {
+    if (disabled) return
+    setQuery(selectedOption ? '' : allowCustom ? String(value || '') : '')
+    setIsOpen(true)
+  }
+
+  const handleInputChange = event => {
+    const nextValue = event.target.value
+    setQuery(nextValue)
+    if (allowCustom) onChange({ target: { value: nextValue } })
+    setIsOpen(true)
+  }
+
+  const filteredOptions = options.filter(option => String(option.label).toLowerCase().includes(query.trim().toLowerCase()))
+  const inputValue = isOpen ? query : selectedOption?.label || (allowCustom ? String(value || '') : '')
+
+  return (
+    <div ref={fieldRef} className="relative">
+      <input
+        type="text"
+        value={inputValue}
+        onFocus={handleFocus}
+        onChange={handleInputChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        role="combobox"
+        aria-expanded={isOpen ? 'true' : 'false'}
+        aria-controls={listboxId}
+        aria-autocomplete="list"
+        className={`glass-input h-10 w-full px-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary/50 ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}
+      />
+      {isOpen && !disabled && (
+        <div id={listboxId} role="listbox" className="absolute left-0 right-0 top-full z-[1120] mt-1 max-h-52 overflow-y-auto rounded-xl border border-card-border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md">
+          {filteredOptions.length === 0 ? (
+            <div className="px-3 py-3 text-center text-xs text-foreground/40">Tidak ada hasil</div>
+          ) : filteredOptions.map(option => (
+            <button
+              key={option.value || 'empty'}
+              type="button"
+              role="option"
+              aria-selected={String(value) === String(option.value)}
+              onClick={() => { onChange({ target: { value: option.value } }); setQuery(''); setIsOpen(false) }}
+              className="flex w-full items-start rounded-lg px-3 py-2 text-left text-sm text-foreground/80 transition-colors hover:bg-foreground/10 hover:text-foreground"
+            >
+              <span className="whitespace-normal break-words">{option.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
 import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 
-export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {} }) {
+export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {}, onClose, onSaved, onCancel, compact = true }) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const requestedReturnTo = searchParams.get('from')
+  const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
+    ? requestedReturnTo
+    : '/sales'
   const isExistingOrder = Boolean(initialData?.id)
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
@@ -119,6 +192,22 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [dpAmount, setDpAmount] = useState(Number(initialData?.dp_amount || 0))
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
   const [designService, setDesignService] = useState(Boolean(initialData?.designService))
+
+  const handleClose = () => {
+    if (onClose) {
+      onClose()
+      return
+    }
+    router.replace(returnTo)
+  }
+
+  const handleSaved = () => {
+    if (onSaved) {
+      onSaved()
+      return
+    }
+    router.push('/sales')
+  }
 
   const formatRp = (val) => {
     if (val === undefined || val === null || val === '') return ''
@@ -259,6 +348,12 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   const handleSubmit = async () => {
     if (!customerId) return setError("Pilih pelanggan terlebih dahulu.")
+    const customerExists = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
+    if (!customerExists && customerId.trim() !== '') {
+      setNewCustomerName(customerId)
+      setShowAddCustomer(true)
+      return
+    }
     if (items.some(i => !i.product_id || !i.order_type)) {
       return setError("Pastikan Jenis Pesanan dan Produk sudah dipilih.")
     }
@@ -268,7 +363,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     
     try {
       
-      const selectedCustomer = localCustomers.find(c => c.customer_code === customerId)
+      const selectedCustomer = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
       if (!selectedCustomer) {
         setLoading(false)
         return setError("Pelanggan tidak ditemukan. Silakan tambahkan di menu Master Data terlebih dahulu.")
@@ -296,7 +391,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       
       if (result.success) {
         alert(requestId ? `Request berhasil dikonfirmasi menjadi Sales Order!` : initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
-        router.push('/sales')
+        handleSaved()
       } else {
         setError(result.error || "Terjadi kesalahan saat menyimpan data.")
       }
@@ -306,6 +401,321 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     } finally {
       setLoading(false)
     }
+  }
+
+  if (compact) {
+    return (
+      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-[2px]">
+        <button
+          type="button"
+          aria-label="Tutup form Sales Order"
+          onClick={handleClose}
+          className="absolute inset-0 cursor-default"
+        />
+
+        <aside
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="sales-order-drawer-title"
+          className="po-drawer-enter relative ml-auto flex h-full w-[92%] max-w-md flex-col border-l border-white/10 bg-background shadow-2xl will-change-transform sm:w-[80%] lg:w-[72%]"
+        >
+          <header className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 md:px-4">
+            <div className="min-w-0">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Sales Order</p>
+              <h1 id="sales-order-drawer-title" className="truncate text-base font-bold text-foreground md:text-lg">
+                {requestId ? 'Review Pesanan Customer' : initialData ? 'Edit Sales Order' : 'Buat Sales Order'}
+              </h1>
+            </div>
+            <button type="button" onClick={handleClose} aria-label="Tutup" className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">
+              <X className="h-5 w-5" />
+            </button>
+          </header>
+
+          <div className="flex-1 overflow-y-auto p-2.5 md:p-3">
+            {error && <div className="mb-2 rounded-lg border border-red-500/20 bg-red-500/10 p-2.5 text-sm text-red-400">{error}</div>}
+
+            <div className="space-y-2">
+              <section className="rounded-xl border border-white/10 bg-white/5 p-2.5 md:p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary">1. Pelanggan</p>
+                    <h2 className="text-base font-bold text-foreground">Info Pesanan</h2>
+                  </div>
+                  <span className="text-xs text-foreground/40">Data utama</span>
+                </div>
+
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-foreground/70">Tanggal</label>
+                    <CustomDatePicker value={orderDate} onChange={setOrderDate} />
+                  </div>
+                  <div className="space-y-1 sm:col-span-1">
+                    <label className="text-xs font-medium text-foreground/70">Pelanggan</label>
+                    <SuggestField
+                      value={customerId}
+                      onChange={e => {
+                        setCustomerId(e.target.value)
+                        handleCustomerChange({ target: { value: e.target.value } })
+                      }}
+                      allowCustom
+                      options={[
+                        { value: '', label: 'Pilih Pelanggan...' },
+                        ...localCustomers.map(c => ({ value: c.customer_code, label: `${c.name}${c.type ? ` — ${c.type}` : ''}` }))
+                      ]}
+                    />
+                    <p className="text-[11px] text-foreground/40">
+                      Pelanggan baru? <button type="button" onClick={() => { setNewCustomerName(customerId); setShowAddCustomer(true) }} className="text-primary hover:underline">Tambah Baru</button>
+                    </p>
+                    </div>
+                  </div>
+                  {isMarketplace && (
+                    <div className="mt-2 space-y-1">
+                      <label className="text-xs font-medium text-foreground/70">No. Resi / Referensi Marketplace</label>
+                      <input type="text" value={marketplaceReceipt} onChange={e => setMarketplaceReceipt(e.target.value)} className="glass-input w-full text-sm" placeholder="Masukkan nomor pesanan marketplace..." />
+                    </div>
+                  )}
+                </section>
+
+              <section className="rounded-xl border border-white/10 bg-white/5 p-2.5 md:p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary">2. Barang</p>
+                    <h2 className="text-base font-bold text-foreground">Detail Pesanan</h2>
+                  </div>
+                  <button type="button" onClick={handleAddItem} className="btn-secondary flex h-8 items-center gap-1.5 px-3 text-xs">
+                    <Plus className="h-3.5 w-3.5" /> Tambah Item
+                  </button>
+                </div>
+
+                <div className="space-y-1.5">
+                  {items.map((item, index) => {
+                    const categoryOptions = getCategoriesForItem(item.order_type)
+                    const productOptions = products
+                      .filter(p => p.category === item.category && (p.is_active !== false || p.name === item.product_search))
+                      .map(p => ({ value: p.name, label: p.name }))
+                    const product = products.find(p => p.name === item.product_search)
+                    let itemTotal = Number(item.qty) * Number(item.price)
+                    if (item.isFastTrack) itemTotal += 100000 * Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
+                    if (item.isTwoColor) itemTotal += 250 * Number(item.qty) * Number(item.unit_multiplier || 1)
+
+                    return (
+                      <div key={item.id} className="rounded-lg border border-white/10 bg-black/10 p-2.5">
+                        <div className="mb-2 flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-foreground/70">Item {index + 1}</span>
+                          {items.length > 1 && (
+                            <button type="button" onClick={() => handleRemoveItem(item.id)} className="flex items-center gap-1 text-xs text-red-400 transition-colors hover:text-red-300">
+                              <Trash2 className="h-3.5 w-3.5" /> Hapus
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="block text-[10px] text-foreground/60">Jenis Pesanan</label>
+                            <CustomSelect
+                              value={item.order_type}
+                              onChange={e => handleItemChange(item.id, 'order_type', e.target.value)}
+                              options={[
+                                { value: '', label: 'Pilih Jenis...' },
+                                ...Array.from(new Set([...(dropdownConfig.order_type || ['SABLON', 'POLOS'])])).map(value => ({ value, label: value }))
+                              ]}
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="block text-[10px] text-foreground/60">Kategori</label>
+                            <CustomSelect
+                              value={item.category}
+                              onChange={e => handleItemChange(item.id, 'category', e.target.value)}
+                              options={[
+                                { value: '', label: 'Pilih Kategori...' },
+                                ...categoryOptions.map(value => ({ value, label: value }))
+                              ]}
+                              disabled={!item.order_type}
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-4">
+                            <label className="block text-[10px] text-foreground/60">Produk</label>
+                            <SuggestField
+                              value={item.product_search}
+                              onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
+                              placeholder="Pilih Produk..."
+                              options={[{ value: '', label: 'Pilih Produk...' }, ...productOptions]}
+                              disabled={!item.category}
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="block text-[10px] text-foreground/60">Qty</label>
+                            <input
+                              type="text"
+                              value={formatRp(item.qty)}
+                              onBlur={e => {
+                                const value = parseRp(e.target.value)
+                                const minQty = getMinQty({ orderType: item.order_type, category: item.category, printingColors: item.printingColors, pricelistConfig })
+                                if (value < minQty) handleItemChange(item.id, 'qty', minQty)
+                              }}
+                              onChange={e => handleItemChange(item.id, 'qty', parseRp(e.target.value))}
+                              className="glass-input w-full text-sm"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="block text-[10px] text-foreground/60">Satuan</label>
+                            <CustomSelect
+                              value={item.unit}
+                              onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
+                              options={[
+                                { value: 'PCS', label: 'PCS' },
+                                ...(item.order_type?.toUpperCase() !== 'SABLON' && item.order_type?.toUpperCase() !== 'PRINTING' && product?.product_units || [])
+                                  .filter(unit => unit.unit_name !== 'PCS')
+                                  .map(unit => ({ value: unit.unit_name, label: unit.unit_name }))
+                              ]}
+                              disabled={!item.product_search}
+                            />
+                          </div>
+                          <div className="space-y-1 sm:col-span-2">
+                            <label className="block text-[10px] text-foreground/60">Harga Satuan (Rp)</label>
+                            <input type="text" value={formatRp(item.price)} onChange={e => handleItemChange(item.id, 'price', parseRp(e.target.value))} className="glass-input w-full text-sm" />
+                          </div>
+                        </div>
+
+                        {item.order_type?.toUpperCase() === 'SABLON' && (
+                          <details className="mt-2 border-t border-white/5 pt-2">
+                            <summary className="cursor-pointer list-none text-[11px] font-medium text-foreground/60">Opsi produksi</summary>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
+                                <input type="checkbox" checked={item.isFastTrack || false} onChange={e => handleItemChange(item.id, 'isFastTrack', e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary" />
+                                <span className="text-xs text-red-400">🔥 Fast Track <span className="block text-[10px] text-foreground/50">+ Rp 100.000 / 1000 pcs</span></span>
+                              </label>
+                              <label className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
+                                <input type="checkbox" checked={item.isTwoColor || false} onChange={e => handleItemChange(item.id, 'isTwoColor', e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary" />
+                                <span className="text-xs text-yellow-400">🎨 2 Warna <span className="block text-[10px] text-foreground/50">+ Rp 250 / pcs</span></span>
+                              </label>
+                              <input type="url" placeholder="URL Mockup / Desain (opsional)" value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input text-sm sm:col-span-2" />
+                            </div>
+                          </details>
+                        )}
+
+                        {item.order_type?.toUpperCase() === 'PRINTING' && (
+                          <details className="mt-2 border-t border-white/5 pt-2">
+                            <summary className="cursor-pointer list-none text-[11px] font-medium text-foreground/60">Opsi printing</summary>
+                            <div className="mt-2 grid gap-2 sm:grid-cols-2">
+                              {['3 Warna', '4 Warna'].map(color => (
+                                <label key={color} className="flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2">
+                                  <input type="radio" name={`printingColor_${item.id}`} checked={item.printingColors === color} onChange={() => handleItemChange(item.id, 'printingColors', color)} className="h-4 w-4 text-primary" />
+                                  <span className="text-xs text-foreground/80">🎨 Printing {color}</span>
+                                </label>
+                              ))}
+                              <input type="url" placeholder="URL Mockup / Desain (opsional)" value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input text-sm sm:col-span-2" />
+                            </div>
+                          </details>
+                        )}
+
+                        <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2 text-xs">
+                          <span className="text-foreground/50">Subtotal Item</span>
+                          <span className="font-bold text-primary">Rp {itemTotal.toLocaleString('id-ID')}</span>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {requestId && (
+                  <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2.5">
+                    <input type="checkbox" checked={designService} onChange={e => setDesignService(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary" />
+                    <span className="text-xs font-medium text-foreground/80">Jasa Desain Logo (+Rp 50.000)</span>
+                  </label>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-white/10 bg-white/5 p-2.5 md:p-3">
+                <div className="mb-2 flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary">3. Pembayaran</p>
+                    <h2 className="text-base font-bold text-foreground">Sistem Pembayaran</h2>
+                  </div>
+                  <div className="rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1.5 text-right">
+                    <p className="text-[10px] font-medium text-primary/80">Total</p>
+                    <p className="text-base font-bold text-primary">Rp {grandTotal.toLocaleString('id-ID')}</p>
+                  </div>
+                </div>
+
+                {isExistingOrder ? (
+                  <div className="grid grid-cols-2 gap-2 text-xs">
+                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">DP tercatat</span><strong className="mt-0.5 block text-green-400">Rp {Number(dpAmount).toLocaleString('id-ID')}</strong></div>
+                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">Sisa tagihan</span><strong className={`mt-0.5 block ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID')}</strong></div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-foreground/70">DP / Dibayar (Rp)</label>
+                      <input type="text" value={formatRp(dpAmount)} onChange={e => setDpAmount(parseRp(e.target.value))} disabled={isMarketplace} className={`glass-input w-full text-sm ${isMarketplace ? 'cursor-not-allowed opacity-50' : ''}`} />
+                      {isMarketplace && <p className="text-[10px] text-yellow-400">Marketplace otomatis Tempo.</p>}
+                    </div>
+                    {dpAmount > 0 && !isMarketplace && (
+                      <div className="space-y-1">
+                        <label className="text-xs font-medium text-foreground/70">Rekening DP</label>
+                        <CustomSelect value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} options={[{ value: '', label: 'Pilih Rekening...' }, ...(dropdownConfig.payment_method || ['BCA', 'MANDIRI', 'CASH']).map(value => ({ value, label: value }))]} />
+                      </div>
+                    )}
+                    <div className="rounded-lg border border-white/5 bg-black/10 p-2 text-xs sm:col-span-2">
+                      <div className="flex items-center justify-between"><span className="text-foreground/60">Sisa Tagihan</span><strong className={remaining > 0 ? 'text-yellow-400' : 'text-green-400'}>Rp {Math.max(0, remaining).toLocaleString('id-ID')}</strong></div>
+                    </div>
+                  </div>
+                )}
+              </section>
+
+              <section className="rounded-xl border border-white/10 bg-white/5 px-2.5 py-2">
+                <details>
+                  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-xs font-medium text-foreground/70">
+                    <span>Catatan <span className="text-foreground/40">(opsional)</span></span>
+                    <span className="text-[11px] text-foreground/40">Tambah catatan</span>
+                  </summary>
+                  <textarea value={notes} onChange={e => setNotes(e.target.value)} className="glass-input mt-2 h-12 w-full resize-none text-sm" placeholder="Catatan pesanan..." />
+                </details>
+              </section>
+            </div>
+          </div>
+
+          <footer className="flex items-center justify-between gap-3 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
+            <div className="flex items-center gap-2">
+              {initialData?.id && (
+                <>
+                  <a href={`/track/${initialData.invoice_number || initialData.id}`} target="_blank" rel="noreferrer" className="rounded-lg px-2 py-2 text-xs text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">Track</a>
+                  <a href={`/sales/${initialData.id}/invoice`} target="_blank" rel="noreferrer" className="rounded-lg px-2 py-2 text-xs text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">Print</a>
+                </>
+              )}
+              {initialData?.id && initialData.payment_status !== 'BATAL' && onCancel && (
+                <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="rounded-lg border border-red-500/30 px-3 py-2 text-sm font-medium text-red-400 transition-colors hover:bg-red-500/10">
+                  Batal Pesanan
+                </button>
+              )}
+              <button type="button" onClick={handleClose} className="btn-secondary px-4 text-sm">Batal</button>
+            </div>
+            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex items-center gap-2 px-5 text-sm">
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+              {loading ? 'Memproses...' : requestId ? 'Konfirmasi SO' : initialData ? 'Simpan Perubahan' : 'Simpan SO'}
+            </button>
+          </footer>
+        </aside>
+
+        {showAddCustomer && (
+          <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setShowAddCustomer(false)}>
+            <div className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-background shadow-2xl">
+              <div className="border-b border-white/10 bg-white/5 p-4"><h3 className="font-bold text-foreground">Tambah Pelanggan Baru</h3></div>
+              <div className="space-y-4 p-6">
+                <p className="text-sm text-foreground/60">Pelanggan <b>{newCustomerName}</b> tidak ditemukan. Tambahkan sekarang?</p>
+                <div className="space-y-1"><label className="text-xs font-medium text-foreground/80">Nama / Brand</label><input type="text" value={newCustomerName} onChange={e => setNewCustomerName(e.target.value)} className="glass-input w-full" /></div>
+                <div className="space-y-1"><label className="text-xs font-medium text-foreground/80">No HP / WA</label><input type="text" value={newCustomerPhone} onChange={e => setNewCustomerPhone(e.target.value)} className="glass-input w-full" /></div>
+                <div className="space-y-1"><label className="text-xs font-medium text-foreground/60">Tipe Pelanggan</label><CustomSelect value={newCustomerType} onChange={e => setNewCustomerType(e.target.value)} options={(dropdownConfig.customer_type || ['REGULLER', 'RESELLER', 'SHOPEE', 'TOKOPEDIA']).map(value => ({ value, label: value }))} /></div>
+              </div>
+              <div className="flex justify-end gap-3 border-t border-white/10 bg-white/5 p-4">
+                <button type="button" onClick={() => setShowAddCustomer(false)} className="btn-secondary h-10 px-4 text-sm">Batal</button>
+                <button type="button" onClick={handleAddCustomer} disabled={loading} className="btn-primary h-10 px-4 text-sm">{loading ? 'Menyimpan...' : 'Simpan Pelanggan'}</button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
