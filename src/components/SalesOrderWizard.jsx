@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import { approveCustomerOrderRequest } from '@/app/actions/orderRequests'
 
 const isMarketplaceCustomerType = (type) => {
   const normalizedType = String(type || '').toUpperCase()
@@ -14,8 +15,9 @@ import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 
-export default function SalesOrderWizard({ customers, products, workshops, initialData, dropdownConfig = {}, pricelistConfig = {} }) {
+export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {} }) {
   const router = useRouter()
+  const isExistingOrder = Boolean(initialData?.id)
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
@@ -116,6 +118,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   // Tab 3: Pembayaran
   const [dpAmount, setDpAmount] = useState(Number(initialData?.dp_amount || 0))
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
+  const [designService, setDesignService] = useState(Boolean(initialData?.designService))
 
   const formatRp = (val) => {
     if (val === undefined || val === null || val === '') return ''
@@ -144,7 +147,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
   
   const calculateTotal = () => {
-    return items.reduce((sum, item) => {
+    const itemTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price)
       if (item.isFastTrack) {
         const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
@@ -156,9 +159,10 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       }
       return sum + itemTotal
     }, 0)
+    return itemTotal + (designService ? 50000 : 0)
   }
 
-  const grandTotal = calculateTotal()
+    const grandTotal = calculateTotal()
   const remaining = grandTotal - dpAmount
 
   const handleAddItem = () => {
@@ -277,18 +281,21 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         items,
         dpAmount,
         paymentAccount,
-        marketplaceReceipt
+        marketplaceReceipt,
+        designService
       }
 
       let result;
-      if (initialData?.id) {
+      if (requestId) {
+        result = await approveCustomerOrderRequest(requestId, payload)
+      } else if (initialData?.id) {
         result = await updateSalesOrder(initialData.id, payload)
       } else {
         result = await createSalesOrder(payload)
       }
       
       if (result.success) {
-        alert(initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
+        alert(requestId ? `Request berhasil dikonfirmasi menjadi Sales Order!` : initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
         router.push('/sales')
       } else {
         setError(result.error || "Terjadi kesalahan saat menyimpan data.")
@@ -309,19 +316,19 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         <button onClick={() => router.back()} className="flex items-center gap-2 text-foreground/60 hover:text-primary transition-colors text-sm">
           <ArrowLeft className="w-4 h-4" /> Kembali
         </button>
-        <h1 className="text-2xl font-bold text-foreground">{initialData ? 'Edit Sales Order' : 'Buat Sales Order'}</h1>
+        <h1 className="text-2xl font-bold text-foreground">{requestId ? 'Review Pesanan Customer' : initialData ? 'Edit Sales Order' : 'Buat Sales Order'}</h1>
         <div className="w-20" /> {/* Spacer */}
       </div>
 
       <div className="flex items-center justify-between mb-8 relative">
         <div className="absolute left-0 top-1/2 -translate-y-1/2 w-full h-1 bg-white/5 -z-10 rounded-full" />
         <div className={`absolute left-0 top-1/2 -translate-y-1/2 h-1 bg-primary -z-10 rounded-full transition-all duration-300 ${
-          initialData ? 'w-full' : (currentTab === 1 ? 'w-[15%]' : currentTab === 2 ? 'w-[50%]' : 'w-full')
+          isExistingOrder ? 'w-full' : (currentTab === 1 ? 'w-[15%]' : currentTab === 2 ? 'w-[50%]' : 'w-full')
         }`} />
 
-        <StepIndicator step={1} current={initialData ? 3 : currentTab} icon={User} title="Info Umum" />
-        <StepIndicator step={2} current={initialData ? 3 : currentTab} icon={ShoppingCart} title="Detail Pesanan" />
-        { !initialData && <StepIndicator step={3} current={currentTab} icon={CreditCard} title="Pembayaran" /> }
+        <StepIndicator step={1} current={isExistingOrder ? 3 : currentTab} icon={User} title="Info Umum" />
+        <StepIndicator step={2} current={isExistingOrder ? 3 : currentTab} icon={ShoppingCart} title="Detail Pesanan" />
+        { !isExistingOrder && <StepIndicator step={3} current={currentTab} icon={CreditCard} title="Pembayaran" /> }
       </div>
 
       {error && (
@@ -581,11 +588,23 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               ))}
             </div>
 
+            {requestId && (
+              <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={designService}
+                  onChange={e => setDesignService(e.target.checked)}
+                  className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary"
+                />
+                <span className="text-sm font-medium text-foreground/80">Jasa Desain Logo (+Rp 50.000)</span>
+              </label>
+            )}
+
             <div className="flex justify-between pt-4 border-t border-white/5">
               <button onClick={() => setCurrentTab(1)} className="btn-secondary flex items-center gap-2">
                  Kembali
               </button>
-              {initialData ? (
+              {isExistingOrder ? (
                 <button onClick={handleSubmit} disabled={loading} className="btn-primary flex items-center gap-2 px-8">
                   {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
                   {loading ? 'Menyimpan...' : 'Simpan Perubahan'}
@@ -660,7 +679,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
       </div>
       {showAddCustomer && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setShowAddCustomer(false)}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 bg-white/5">
               <h3 className="font-bold text-foreground">Tambah Pelanggan Baru</h3>

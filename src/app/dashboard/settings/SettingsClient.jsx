@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon } from 'lucide-react'
 import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig } from './actions'
+import CurrencyInput from '@/components/CurrencyInput'
 
 export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false }) {
   const [activeTab, setActiveTab] = useState(onlyAccess ? 'access' : 'dropdowns')
@@ -490,8 +491,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                   <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">
                     Rp
                   </div>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     value={cashflow.king_fixed_expenses}
                     onChange={(e) => setCashflow({ ...cashflow, king_fixed_expenses: Number(e.target.value) })}
                     className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-right focus:outline-none focus:border-primary/50 text-foreground font-mono text-lg"
@@ -509,8 +509,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                   <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">
                     Rp
                   </div>
-                  <input
-                    type="number"
+                  <CurrencyInput
                     value={cashflow.tabungan_fixed_in}
                     onChange={(e) => setCashflow({ ...cashflow, tabungan_fixed_in: Number(e.target.value) })}
                     className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 text-right focus:outline-none focus:border-primary/50 text-foreground font-mono text-lg"
@@ -573,8 +572,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                     <p className="text-xs text-foreground/40 mt-1">Margin profit Gudang dalam Rupiah (angka mati) per Pcs.</p>
                     <div className="relative">
                       <div className="absolute inset-y-0 left-0 flex items-center pl-4 pointer-events-none text-foreground/40 font-bold">Rp</div>
-                      <input
-                        type="number"
+                      <CurrencyInput
                         value={pricelist.profit_gudang_nominal}
                         onChange={(e) => setPricelist({ ...pricelist, profit_gudang_nominal: Number(e.target.value) })}
                         className="w-full bg-black/40 border border-white/10 rounded-xl pl-12 pr-4 py-3 focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
@@ -668,15 +666,14 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                             <td key={tier} className="px-2 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-[10px] text-foreground/40 font-mono">Rp</span>
-                                <input
-                                  type="number"
+                                <CurrencyInput
                                   value={pricelist.sablon_matrix[category][tier]}
                                   onChange={(e) => {
                                     const newMatrix = { ...pricelist.sablon_matrix }
                                     newMatrix[category] = { ...newMatrix[category], [tier]: Number(e.target.value) }
                                     setPricelist({ ...pricelist, sablon_matrix: newMatrix })
                                   }}
-                                  className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
+                                  className="w-24 sm:w-28 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-yellow-400/50 text-foreground font-mono"
                                 />
                               </div>
                             </td>
@@ -721,15 +718,14 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                             <td key={tier} className="px-2 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-[10px] text-foreground/40 font-mono">Rp</span>
-                                <input
-                                  type="number"
+                                <CurrencyInput
                                   value={pricelist.printing_matrix[category][tier]}
                                   onChange={(e) => {
                                     const newMatrix = { ...pricelist.printing_matrix }
                                     newMatrix[category] = { ...newMatrix[category], [tier]: Number(e.target.value) }
                                     setPricelist({ ...pricelist, printing_matrix: newMatrix })
                                   }}
-                                  className="w-16 sm:w-20 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-blue-400/50 text-foreground font-mono"
+                                  className="w-24 sm:w-28 bg-black/40 border border-white/10 rounded-lg px-2 py-1.5 text-center text-xs focus:outline-none focus:border-blue-400/50 text-foreground font-mono"
                                 />
                               </div>
                             </td>

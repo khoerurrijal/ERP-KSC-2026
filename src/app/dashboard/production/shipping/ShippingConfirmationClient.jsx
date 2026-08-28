@@ -50,7 +50,7 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
 
       <div className="space-y-4">
         {visibleOrders.map(order => (
-          <div key={order.soId} className="glass-card p-4 sm:p-5 space-y-4">
+          <div key={order.soId} className="glass-card p-3 sm:p-4 space-y-3">
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
               <div>
                 <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider">Nama / Brand</p>
@@ -64,7 +64,7 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'DIKIRIM', label: 'DIKIRIM' })}
-                  className="px-4 py-2.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
+                  className="px-3 py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
                 >
                   <Truck className="w-4 h-4" />
                   {loadingKey === `${order.soId}-DIKIRIM` ? 'Memproses...' : 'Dikirim'}
@@ -72,7 +72,7 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'SUDAH DIAMBIL', label: 'SUDAH DIAMBIL' })}
-                  className="px-4 py-2.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
+                  className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {loadingKey === `${order.soId}-SUDAH DIAMBIL` ? 'Memproses...' : 'Sudah Diambil'}
@@ -82,7 +82,7 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
 
             <div className="grid gap-2">
               {order.items.map(item => (
-                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2.5">
+                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
                   <div>
                     <p className="font-semibold text-sm text-foreground">{item.productName}</p>
                     <p className="text-xs text-foreground/50">{item.orderType} · {item.qty} {item.unit}</p>
@@ -97,7 +97,7 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
       </div>
 
       {pendingConfirmation && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/70 backdrop-blur-sm p-4" onMouseDown={event => event.target === event.currentTarget && setPendingConfirmation(null)}>
           <div className="w-full max-w-md glass-card border border-white/15 rounded-2xl p-6 shadow-2xl">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>

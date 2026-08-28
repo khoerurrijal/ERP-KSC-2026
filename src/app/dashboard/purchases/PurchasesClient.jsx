@@ -1,14 +1,16 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { Search, Plus, Filter, ChevronUp, ChevronDown } from 'lucide-react'
-import { deletePurchaseOrder, payPurchaseOrder } from './new/actions'
+import { payPurchaseOrder } from './new/actions'
 
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
+import PurchaseOrderWizard from '@/components/PurchaseOrderWizard'
 
-export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', dropdownConfig = {} }) {
+export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', dropdownConfig = {}, suppliers = [], products = [], workshops = [] }) {
+  const router = useRouter()
   const [activeTab, setActiveTab] = useState('PO') // 'PO' | 'ITEMS'
   const [searchQuery, setSearchQuery] = useState('')
   const [itemSearchQuery, setItemSearchQuery] = useState('')
@@ -27,6 +29,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const [poPage, setPoPage] = useState(1)
   const [itemPage, setItemPage] = useState(1)
   const pageSize = 50
+  const [purchaseOrderDrawer, setPurchaseOrderDrawer] = useState(null)
 
   const handleSort = (key) => {
     let direction = 'asc'
@@ -34,22 +37,67 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     setSortConfig({ key, direction })
   }
 
-  const handleDelete = async (id) => {
-    if (confirm('Apakah Anda yakin ingin menghapus PO ini? Stok yang sudah masuk akan ditarik kembali secara otomatis.')) {
-      const res = await deletePurchaseOrder(id)
-      if (res.success) {
-        alert('PO berhasil dihapus.')
-        window.location.reload()
-      } else {
-        alert('Gagal menghapus: ' + res.error)
-      }
-    }
-  }
-
   const openPayModal = (id) => {
     setPayTargetId(id)
     setPayMethod('BCA')
     setPayModalOpen(true)
+  }
+
+  const openPurchaseOrder = (purchaseOrder) => {
+    setPurchaseOrderDrawer(purchaseOrder)
+  }
+
+  const openNewPurchaseOrder = () => {
+    setPurchaseOrderDrawer({ mode: 'new' })
+  }
+
+  const closePurchaseOrder = () => {
+    setPurchaseOrderDrawer(null)
+  }
+
+  const handlePurchaseOrderSaved = () => {
+    setPurchaseOrderDrawer(null)
+    router.refresh()
+  }
+
+  const drawerInitialData = useMemo(() => {
+    if (!purchaseOrderDrawer || purchaseOrderDrawer.mode === 'new') return undefined
+
+    const purchaseOrder = purchaseOrderDrawer
+    const workshopId = workshops.find(workshop => workshop.code === purchaseOrder.workshop_code)?.id || ''
+
+    return {
+      id: purchaseOrder.id,
+      po_number: purchaseOrder.po_number,
+      date: purchaseOrder.date,
+      supplier: purchaseOrder.supplier,
+      notes: purchaseOrder.notes || '',
+      status: purchaseOrder.status,
+      payment_method: purchaseOrder.payment_method,
+      items: (purchaseOrder.purchase_items || []).map((item, index) => {
+        const product = products.find(currentProduct => currentProduct.product_code === item.product_code)
+        return {
+          id: item.id || `${purchaseOrder.id}-${index}`,
+          workshop_id: workshopId,
+          category: product?.category || '',
+          product_id: item.product_code,
+          product_search: product?.name || '',
+          qty: item.qty,
+          unit: item.unit || product?.unit || 'PCS',
+          unit_multiplier: item.unit_multiplier || 1,
+          unit_cost: item.unit_price
+        }
+      })
+    }
+  }, [purchaseOrderDrawer, products, workshops])
+
+  const isNewPurchaseOrder = purchaseOrderDrawer?.mode === 'new'
+
+  const handlePurchaseOrderRowKeyDown = (event, purchaseOrder) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      openPurchaseOrder(purchaseOrder)
+    }
   }
 
   const submitPay = async () => {
@@ -180,29 +228,29 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
         <MonthFilter />
-        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto">
+        <button type="button" onClick={openNewPurchaseOrder} className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto">
           <Plus className="w-4 h-4" />
           Buat PO Baru
-        </Link>
+        </button>
       </div>
 
       {/* SUMMARY CARDS */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="glass-card p-4 border-l-4 border-green-500">
+      <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <div className="glass-card p-3 border-l-4 border-green-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Gudang</p>
-          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGudang || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="text-xl font-bold text-foreground mt-2">Rp {(summary.beliGudang || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
-        <div className="glass-card p-4 border-l-4 border-blue-500">
+        <div className="glass-card p-3 border-l-4 border-blue-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Global</p>
-          <p className="text-2xl font-bold text-foreground mt-2">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="text-xl font-bold text-foreground mt-2">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
-        <div className="glass-card p-4 border-l-4 border-green-400">
+        <div className="glass-card p-3 border-l-4 border-green-400">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Lunas</p>
-          <p className="text-2xl font-bold text-green-400 mt-2">Rp {(summary.lunas || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="text-xl font-bold text-green-400 mt-2">Rp {(summary.lunas || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
-        <div className="glass-card p-4 border-l-4 border-yellow-500">
+        <div className="glass-card p-3 border-l-4 border-yellow-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Tempo Aktif</p>
-          <p className="text-2xl font-bold text-yellow-400 mt-2">Rp {(summary.tempo || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Seluruh Waktu</span></p>
+          <p className="text-xl font-bold text-yellow-400 mt-2">Rp {(summary.tempo || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Seluruh Waktu</span></p>
         </div>
       </div>
 
@@ -254,11 +302,11 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('supplier')}>Supplier {renderSortIcon('supplier')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('total_amount')}>Total Tagihan {renderSortIcon('total_amount')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('status')}>Status Bayar {renderSortIcon('status')}</th>
-                  <th className="px-6 py-4 font-medium text-right">Aksi</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('supplier')}>Supplier {renderSortIcon('supplier')}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('total_amount')}>Total Tagihan {renderSortIcon('total_amount')}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('status')}>Status Bayar {renderSortIcon('status')}</th>
+                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -271,27 +319,27 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                 ) : paginatedPOs.map((item) => {
                   const totalAmount = item.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
                   return (
-                  <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
-                    <td className="px-6 py-4 text-foreground/90 font-medium">{item.supplier || '-'}</td>
-                    <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4">
+                  <tr
+                    key={item.id}
+                    onClick={() => openPurchaseOrder(item)}
+                    onKeyDown={(event) => handlePurchaseOrderRowKeyDown(event, item)}
+                    tabIndex={0}
+                    className="cursor-pointer transition-colors hover:bg-white/5 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-primary/50"
+                  >
+                    <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                    <td className="px-4 py-3 text-foreground/90 font-medium">{item.supplier || '-'}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-3">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${item.status === 'LUNAS' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
                         {item.status || 'BELUM LUNAS'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
+                    <td className="px-4 py-3 text-right flex items-center justify-end gap-3">
                       {item.status !== 'LUNAS' && (
-                        <button onClick={() => openPayModal(item.id)} className="text-green-400 hover:text-green-300 font-medium text-xs">
+                        <button onClick={(event) => { event.stopPropagation(); openPayModal(item.id) }} className="rounded-full bg-green-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-green-400">
                           Pelunasan
                         </button>
                       )}
-                      <Link href={`/purchases/${item.id}/edit`} className="text-accent hover:text-accent/80 font-medium text-xs">
-                        Edit
-                      </Link>
-                      <button onClick={() => handleDelete(item.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">
-                        Hapus
-                      </button>
                     </td>
                   </tr>
                 )})}
@@ -301,13 +349,13 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('date')}>Tanggal {renderSortIcon('date', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('po_number')}>No PO {renderSortIcon('po_number', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('supplier')}>Supplier {renderSortIcon('supplier', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('item_name')}>Nama Item {renderSortIcon('item_name', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('qty')}>Qty {renderSortIcon('qty', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('unit_price')}>Harga Satuan {renderSortIcon('unit_price', true)}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('total_price')}>Total {renderSortIcon('total_price', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('date')}>Tanggal {renderSortIcon('date', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('po_number')}>No PO {renderSortIcon('po_number', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('supplier')}>Supplier {renderSortIcon('supplier', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('item_name')}>Nama Item {renderSortIcon('item_name', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('qty')}>Qty {renderSortIcon('qty', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('unit_price')}>Harga Satuan {renderSortIcon('unit_price', true)}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('total_price')}>Total {renderSortIcon('total_price', true)}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -319,13 +367,13 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                   </tr>
                 ) : paginatedItems.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.date ? new Date(item.purchase_orders.date).toLocaleDateString('id-ID') : '-'}</td>
-                    <td className="px-6 py-4 text-foreground/90 font-medium">{item.purchase_orders?.po_number || '-'}</td>
-                    <td className="px-6 py-4 text-foreground/90">{item.purchase_orders?.supplier || '-'}</td>
-                    <td className="px-6 py-4 font-medium">{item.products?.name || item.item_name || '-'}</td>
-                    <td className="px-6 py-4">{item.qty} {item.unit}</td>
-                    <td className="px-6 py-4">Rp {Number(item.unit_price || 0).toLocaleString('id-ID')}</td>
-                    <td className="px-6 py-4 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-3 text-foreground/90">{item.purchase_orders?.date ? new Date(item.purchase_orders.date).toLocaleDateString('id-ID') : '-'}</td>
+                    <td className="px-4 py-3 text-foreground/90 font-medium">{item.purchase_orders?.po_number || '-'}</td>
+                    <td className="px-4 py-3 text-foreground/90">{item.purchase_orders?.supplier || '-'}</td>
+                    <td className="px-4 py-3 font-medium">{item.products?.name || item.item_name || '-'}</td>
+                    <td className="px-4 py-3">{item.qty} {item.unit}</td>
+                    <td className="px-4 py-3">Rp {Number(item.unit_price || 0).toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID')}</td>
                   </tr>
                 ))}
               </tbody>
@@ -369,9 +417,21 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
         </div>
       </div>
 
+      {purchaseOrderDrawer && (
+        <PurchaseOrderWizard
+          suppliers={suppliers}
+          products={products}
+          workshops={workshops}
+          initialData={isNewPurchaseOrder ? undefined : drawerInitialData}
+          dropdownConfig={dropdownConfig}
+          onClose={closePurchaseOrder}
+          onSaved={handlePurchaseOrderSaved}
+        />
+      )}
+
       {/* MODAL PELUNASAN */}
       {payModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setPayModalOpen(false)}>
           <div className="glass-card w-full max-w-md p-6 flex flex-col gap-6 animate-in zoom-in-95 duration-200">
             <div>
               <h3 className="text-lg font-bold text-foreground">Pelunasan PO</h3>

@@ -62,7 +62,7 @@ export default function MockupUploadModal({ isOpen, onClose, itemId, initialUrl 
   }
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && onClose()}>
       <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
         <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
           <h3 className="font-bold text-foreground">Set Mockup / Desain</h3>

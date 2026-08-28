@@ -1,16 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { usePathname } from 'next/navigation'
-import { LogOut, Sun, Moon, User, Menu, MessageCircle, Check, X } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { usePathname, useRouter } from 'next/navigation'
+import { LogOut, Sun, Moon, User, Menu, MessageCircle, Check, X, Bell } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { getWaBotStatus, toggleWaBotStatus } from '@/app/dashboard/settings/actions'
+import { getAdminNotifications, markAdminNotificationRead } from '@/app/actions/notifications'
 
 export default function Topbar({ userRole = '', onToggleSidebar }) {
   const pathname = usePathname()
+  const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
   const [isWaBotActive, setIsWaBotActive] = useState(true)
   const [isToggling, setIsToggling] = useState(false)
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false)
+  const [notifications, setNotifications] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const notificationRef = useRef(null)
+  const profileRef = useRef(null)
   const { theme, setTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
@@ -19,6 +26,49 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
     // Fetch initial WA bot status
     getWaBotStatus().then(status => setIsWaBotActive(status))
   }, [])
+
+  useEffect(() => {
+    if (!['Owner', 'Admin'].includes(userRole)) return undefined
+
+    let active = true
+    const loadNotifications = async () => {
+      const result = await getAdminNotifications()
+      if (active && result.success) {
+        setNotifications(result.notifications || [])
+        setUnreadCount(result.unreadCount || 0)
+      }
+    }
+
+    loadNotifications()
+    const timer = window.setInterval(loadNotifications, 30000)
+    return () => {
+      active = false
+      window.clearInterval(timer)
+    }
+  }, [userRole])
+
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notificationRef.current && !notificationRef.current.contains(event.target)) {
+        setIsNotificationOpen(false)
+      }
+      if (profileRef.current && !profileRef.current.contains(event.target)) {
+        setIsProfileOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const handleNotificationClick = async (notification) => {
+    if (!notification.read_at) {
+      await markAdminNotificationRead(notification.id)
+      setNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
+      setUnreadCount(current => Math.max(0, current - 1))
+    }
+    if (notification.href) router.push(notification.href)
+  }
 
   const handleToggleWaBot = async () => {
     try {
@@ -50,6 +100,7 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
   const pageMeta = [
     ['/dashboard', 'Dashboard', 'Ringkasan operasional King Sablon'],
     ['/sales', 'Sales Order', 'Kelola invoice, pembayaran, dan pesanan'],
+    ['/dashboard/order-requests', 'Pesanan Masuk', 'Review pesanan customer sebelum masuk sistem'],
     ['/marketplace', 'Marketplace', 'Rekonsiliasi pesanan dan pencairan'],
     ['/production/status', 'Status Pesanan', 'Ubah status dan konfirmasi pengiriman'],
     ['/production/shipping', 'Konfirmasi Pengiriman', 'Konfirmasi pesanan yang siap dikirim atau diambil'],
@@ -113,8 +164,45 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
           </div>
         )}
 
+        {(userRole === 'Owner' || userRole === 'Admin') && (
+          <div className="relative" ref={notificationRef}>
+            <button
+              onClick={() => setIsNotificationOpen(current => !current)}
+              className="relative w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-colors"
+              aria-label="Notifikasi Admin"
+            >
+              <Bell className="w-5 h-5 text-primary" />
+              {unreadCount > 0 && <span className="absolute -top-1 -right-1 min-w-5 h-5 px-1 rounded-full bg-red-500 text-white text-[10px] font-black flex items-center justify-center">{unreadCount > 99 ? '99+' : unreadCount}</span>}
+            </button>
+
+            {isNotificationOpen && (
+              <div className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60]">
+                <div className="p-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
+                  <span className="font-bold text-sm">Notifikasi Admin</span>
+                  <span className="text-xs text-foreground/50">{unreadCount} belum dibaca</span>
+                </div>
+                <div className="max-h-80 overflow-y-auto">
+                  {notifications.length === 0 ? (
+                    <p className="p-5 text-center text-xs text-foreground/50">Belum ada notifikasi.</p>
+                  ) : notifications.map(notification => (
+                    <button
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className={`w-full text-left p-3 border-b border-white/5 hover:bg-white/5 transition-colors ${notification.read_at ? 'opacity-60' : 'bg-primary/5'}`}
+                    >
+                      <p className="text-sm font-bold text-foreground">{notification.title}</p>
+                      <p className="text-xs text-foreground/60 mt-1">{notification.message}</p>
+                      <p className="text-[10px] text-foreground/40 mt-1">{new Date(notification.created_at).toLocaleString('id-ID')}</p>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* Profile Button */}
-        <div className="relative">
+        <div className="relative" ref={profileRef}>
           <button 
             onClick={() => setIsProfileOpen(!isProfileOpen)}
             className="w-10 h-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center hover:bg-primary/20 transition-all focus:outline-none"

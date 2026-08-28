@@ -107,6 +107,39 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
     })
   }
 
+  const modalPricePreview = useMemo(() => {
+    if (!modalSelectedProductObj) return { unitPrice: 0, total: 0 }
+
+    const qty = parseInt(modalQty, 10) || 0
+    const unitPrice = calculateItemPriceUtil({
+      product: modalSelectedProductObj,
+      qty: qty || 1,
+      orderType: modalType,
+      isTwoColor: modalType === 'SABLON' ? modalIsTwoColor : false,
+      printingColors: modalType === 'PRINTING' ? modalPrintingColors : null,
+      pricelistConfig
+    })
+
+    let total = unitPrice * qty
+    if (modalIsFastTrack) total += 100000
+
+    if (modalIncludeLid && modalLidProduct) {
+      const lidProduct = products.find(p => p.id === modalLidProduct)
+      const lidType = orderTypeOptions.includes('POLOS') ? 'POLOS' : orderTypeOptions[0]
+      const lidUnitPrice = calculateItemPriceUtil({
+        product: lidProduct,
+        qty: qty || 1,
+        orderType: lidType,
+        isTwoColor: false,
+        printingColors: null,
+        pricelistConfig
+      })
+      total += lidUnitPrice * qty
+    }
+
+    return { unitPrice, total }
+  }, [modalSelectedProductObj, modalQty, modalType, modalIsTwoColor, modalPrintingColors, modalIsFastTrack, modalIncludeLid, modalLidProduct, products, orderTypeOptions, pricelistConfig])
+
   const totals = useMemo(() => {
     let subtotal = 0
     let fastTrackTotal = 0
@@ -218,8 +251,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
       const data = await res.json()
       if (data.success) {
-        // Redirect to Public Digital Invoice page
-        window.location.href = `/invoice/${data.data?.invoice_number || data.invoice || data.data?.invoice}`
+        window.location.href = `/order/received?request=${encodeURIComponent(data.data?.request_number || '-')}`
       } else {
         alert("Gagal memproses pesanan: " + data.error)
       }
@@ -263,7 +295,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
             <p className="text-foreground/50 italic">Belum ada kategori untuk jenis ini.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-6">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-5">
             {displayedCategories.map(cat => {
               // Placeholder using local logo
               const fallbackImage = '/logo-dark.png'
@@ -288,9 +320,9 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-80" />
                   </div>
-                  <div className="p-3 sm:p-4 flex-1 flex flex-col justify-end text-center relative -mt-10 sm:-mt-12">
-                    <h3 className="font-black text-sm sm:text-base text-white drop-shadow-md truncate">{cat}</h3>
-                    <p className="text-[10px] sm:text-xs text-primary font-bold mt-1 opacity-0 group-hover:opacity-100 transition-opacity translate-y-2 group-hover:translate-y-0">PILIH SEKARANG &rarr;</p>
+                  <div className="p-3 sm:p-4 min-h-[4.5rem] flex flex-col justify-center text-center bg-black/30">
+                    <h3 className="font-black text-sm sm:text-base text-white leading-tight line-clamp-2 break-words">{cat}</h3>
+                    <p className="text-[10px] text-primary/80 font-bold mt-1">Pilih produk →</p>
                   </div>
                 </div>
               )
@@ -301,7 +333,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
       {/* 3. MODAL PRODUK */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setShowProductModal(false)}>
           <div className="bg-black/80 backdrop-blur-2xl border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
             
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
@@ -322,7 +354,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                   options={modalProducts.map(p => ({ value: p.id, label: p.name }))}
                   placeholder="-- Pilih Ukuran --"
                   className="w-full"
-                  menuPosition="static"
+                  menuPosition="absolute"
                 />
               </div>
 
@@ -363,49 +395,64 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                     )}
                   </div>
 
-                  {modalType === 'SABLON' && (
-                    <>
-                      <label className="flex items-center gap-3 cursor-pointer group bg-black/40 p-3 rounded-xl border border-white/10 hover:border-yellow-500/50 transition-colors">
-                        <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500" checked={modalIsTwoColor} onChange={(e) => setModalIsTwoColor(e.target.checked)} />
-                        <div>
-                          <p className="font-bold text-sm text-yellow-500">Cetak Sablon 2 Warna</p>
-                          <p className="text-xs text-foreground/60">+ Rp 250 / pcs</p>
-                        </div>
-                      </label>
-                      <label className="flex items-center gap-3 cursor-pointer group bg-black/40 p-3 rounded-xl border border-white/10 hover:border-blue-500/50 transition-colors">
-                        <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500" checked={modalIsFastTrack} onChange={(e) => setModalIsFastTrack(e.target.checked)} />
-                        <div>
-                          <p className="font-bold text-sm text-blue-400">Fast Track (1-3 Hari)</p>
-                          <p className="text-xs text-foreground/60">+ Rp 100.000 / Pesanan</p>
-                        </div>
-                      </label>
-                    </>
-                  )}
+                  <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2.5 flex items-center justify-between gap-3">
+                    <div>
+                      <p className="text-[10px] uppercase tracking-wide text-foreground/50">Harga produk utama</p>
+                      <p className="font-bold text-sm text-primary">{formatRp(modalPricePreview.unitPrice)} / pcs</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase tracking-wide text-foreground/50">Estimasi total</p>
+                      <p className="font-black text-base text-primary">{formatRp(modalPricePreview.total)}</p>
+                    </div>
+                  </div>
 
-                  {/* OPSI TAMBAH TUTUP */}
-                  {lidCategory && lidProducts.length > 0 && modalType !== 'POLOS' && (
-                    <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl p-4 space-y-3">
-                      <label className="flex items-center gap-3 cursor-pointer group">
-                        <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-blue-500 focus:ring-blue-500" checked={modalIncludeLid} onChange={(e) => setModalIncludeLid(e.target.checked)} />
-                        <div>
-                          <p className="font-bold text-sm text-blue-400">Sekalian Tambah Tutup?</p>
-                          <p className="text-xs text-foreground/60">Qty otomatis disamakan dengan cup</p>
-                        </div>
-                      </label>
-                      
-                      {modalIncludeLid && (
-                        <div className="pl-8 animate-in slide-in-from-top-1">
-                          <CustomSelect 
-                            value={modalLidProduct}
-                            onChange={(e) => setModalLidProduct(e.target.value)}
-                            options={lidProducts.map(p => ({ value: p.id, label: p.name }))}
-                            placeholder="-- Pilih Jenis Tutup --"
-                            className="w-full text-sm"
-                            menuPosition="static"
-                          />
+                  {(modalType === 'SABLON' || (lidCategory && lidProducts.length > 0 && modalType !== 'POLOS')) && (
+                    <details className="rounded-xl border border-white/10 bg-white/[0.02] group">
+                      <summary className="flex cursor-pointer list-none items-center justify-between px-3 py-2.5 text-xs font-bold text-foreground/60 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                        <span>Opsi tambahan</span>
+                        <span className="text-[10px] text-primary">
+                          {(modalIncludeLid || modalIsTwoColor || modalIsFastTrack) ? 'Ada yang dipilih' : 'Buka opsi'}
+                        </span>
+                      </summary>
+                      <div className="space-y-2 px-2.5 pb-2.5">
+
+                      {lidCategory && lidProducts.length > 0 && modalType !== 'POLOS' && (
+                        <div className="space-y-2">
+                          <label className="flex min-h-10 items-center gap-2.5 cursor-pointer rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 hover:border-blue-500/40 transition-colors">
+                            <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" checked={modalIncludeLid} onChange={(e) => setModalIncludeLid(e.target.checked)} />
+                            <span className="text-xs font-bold text-blue-300">Sekalian tambah tutup</span>
+                            <span className="ml-auto text-[10px] text-foreground/45">Qty sama</span>
+                          </label>
+
+                          {modalIncludeLid && (
+                            <div className="animate-in slide-in-from-top-1">
+                              <CustomSelect
+                                value={modalLidProduct}
+                                onChange={(e) => setModalLidProduct(e.target.value)}
+                                options={lidProducts.map(p => ({ value: p.id, label: p.name }))}
+                                placeholder="-- Pilih Jenis Tutup --"
+                                className="w-full text-sm"
+                                menuPosition="absolute"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
-                    </div>
+
+                      {modalType === 'SABLON' && (
+                        <div className="grid grid-cols-2 gap-2">
+                          <label className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 hover:border-yellow-500/40 transition-colors">
+                            <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-yellow-500 focus:ring-yellow-500" checked={modalIsTwoColor} onChange={(e) => setModalIsTwoColor(e.target.checked)} />
+                            <span className="text-[11px] font-bold text-yellow-300 leading-tight">Sablon 2 warna<br /><small className="font-normal text-foreground/45">+250/pcs</small></span>
+                          </label>
+                          <label className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-white/10 bg-black/20 px-2.5 py-2 hover:border-blue-500/40 transition-colors">
+                            <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-blue-500 focus:ring-blue-500" checked={modalIsFastTrack} onChange={(e) => setModalIsFastTrack(e.target.checked)} />
+                            <span className="text-[11px] font-bold text-blue-300 leading-tight">Fast Track<br /><small className="font-normal text-foreground/45">+100k/order</small></span>
+                          </label>
+                        </div>
+                      )}
+                      </div>
+                    </details>
                   )}
 
                 </div>
@@ -444,8 +491,8 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
       {/* 5. CART SIDEBAR (DRAWER) */}
       {isCartOpen && (
         <>
-          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[90] animate-in fade-in duration-300" onClick={() => setIsCartOpen(false)} />
-          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-black/90 backdrop-blur-3xl border-l border-white/10 z-[100] flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000] animate-in fade-in duration-300" onClick={() => setIsCartOpen(false)} />
+          <div className="fixed top-0 right-0 h-full w-full max-w-md bg-black/90 backdrop-blur-3xl border-l border-white/10 z-[1001] flex flex-col animate-in slide-in-from-right duration-300 shadow-2xl">
             
             {/* Header */}
             <div className="p-6 border-b border-white/10 flex justify-between items-center bg-white/5">
@@ -490,21 +537,18 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
               {/* Addons */}
               {cart.length > 0 && (
-                <div className="mt-8 border-t border-white/10 pt-6">
-                  <h3 className="font-bold text-sm mb-3 text-foreground/80">Layanan Tambahan (Opsional)</h3>
-                  <div className="space-y-2">
-                    <label className="flex items-center gap-3 cursor-pointer p-3 rounded-xl border border-white/10 hover:bg-white/5 transition-colors">
-                      <input type="checkbox" className="w-5 h-5 rounded border-gray-300 text-primary focus:ring-primary" checked={isDesignService} onChange={(e) => setIsDesignService(e.target.checked)} />
-                      <div className="flex-1 flex justify-between items-center">
-                        <div>
-                          <p className="font-bold text-sm">Jasa Desain Logo</p>
-                          <p className="text-[10px] text-foreground/50">Buat desain dari nol</p>
-                        </div>
-                        <span className="text-primary font-bold text-xs">+50k</span>
-                      </div>
-                    </label>
-                  </div>
-                </div>
+                <details className="mt-8 border-t border-white/10 pt-4 group">
+                  <summary className="flex cursor-pointer list-none items-center justify-between rounded-lg px-1 py-1 text-xs font-bold text-foreground/60 hover:text-foreground [&::-webkit-details-marker]:hidden">
+                    <span>Layanan tambahan (opsional)</span>
+                    <span className="text-[10px] text-primary group-open:hidden">Tambah</span>
+                    <span className="hidden text-[10px] text-foreground/40 group-open:inline">Tutup</span>
+                  </summary>
+                  <label className="mt-2 flex items-center gap-2.5 cursor-pointer rounded-lg border border-white/10 bg-white/[0.02] px-2.5 py-2 hover:bg-white/5 transition-colors">
+                    <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-primary focus:ring-primary" checked={isDesignService} onChange={(e) => setIsDesignService(e.target.checked)} />
+                    <span className="text-xs font-bold">Jasa desain logo</span>
+                    <span className="ml-auto text-[10px] text-primary font-bold">+50k</span>
+                  </label>
+                </details>
               )}
             </div>
 
@@ -530,7 +574,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
       {/* 6. MODAL CHECKOUT */}
       {showCheckoutModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1100] flex items-center justify-center p-4 animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setShowCheckoutModal(false)}>
           <div className="bg-black/90 backdrop-blur-3xl border border-white/10 w-full max-w-md rounded-2xl sm:rounded-3xl shadow-2xl p-5 sm:p-8 relative animate-in zoom-in-95 duration-200">
             <button onClick={() => setShowCheckoutModal(false)} className="absolute top-4 right-4 w-8 h-8 flex items-center justify-center rounded-full bg-white/10 hover:bg-white/20">✕</button>
             

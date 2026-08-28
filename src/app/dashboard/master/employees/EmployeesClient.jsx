@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Plus, Edit2, Trash2, Save, X, Loader2, CheckCircle2, XCircle } from 'lucide-react'
 import { saveEmployee, deleteEmployee } from './actions'
 import CustomSelect from '@/components/CustomSelect'
+import CurrencyInput from '@/components/CurrencyInput'
 
 export default function EmployeesClient({ initialEmployees, schemas }) {
   const [employees, setEmployees] = useState(initialEmployees)
@@ -195,7 +196,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onMouseDown={event => event.target === event.currentTarget && setIsModalOpen(false)}>
           <div className="bg-background border border-white/10 rounded-2xl w-full max-w-md shadow-2xl">
             <div className="border-b border-white/10 px-6 py-4 flex justify-between items-center">
               <h2 className="text-xl font-bold">{formData.id ? 'Edit' : 'Tambah'} Karyawan</h2>
@@ -277,8 +278,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
                 <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground/80">Gaji Pokok (Harian)</label>
-                    <input 
-                      type="number" 
+                    <CurrencyInput
                       value={formData.gaji_harian} 
                       onChange={e => setFormData({...formData, gaji_harian: Number(e.target.value)})} 
                       className="glass-input w-full"
@@ -286,8 +286,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
                   </div>
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground/80">Uang Makan (Harian)</label>
-                    <input 
-                      type="number" 
+                    <CurrencyInput
                       value={formData.uang_makan} 
                       onChange={e => setFormData({...formData, uang_makan: Number(e.target.value)})} 
                       className="glass-input w-full"

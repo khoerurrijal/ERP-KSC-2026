@@ -69,6 +69,26 @@ body {
   animation-delay: 0ms !important;
 }
 
+@keyframes po-drawer-slide-in {
+  from {
+    transform: translate3d(100%, 0, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+.po-drawer-enter {
+  animation: po-drawer-slide-in 480ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .po-drawer-enter {
+    animation-duration: 1ms;
+  }
+}
+
 /* Aurora & Logo Background Setup */
 body::before, body::after {
   content: "";

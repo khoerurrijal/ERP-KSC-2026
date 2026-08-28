@@ -31,12 +31,15 @@ export default async function MarketplacePage() {
       .order('date', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(1000)
-    rawOrders = data || []
+    rawOrders = (data || []).filter(order => {
+      const paymentStatus = String(order.payment_status || '').toUpperCase()
+      return paymentStatus !== 'LUNAS'
+        && paymentStatus !== 'BATAL'
+        && order.is_legacy_import !== true
+    })
   }
 
-  const validOrders = rawOrders || []
-
-  const marketplaceOrders = validOrders;
+  const marketplaceOrders = rawOrders
 
   const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
   const dropdownConfig = settings?.value || {}

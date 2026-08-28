@@ -301,7 +301,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
       )}
       {/* Modal Simpan Rekap */}
       {saveModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setSaveModalOpen(false)}>
           <div className="glass-card w-full max-w-md p-6 flex flex-col gap-6 animate-in zoom-in-95 duration-200 shadow-2xl border border-white/10">
             <div>
               <h3 className="text-xl font-bold text-primary">Simpan Rekap Gaji</h3>

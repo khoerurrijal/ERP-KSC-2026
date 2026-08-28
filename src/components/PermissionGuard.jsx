@@ -24,6 +24,7 @@ export default function PermissionGuard({ allowedMenus, userRole, children }) {
     '/settings': 'pengaturan',
     '/system-config': 'pengaturan',
     '/dashboard/sales': 'penjualan',
+    '/dashboard/order-requests': 'penjualan',
     '/dashboard/marketplace': 'marketplace',
     '/dashboard/production': 'produksi',
     '/dashboard/inventory': 'gudang',

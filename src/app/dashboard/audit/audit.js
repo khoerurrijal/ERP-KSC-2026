@@ -47,7 +47,7 @@ export async function runAuditScan(supabase) {
   const [ordersResult, itemsResult, transactionsResult, settingsResult] = await Promise.all([
     supabase
       .from('sales_orders')
-      .select('id, invoice_number, date, total_amount, dp_amount, payment_status, marketplace_receipt, marketplace_pencairan')
+      .select('id, invoice_number, date, total_amount, dp_amount, payment_status, marketplace_receipt, marketplace_pencairan, is_legacy_import, customers(name, type)')
       .order('date', { ascending: false })
       .limit(5000),
     supabase
@@ -89,18 +89,41 @@ export async function runAuditScan(supabase) {
   const items = itemsResult.data || []
   const transactions = transactionsResult.data || []
   const settings = new Set((settingsResult.data || []).map(setting => setting.key))
-  const orderById = new Map(orders.map(order => [String(order.id), order]))
   const issues = []
   const legacyServicesByOrder = new Map()
   const finishedUnpaidByOrder = new Map()
   const deliveredPaidByOrder = new Map()
+
+  const isMarketplaceOrder = (order) => {
+    const customer = normalizeRelation(order?.customers)
+    const marketplaceText = `${customer?.name || ''} ${customer?.type || ''}`.toLowerCase()
+    return marketplaceText.includes('marketplace')
+      || ['shopee', 'tokopedia', 'tiktok'].some(platform => marketplaceText.includes(platform))
+      || Boolean(normalizeMarketplaceReceipt(order?.marketplace_receipt))
+  }
+
+  const isActiveMarketplaceOrder = (order) => {
+    const paymentStatus = normalizeText(order?.payment_status)
+    return paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL' && isMarketplaceOrder(order)
+  }
+
+  const allOrderById = new Map(orders.map(order => [String(order.id), order]))
+  const auditedOrders = orders.filter(order => {
+    const paymentStatus = normalizeText(order.payment_status)
+    return !(isMarketplaceOrder(order) && (order.is_legacy_import === true || paymentStatus === 'LUNAS' || paymentStatus === 'BATAL'))
+  })
+  const orderById = new Map(auditedOrders.map(order => [String(order.id), order]))
+  const auditedItems = items.filter(item => {
+    const order = allOrderById.get(String(item.so_id))
+    return !order || orderById.has(String(order.id))
+  })
 
   const addToIssueGroup = (groups, key, row) => {
     if (!groups.has(key)) groups.set(key, [])
     groups.get(key).push(row)
   }
 
-  const duplicateInvoices = groupBy(orders, order => normalizeText(order.invoice_number))
+  const duplicateInvoices = groupBy(auditedOrders, order => normalizeText(order.invoice_number))
   for (const [invoice, rows] of duplicateInvoices) {
     if (rows.length < 2) continue
     issues.push(makeIssue(
@@ -114,7 +137,7 @@ export async function runAuditScan(supabase) {
     ))
   }
 
-  const duplicateReceipts = groupBy(orders, order => normalizeMarketplaceReceipt(order.marketplace_receipt))
+  const duplicateReceipts = groupBy(auditedOrders.filter(isActiveMarketplaceOrder), order => normalizeMarketplaceReceipt(order.marketplace_receipt))
   for (const [receipt, rows] of duplicateReceipts) {
     if (!receipt || rows.length < 2) continue
     issues.push(makeIssue(
@@ -128,7 +151,7 @@ export async function runAuditScan(supabase) {
     ))
   }
 
-  for (const item of items) {
+  for (const item of auditedItems) {
     const order = orderById.get(String(item.so_id))
     const product = normalizeRelation(item.products)
     const code = normalizeText(item.product_code)
@@ -249,12 +272,13 @@ export async function runAuditScan(supabase) {
     ))
   }
 
-  for (const order of orders) {
+  for (const order of auditedOrders) {
     const paymentStatus = normalizeText(order.payment_status)
     const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     const payout = Number(order.marketplace_pencairan || 0)
     const total = Number(order.total_amount || 0)
     const orderItems = items.filter(item => String(item.so_id) === String(order.id))
+    const activeMarketplaceOrder = isActiveMarketplaceOrder(order)
 
     if (orderItems.length === 0 && paymentStatus !== 'BATAL') {
       issues.push(makeIssue(
@@ -268,7 +292,7 @@ export async function runAuditScan(supabase) {
       ))
     }
 
-    if (receipt && paymentStatus === 'LUNAS' && payout <= 0) {
+    if (activeMarketplaceOrder && receipt && payout <= 0) {
       issues.push(makeIssue(
         `marketplace-payout-missing-${order.id}`,
         'warning',
@@ -280,7 +304,7 @@ export async function runAuditScan(supabase) {
       ))
     }
 
-    if (receipt && paymentStatus !== 'LUNAS' && payout > 0) {
+    if (activeMarketplaceOrder && receipt && payout > 0) {
       issues.push(makeIssue(
         `marketplace-status-mismatch-${order.id}`,
         'critical',

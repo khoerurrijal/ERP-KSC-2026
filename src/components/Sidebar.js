@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Sun, Moon } from 'lucide-react'
+import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTheme } from 'next-themes'
 
 const MENU_GROUPS = [
@@ -19,6 +19,7 @@ const MENU_GROUPS = [
     icon: TrendingUp,
     subItems: [
       { name: 'Sales Order', path: '/sales', icon: FileText, key: 'penjualan' },
+      { name: 'Pesanan Masuk', path: '/dashboard/order-requests', icon: Inbox, key: 'penjualan' },
       { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag, key: 'marketplace' },
       { name: 'Produksi', path: '/production', icon: Factory, key: 'produksi' },
       { name: 'Status Pesanan', path: '/status-pesanan', icon: PackageCheck, key: 'produksi' },
@@ -66,9 +67,10 @@ const MENU_GROUPS = [
   }
 ]
 
-export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false }) {
+export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {} }) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
+  const sidebarRef = useRef(null)
   
   // Filter menu based on allowedMenus
   const filteredMenus = MENU_GROUPS.map(group => {
@@ -98,15 +100,46 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     if (activeGroupName) setOpenGroupKey(activeGroupName)
   }, [activeGroupName])
 
+  useEffect(() => {
+    if (!isCollapsed || !openGroupKey) return undefined
+
+    const handleClickOutside = (event) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        setOpenGroupKey(null)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isCollapsed, openGroupKey])
+
+  useEffect(() => {
+    if (!isMobile || !isMobileOpen) return undefined
+
+    const handleClickOutside = (event) => {
+      if (sidebarRef.current && !sidebarRef.current.contains(event.target)) {
+        setIsMobileOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isMobile, isMobileOpen])
+
   const toggleGroup = (groupName) => {
     setOpenGroupKey(current => current === groupName ? null : groupName)
+  }
+
+  const handleToggleCollapse = () => {
+    if (!isCollapsed) setOpenGroupKey(null)
+    onToggleCollapse()
   }
 
   // (The isOperatorOnly block has been removed since Topbar handles it)
 
   if (isMobile) {
     return (
-      <div className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
+      <div ref={sidebarRef} className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center justify-between p-4">
           <div className="flex shrink-0">
             <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
@@ -135,30 +168,47 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
   }
 
   return (
-    <aside className="w-64 h-screen fixed left-0 top-0 glass-panel flex flex-col z-50">
-      <div className="p-6 pb-2 flex justify-center">
-        <div className="w-full max-w-[130px] transition-all duration-300 cursor-pointer hover:scale-105">
+    <aside ref={sidebarRef} className={`h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+      <div className={`relative flex ${isCollapsed ? 'flex-col items-center gap-2 p-3' : 'items-center justify-center p-6 pb-2'}`}>
+        <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} transition-all duration-300 cursor-pointer hover:scale-105`}>
           <img 
             src="/logo.png" 
             alt="King Sablon Logo Light" 
-            className="w-full h-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden" 
+            className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden"
           />
           <img 
             src="/logo-dark.png" 
             alt="King Sablon Logo Dark" 
-            className="w-full h-auto object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block" 
+            className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block"
           />
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto py-2 px-3 space-y-2">
+      <div className={`flex-1 overflow-y-auto py-2 space-y-2 ${isCollapsed ? 'px-2' : 'px-3'}`}>
         {filteredMenus.map((group, idx) => (
-          <MenuGroup key={idx} group={group} pathname={pathname} isOpen={openGroupKey === group.name} onToggle={() => toggleGroup(group.name)} />
+          <MenuGroup
+            key={idx}
+            group={group}
+            pathname={pathname}
+            isCollapsed={isCollapsed}
+            isOpen={openGroupKey === group.name}
+            onClick={isCollapsed ? () => setOpenGroupKey(null) : undefined}
+            onToggle={() => toggleGroup(group.name)}
+          />
         ))}
       </div>
 
-      <div className="p-4 border-t border-card-border mt-auto flex justify-center text-xs text-foreground/40 text-center">
-        King Sablon Cup Master ERP<br/>v1.0
+      <div className={`border-t border-card-border mt-auto text-xs text-foreground/40 text-center ${isCollapsed ? 'p-2' : 'p-4'}`}>
+        <button
+          type="button"
+          onClick={handleToggleCollapse}
+          aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="mx-auto mb-2 flex rounded-lg p-2 text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground"
+        >
+          {isCollapsed ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+        </button>
+        {isCollapsed ? <span title="King Sablon Cup Master ERP">v1</span> : <>King Sablon Cup Master ERP<br/>v1.0</>}
       </div>
     </aside>
   )
@@ -188,7 +238,7 @@ function ThemeToggle() {
   )
 }
 
-function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => {} }) {
+function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => {}, isCollapsed = false }) {
   const hasSubItems = !!group.subItems
   
   // Check if any subitem is active
@@ -202,14 +252,17 @@ function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => 
       <Link
         href={group.path}
         onClick={onClick}
+        title={isCollapsed ? group.name : undefined}
         className={`flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${
+          isCollapsed ? 'justify-center px-2' : ''
+        } ${
           isDirectActive
             ? 'bg-primary/20 text-primary font-medium'
             : 'text-foreground/70 hover:bg-white/5 hover:text-foreground'
         }`}
       >
         <Icon className="w-5 h-5" />
-        <span>{group.name}</span>
+        <span className={isCollapsed ? 'sr-only' : ''}>{group.name}</span>
       </Link>
     )
   }
@@ -218,7 +271,11 @@ function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => 
     <div className="space-y-1">
       <button
         onClick={onToggle}
+        title={isCollapsed ? group.name : undefined}
+        aria-label={isCollapsed ? group.name : undefined}
         className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl transition-all ${
+          isCollapsed ? 'justify-center px-2' : ''
+        } ${
           isAnySubActive && !isOpen
             ? 'text-primary font-medium'
             : 'text-foreground/80 hover:bg-white/5 hover:text-foreground'
@@ -226,13 +283,13 @@ function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => 
       >
         <div className="flex items-center gap-3">
           <Icon className={`w-5 h-5 ${isAnySubActive ? 'text-primary' : ''}`} />
-          <span>{group.name}</span>
+          <span className={isCollapsed ? 'sr-only' : ''}>{group.name}</span>
         </div>
-        {isOpen ? <ChevronDown className="w-4 h-4 opacity-50" /> : <ChevronRight className="w-4 h-4 opacity-50" />}
+        {!isCollapsed && (isOpen ? <ChevronDown className="w-4 h-4 opacity-50" /> : <ChevronRight className="w-4 h-4 opacity-50" />)}
       </button>
 
       {isOpen && (
-        <div className="pl-11 pr-2 space-y-1 pb-2">
+        <div className={`${isCollapsed ? 'absolute left-full top-0 z-[60] ml-2 min-w-52 rounded-xl border border-white/10 bg-background/95 p-2 shadow-2xl backdrop-blur-xl' : 'pl-11 pr-2 pb-2'} space-y-1`}>
           {group.subItems.map((sub, idx) => {
             const SubIcon = sub.icon
             const isSubActive = pathname === sub.path || pathname.startsWith(sub.path + '/')
@@ -241,7 +298,8 @@ function MenuGroup({ group, pathname, onClick, isOpen = false, onToggle = () => 
                 key={idx}
                 href={sub.path}
                 onClick={onClick}
-                className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all ${
+                title={isCollapsed ? sub.name : undefined}
+                className={`flex items-center gap-3 rounded-lg text-sm transition-all ${isCollapsed ? 'px-3 py-2' : 'px-3 py-2'} ${
                   isSubActive
                     ? 'bg-primary/20 text-primary font-medium'
                     : 'text-foreground/60 hover:bg-white/5 hover:text-foreground'

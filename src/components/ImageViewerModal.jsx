@@ -5,7 +5,7 @@ export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
   if (!isOpen || !imageUrl) return null
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && onClose()}>
       <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col items-center justify-center pointer-events-none">
         
         {/* Close Button */}

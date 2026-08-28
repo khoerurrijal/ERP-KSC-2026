@@ -159,8 +159,8 @@ export default function InventoryClient({
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
       <div className="flex justify-end">
-        <Link href="/purchases/new" className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
-          <Plus className="w-4 h-4" /> Restock (PO)
+        <Link href="/purchases/new?from=%2Finventory" className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap">
+          <Plus className="w-4 h-4" /> Restock
         </Link>
       </div>
 
@@ -168,7 +168,7 @@ export default function InventoryClient({
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         
         <div className="md:col-span-4 glass-card overflow-hidden flex flex-col">
-          <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="p-3 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <h2 className="font-bold text-foreground flex items-center gap-2 whitespace-nowrap">
               <PackageSearch className="w-5 h-5 text-green-400" />
               Status Stok Barang
@@ -190,7 +190,7 @@ export default function InventoryClient({
           </div>
 
           {showFilters && (
-            <div className="p-4 border-b border-white/10 bg-white/5 grid grid-cols-1 sm:grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+            <div className="p-3 border-b border-white/10 bg-white/5 grid grid-cols-1 sm:grid-cols-2 gap-3 animate-in fade-in slide-in-from-top-2">
               <CustomSelect 
                 value={filterCategory} 
                 onChange={e => {
@@ -223,35 +223,35 @@ export default function InventoryClient({
             </div>
           )}
 
-          <div className="overflow-x-auto p-4">
+          <div className="overflow-x-auto p-3">
             <table className="w-full text-sm text-left">
               <thead className="text-foreground/70 uppercase text-xs border-b border-white/10">
                 <tr>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('name')}>Nama Produk {renderSortIcon('name')}</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('category')}>Kategori {renderSortIcon('category')}</th>
-                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop')}>Workshop {renderSortIcon('workshop')}</th>
-                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('stock_qty')}>Stok Tersedia {renderSortIcon('stock_qty')}</th>
-                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('physical_stock')}>Stok Fisik {renderSortIcon('physical_stock')}</th>
-                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
+                  <th className="px-3 py-2.5 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('name')}>Nama Produk {renderSortIcon('name')}</th>
+                  <th className="px-3 py-2.5 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('category')}>Kategori {renderSortIcon('category')}</th>
+                  <th className="px-3 py-2.5 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop')}>Workshop {renderSortIcon('workshop')}</th>
+                  <th className="px-3 py-2.5 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('stock_qty')}>Stok Tersedia {renderSortIcon('stock_qty')}</th>
+                  <th className="px-3 py-2.5 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('physical_stock')}>Stok Fisik {renderSortIcon('physical_stock')}</th>
+                  <th className="px-3 py-2.5 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
                 {filteredAndSorted.map(p => (
                   <tr key={p.product_code} className="hover:bg-white/5">
-                    <td className="px-4 py-3 font-medium text-foreground/90">{p.name}</td>
-                    <td className="px-4 py-3 text-foreground/60">{p.category}</td>
-                    <td className="px-4 py-3 text-foreground/60">{p.workshops?.name}</td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2.5 font-medium text-foreground/90">{p.name}</td>
+                    <td className="px-3 py-2.5 text-foreground/60">{p.category}</td>
+                    <td className="px-3 py-2.5 text-foreground/60">{p.workshops?.name}</td>
+                    <td className="px-3 py-2.5 text-right">
                       <span className={`font-bold ${p.stock_qty > 5000 ? 'text-blue-400' : 'text-blue-200'}`}>
                         {p.stock_qty || 0} {p.unit || 'pcs'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2.5 text-right">
                       <span className={`font-bold ${p.physical_stock > 5000 ? 'text-green-400' : 'text-yellow-400'}`}>
                         {p.physical_stock || 0} {p.unit || 'pcs'}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-right">
+                    <td className="px-3 py-2.5 text-right">
                       <button 
                         onClick={() => openOpnameModal(p)}
                         className="text-xs bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-full border border-white/10 text-foreground/80 transition-colors"
@@ -301,7 +301,7 @@ export default function InventoryClient({
 
       {activeTab === 'pipeline' && (
         <div className="glass-card overflow-hidden">
-          <div className="p-4 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+          <div className="p-3 border-b border-white/10 bg-white/5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
             <div>
               <h2 className="font-bold text-foreground flex items-center gap-2">
                 <Kanban className="w-5 h-5 text-primary" />
@@ -326,7 +326,7 @@ export default function InventoryClient({
           </div>
 
           {showFilters && (
-            <div className="p-4 border-b border-white/10 bg-white/5 animate-in fade-in slide-in-from-top-2">
+            <div className="p-3 border-b border-white/10 bg-white/5 animate-in fade-in slide-in-from-top-2">
               <CustomSelect 
                 value={filterCategory} 
                 onChange={e => setFilterCategory(e.target.value)} 
@@ -342,46 +342,46 @@ export default function InventoryClient({
             <table className="w-full text-left border-collapse text-sm whitespace-nowrap">
               <thead>
                 <tr className="border-b border-white/10 bg-white/5">
-                  <th className="p-4 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64 cursor-pointer hover:text-white" onClick={() => handleSort('name')}><div className="flex items-center gap-2"><Package className="w-4 h-4"/> Produk {renderSortIcon('name')}</div></th>
-                  <th className="p-4 font-semibold text-foreground/60 text-center cursor-pointer hover:text-white" onClick={() => handleSort('fisik')}>Fisik (Gudang) {renderSortIcon('fisik')}</th>
-                  <th className="p-4 font-semibold text-blue-400 text-center cursor-pointer hover:text-blue-300" onClick={() => handleSort('qty_booking')}><div className="flex items-center justify-center gap-1"><ShoppingCart className="w-4 h-4"/> Baru Masuk {renderSortIcon('qty_booking')}</div></th>
-                  <th className="p-4 font-semibold text-yellow-400 text-center cursor-pointer hover:text-yellow-300" onClick={() => handleSort('qty_proses')}><div className="flex items-center justify-center gap-1"><Settings className="w-4 h-4"/> Proses {renderSortIcon('qty_proses')}</div></th>
-                  <th className="p-4 font-semibold text-orange-400 text-center cursor-pointer hover:text-orange-300" onClick={() => handleSort('qty_siap')}><div className="flex items-center justify-center gap-1"><Gift className="w-4 h-4"/> Sudah Jadi {renderSortIcon('qty_siap')}</div></th>
-                  <th className="p-4 font-semibold text-purple-400 text-center cursor-pointer hover:text-purple-300" onClick={() => handleSort('qty_selesai')}><div className="flex items-center justify-center gap-1"><Truck className="w-4 h-4"/> Dikirim {renderSortIcon('qty_selesai')}</div></th>
-                  <th className="p-4 font-semibold text-green-400 text-center cursor-pointer hover:text-green-300" onClick={() => handleSort('tersedia')}><div className="flex items-center justify-center gap-1"><CheckCircle2 className="w-4 h-4"/> Tersedia (Bebas) {renderSortIcon('tersedia')}</div></th>
+                  <th className="p-3 font-semibold text-foreground/60 sticky left-0 bg-background/95 backdrop-blur-sm z-10 w-64 cursor-pointer hover:text-white" onClick={() => handleSort('name')}><div className="flex items-center gap-2"><Package className="w-4 h-4"/> Produk {renderSortIcon('name')}</div></th>
+                  <th className="p-3 font-semibold text-foreground/60 text-center cursor-pointer hover:text-white" onClick={() => handleSort('fisik')}>Fisik (Gudang) {renderSortIcon('fisik')}</th>
+                  <th className="p-3 font-semibold text-blue-400 text-center cursor-pointer hover:text-blue-300" onClick={() => handleSort('qty_booking')}><div className="flex items-center justify-center gap-1"><ShoppingCart className="w-4 h-4"/> Baru Masuk {renderSortIcon('qty_booking')}</div></th>
+                  <th className="p-3 font-semibold text-yellow-400 text-center cursor-pointer hover:text-yellow-300" onClick={() => handleSort('qty_proses')}><div className="flex items-center justify-center gap-1"><Settings className="w-4 h-4"/> Proses {renderSortIcon('qty_proses')}</div></th>
+                  <th className="p-3 font-semibold text-orange-400 text-center cursor-pointer hover:text-orange-300" onClick={() => handleSort('qty_siap')}><div className="flex items-center justify-center gap-1"><Gift className="w-4 h-4"/> Sudah Jadi {renderSortIcon('qty_siap')}</div></th>
+                  <th className="p-3 font-semibold text-purple-400 text-center cursor-pointer hover:text-purple-300" onClick={() => handleSort('qty_selesai')}><div className="flex items-center justify-center gap-1"><Truck className="w-4 h-4"/> Dikirim {renderSortIcon('qty_selesai')}</div></th>
+                  <th className="p-3 font-semibold text-green-400 text-center cursor-pointer hover:text-green-300" onClick={() => handleSort('tersedia')}><div className="flex items-center justify-center gap-1"><CheckCircle2 className="w-4 h-4"/> Tersedia (Bebas) {renderSortIcon('tersedia')}</div></th>
                 </tr>
               </thead>
               <tbody>
                 {paginatedPipeline.map(pipe => (
                   <tr key={pipe.product_code} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                    <td className="p-4 sticky left-0 bg-background/95 backdrop-blur-sm group-hover:bg-white/5 transition-colors">
+                    <td className="p-3 sticky left-0 bg-background/95 backdrop-blur-sm group-hover:bg-white/5 transition-colors">
                       <p className="font-semibold text-foreground text-sm truncate w-64">{pipe.product_name}</p>
                       <p className="text-xs text-foreground/50">{pipe.category}</p>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className="font-bold text-base">{Number(pipe.fisik).toLocaleString('id-ID')}</span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_booking > 0 ? 'bg-blue-500/20 text-blue-400' : 'text-foreground/20'}`}>
                         {Number(pipe.qty_booking).toLocaleString('id-ID')}
                       </span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_proses > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'text-foreground/20'}`}>
                         {Number(pipe.qty_proses).toLocaleString('id-ID')}
                       </span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_siap > 0 ? 'bg-orange-500/20 text-orange-400' : 'text-foreground/20'}`}>
                         {Number(pipe.qty_siap).toLocaleString('id-ID')}
                       </span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_selesai > 0 ? 'bg-purple-500/20 text-purple-400' : 'text-foreground/20'}`}>
                         {Number(pipe.qty_selesai).toLocaleString('id-ID')}
                       </span>
                     </td>
-                    <td className="p-4 text-center">
+                    <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.tersedia > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
                         {Number(pipe.tersedia).toLocaleString('id-ID')}
                       </span>
@@ -424,7 +424,7 @@ export default function InventoryClient({
       )}
 
       {showOpnameModal && opnameProduct && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setShowOpnameModal(false)}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden">
             <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
               <h3 className="font-bold text-foreground">Stok Opname</h3>

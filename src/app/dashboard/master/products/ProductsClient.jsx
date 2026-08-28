@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X, Upload } from 'lucide-react'
 import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './actions'
 import CustomSelect from '@/components/CustomSelect'
+import CurrencyInput from '@/components/CurrencyInput'
 
 export default function ProductsClient({ products: initialProducts = [], error = null, workshops = [] }) {
   const [products, setProducts] = useState(initialProducts)
@@ -214,7 +215,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && closeModal()}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 bg-white/5 flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -275,8 +276,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground/80">HPP Murni Dasar (Rp)</label>
-                  <input 
-                    type="number" 
+                  <CurrencyInput
                     value={sellingPrice} 
                     onChange={e => setSellingPrice(e.target.value)} 
                     className="glass-input w-full" 

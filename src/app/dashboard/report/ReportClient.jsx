@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { TrendingDown, TrendingUp, Wallet, AlertOctagon, Tag, Building2, FileText, ShieldCheck, CreditCard } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
+import CurrencyInput from '@/components/CurrencyInput'
 
 import { BarChart3, PieChart } from 'lucide-react'
 
@@ -447,7 +448,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
 
       {/* BALANCE MODAL */}
       {isBalanceModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setIsBalanceModalOpen(false)}>
           <div className="glass-card w-full max-w-sm p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-200 shadow-2xl border border-white/10 rounded-3xl">
             <div>
               <h3 className="text-2xl font-black text-primary">Cek Uang Fisik</h3>
@@ -456,8 +457,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             <div className="space-y-5">
               <div className="space-y-2">
                 <label className="text-xs font-bold text-foreground/70 uppercase tracking-wider">Saldo BCA</label>
-                <input 
-                  type="number" 
+                <CurrencyInput
                   value={inputBCA} 
                   onChange={e => setInputBCA(e.target.value)} 
                   className="glass-input w-full font-mono text-xl py-3 px-4 rounded-xl"
@@ -465,8 +465,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-foreground/70 uppercase tracking-wider">Saldo MANDIRI</label>
-                <input 
-                  type="number" 
+                <CurrencyInput
                   value={inputMandiri} 
                   onChange={e => setInputMandiri(e.target.value)} 
                   className="glass-input w-full font-mono text-xl py-3 px-4 rounded-xl"
@@ -474,8 +473,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-bold text-foreground/70 uppercase tracking-wider">Uang Laci (Cash)</label>
-                <input 
-                  type="number" 
+                <CurrencyInput
                   value={inputCash} 
                   onChange={e => setInputCash(e.target.value)} 
                   className="glass-input w-full font-mono text-xl py-3 px-4 rounded-xl"

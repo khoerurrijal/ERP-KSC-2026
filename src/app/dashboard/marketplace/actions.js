@@ -37,9 +37,7 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
 
   const { data: orders, error } = await supabase
     .from('sales_orders')
-    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, date, marketplace_receipt, customers(name)')
-    .not('marketplace_receipt', 'is', null)
-    .neq('marketplace_receipt', '')
+    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, date, marketplace_receipt, customers(name, type)')
     .lte('date', cutoffDate)
     .order('date', { ascending: true })
     .limit(5000)
@@ -49,27 +47,29 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
   const selectedPlatform = String(platform || 'ALL').toUpperCase()
   const candidateOrders = (orders || []).filter(order => {
     const paymentStatus = String(order.payment_status || '').toUpperCase()
-    const payoutMissing = Number(order.marketplace_pencairan || 0) <= 0
     const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
     const customerName = String(customer?.name || '').toLowerCase()
-    const isKnownPlatform = ['shopee', 'tokopedia', 'tiktok'].some(name => customerName.includes(name))
-    const needsReconciliation = paymentStatus !== 'BATAL' && (paymentStatus !== 'LUNAS' || payoutMissing)
+    const customerType = String(customer?.type || '').toLowerCase()
+    const marketplaceText = `${customerName} ${customerType}`
+    const isKnownPlatform = ['shopee', 'tokopedia', 'tiktok'].some(name => marketplaceText.includes(name))
+    const isMarketplaceCustomer = marketplaceText.includes('marketplace') || isKnownPlatform || Boolean(normalizeMarketplaceReceipt(order.marketplace_receipt))
+    const needsReconciliation = paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL'
 
-    if (!needsReconciliation || Number(order.total_amount || 0) <= 0) return false
+    if (!needsReconciliation || !isMarketplaceCustomer || Number(order.total_amount || 0) <= 0) return false
     if (selectedPlatform === 'ALL') return true
     if (selectedPlatform === 'LAINNYA') return !isKnownPlatform
-    return customerName.includes(selectedPlatform.toLowerCase())
+    return marketplaceText.includes(selectedPlatform.toLowerCase())
   })
 
   const receiptCounts = new Map()
   candidateOrders.forEach(order => {
     const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
-    receiptCounts.set(receipt, (receiptCounts.get(receipt) || 0) + 1)
+    if (receipt) receiptCounts.set(receipt, (receiptCounts.get(receipt) || 0) + 1)
   })
 
   const ordersToProcess = candidateOrders.filter(order => {
     const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
-    return receiptCounts.get(receipt) === 1
+    return !receipt || receiptCounts.get(receipt) === 1
   })
 
   return {
@@ -93,7 +93,10 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     if (ordersErr) throw ordersErr
 
     // Duplicate guard: filter hanya SO yang belum settled (payment_status !== 'LUNAS')
-    const pendingOrders = orders.filter(o => o.payment_status !== 'LUNAS')
+    const pendingOrders = orders.filter(o => {
+      const paymentStatus = String(o.payment_status || '').toUpperCase()
+      return paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL'
+    })
     if (pendingOrders.length === 0) {
       throw new Error('Semua pesanan yang dipilih sudah pernah dicairkan (LUNAS). Tidak ada yang diproses.')
     }
@@ -261,50 +264,6 @@ export async function previewQuickMarketplaceSettlement(cutoffDate, platform = '
   }
 }
 
-async function processMarketplacePayoutBackfill(supabase, orders, paymentMethod, settlementDate) {
-  if (orders.length === 0) return { processed: 0 }
-
-  const marketplaceNames = new Set()
-  orders.forEach(order => {
-    const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
-    const customerName = String(customer?.name || '').toLowerCase()
-    if (customerName.includes('shopee')) marketplaceNames.add('Shopee')
-    else if (customerName.includes('tokopedia')) marketplaceNames.add('Tokopedia')
-    else if (customerName.includes('tiktok')) marketplaceNames.add('TikTok')
-    else marketplaceNames.add('Marketplace')
-  })
-
-  const totalPayout = orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0)
-  const invoiceList = orders.map(order => order.invoice_number).join(', ')
-  const { error: transactionError } = await supabase.from('transactions').insert({
-    date: settlementDate,
-    reference: 'PENJUALAN',
-    description: `Backfill Pencairan ${Array.from(marketplaceNames).join(', ')} - ${invoiceList}`,
-    payment_method: paymentMethod,
-    amount_in: totalPayout,
-    amount_out: 0,
-    workshop_code: 'KING'
-  })
-
-  if (transactionError) throw transactionError
-
-  for (const order of orders) {
-    const { error: updateError } = await supabase
-      .from('sales_orders')
-      .update({ marketplace_pencairan: Number(order.total_amount || 0) })
-      .eq('id', order.id)
-
-    if (updateError) throw updateError
-  }
-
-  revalidatePath('/dashboard/marketplace')
-  revalidatePath('/dashboard/transactions')
-  revalidatePath('/dashboard/production')
-  revalidatePath('/dashboard/sales')
-  revalidatePath('/track')
-  return { processed: orders.length }
-}
-
 export async function processQuickMarketplaceSettlement(cutoffDate, platform, paymentMethod, settlementDate) {
   const supabase = await createClient()
 
@@ -313,32 +272,20 @@ export async function processQuickMarketplaceSettlement(cutoffDate, platform, pa
     const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
     if (orders.length === 0) throw new Error('Tidak ada pesanan marketplace yang memenuhi filter.')
 
-    const pendingOrders = orders.filter(order => String(order.payment_status || '').toUpperCase() !== 'LUNAS')
-    const alreadyLunasOrders = orders.filter(order => String(order.payment_status || '').toUpperCase() === 'LUNAS')
-    let processed = 0
+    const settlementData = orders.map(order => ({
+      orderId: order.id,
+      amount: Number(order.total_amount || 0),
+      invoice_number: order.invoice_number
+    }))
 
-    if (pendingOrders.length > 0) {
-      const settlementData = pendingOrders.map(order => ({
-        orderId: order.id,
-        amount: Number(order.total_amount || 0),
-        invoice_number: order.invoice_number
-      }))
-
-      const settlementResult = await processMarketplaceSettlement(settlementData, paymentMethod, settlementDate)
-      if (!settlementResult.success) throw new Error(settlementResult.error)
-      processed += settlementResult.processed || 0
-    }
-
-    if (alreadyLunasOrders.length > 0) {
-      const backfillResult = await processMarketplacePayoutBackfill(supabase, alreadyLunasOrders, paymentMethod, settlementDate)
-      processed += backfillResult.processed || 0
-    }
+    const settlementResult = await processMarketplaceSettlement(settlementData, paymentMethod, settlementDate)
+    if (!settlementResult.success) throw new Error(settlementResult.error)
+    const processed = settlementResult.processed || 0
 
     return {
       success: true,
       processed,
-      pendingProcessed: pendingOrders.length,
-      payoutBackfilled: alreadyLunasOrders.length,
+      pendingProcessed: processed,
       excludedDuplicateCount
     }
   } catch (err) {

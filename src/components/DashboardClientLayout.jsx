@@ -6,6 +6,7 @@ import Topbar from '@/components/Topbar'
 
 export default function DashboardClientLayout({ allowedMenus, userRole, children }) {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   return (
     <div className="min-h-screen bg-transparent text-foreground flex flex-col md:flex-row">
@@ -21,12 +22,15 @@ export default function DashboardClientLayout({ allowedMenus, userRole, children
       {/* Sidebar Component */}
       <div className={`
         fixed inset-y-0 left-0 z-50 transform transition-transform duration-300 ease-in-out
-        md:relative md:translate-x-0 w-[min(16rem,calc(100vw-1.5rem))] print:hidden
+        md:relative md:translate-x-0 w-[min(16rem,calc(100vw-1.5rem))] print:hidden md:transition-[width] md:duration-300
+        ${isSidebarCollapsed ? 'md:w-16' : 'md:w-64'}
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <Sidebar 
           allowedMenus={allowedMenus} 
           userRole={userRole} 
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(current => !current)}
           onCloseMobile={() => setIsSidebarOpen(false)} 
         />
       </div>

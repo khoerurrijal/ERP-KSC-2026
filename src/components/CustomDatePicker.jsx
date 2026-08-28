@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'
 
 const MONTHS = [
@@ -13,6 +14,8 @@ const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 export default function CustomDatePicker({ value, onChange, className = "" }) {
   const [isOpen, setIsOpen] = useState(false)
   const popoverRef = useRef(null)
+  const menuRef = useRef(null)
+  const [menuStyle, setMenuStyle] = useState(null)
   
   // Parse initial value or use current date
   const initialDate = value ? new Date(value) : new Date()
@@ -31,13 +34,49 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
 
   useEffect(() => {
     function handleClickOutside(event) {
-      if (popoverRef.current && !popoverRef.current.contains(event.target)) {
+      const clickedButton = popoverRef.current?.contains(event.target)
+      const clickedMenu = menuRef.current?.contains(event.target)
+      if (!clickedButton && !clickedMenu) {
         setIsOpen(false)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
+
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      setMenuStyle(null)
+      return undefined
+    }
+
+    const updateMenuPosition = () => {
+      const anchor = popoverRef.current?.getBoundingClientRect()
+      if (!anchor) return
+
+      const width = Math.min(288, Math.max(240, window.innerWidth - 24))
+      const estimatedHeight = 340
+      const opensAbove = anchor.bottom + estimatedHeight > window.innerHeight && anchor.top > estimatedHeight
+      const left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12)
+
+      setMenuStyle({
+        position: 'fixed',
+        left,
+        top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
+        width,
+        zIndex: 1100,
+        transform: opensAbove ? 'translateY(-100%)' : undefined
+      })
+    }
+
+    updateMenuPosition()
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [isOpen])
 
   const handlePrevMonth = () => {
     if (displayMonth === 0) {
@@ -101,8 +140,8 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
         </div>
       </button>
 
-      {isOpen && (
-        <div className="absolute left-0 mt-2 p-4 w-72 bg-[#18181B] rounded-xl shadow-2xl border border-white/10 z-[9999] animate-in fade-in zoom-in-95 duration-200">
+      {isOpen && menuStyle && typeof document !== 'undefined' && createPortal(
+        <div ref={menuRef} style={menuStyle} className="p-4 bg-[#18181B] rounded-xl shadow-2xl border border-white/10 z-[1100] animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
             <button 
               type="button"
@@ -153,7 +192,8 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
               )
             })}
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   )

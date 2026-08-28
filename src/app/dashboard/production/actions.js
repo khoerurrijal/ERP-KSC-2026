@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { createAdminNotification } from '@/lib/adminNotifications'
 
 export async function saveProductionProgress(payload) {
   const supabase = await createClient()
@@ -39,7 +40,7 @@ export async function handleAutoStatusUpdate(itemId) {
   const supabase = await createClient()
 
   // Ambil data item dan invoice
-  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
+  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
   if (!item) return;
 
   const so = item.sales_orders;
@@ -127,6 +128,15 @@ export async function handleAutoStatusUpdate(itemId) {
 
   if (newStatus !== oldStatus) {
     await supabase.from('sales_items').update({ status: newStatus }).eq('id', itemId);
+    if (oldStatus !== 'BARU MASUK' || newStatus !== 'SIAP PROSES') {
+      await createAdminNotification(supabase, {
+        notificationType: 'PRODUCTION_STATUS',
+        title: 'Status produksi berubah',
+        message: `${so.invoice_number || 'Pesanan'}: ${oldStatus} → ${newStatus}.`,
+        href: '/dashboard/production',
+        entityId: itemId
+      })
+    }
   }
 }
 
@@ -134,7 +144,8 @@ export async function updateSalesOrderStatus(itemId, status) {
   const supabase = await createClient()
 
   try {
-    const { data: item } = await supabase.from('sales_items').select('*, sales_orders(payment_status)').eq('id', itemId).single()
+    const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status)').eq('id', itemId).single()
+    const oldStatus = String(item?.status || 'BARU MASUK').toUpperCase()
     let finalStatus = status;
     const isLunas = item?.sales_orders?.payment_status === 'LUNAS';
 
@@ -157,6 +168,16 @@ export async function updateSalesOrderStatus(itemId, status) {
       .eq('id', itemId)
     
     if (error) throw error
+
+    if (oldStatus !== String(finalStatus).toUpperCase()) {
+      await createAdminNotification(supabase, {
+        notificationType: 'PRODUCTION_STATUS',
+        title: 'Status produksi berubah',
+        message: `${item?.sales_orders?.invoice_number || 'Pesanan'}: ${oldStatus} → ${String(finalStatus).toUpperCase()}.`,
+        href: '/dashboard/production',
+        entityId: itemId
+      })
+    }
 
     revalidatePath('/dashboard/production')
     revalidatePath('/dashboard/sales')
@@ -207,7 +228,7 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
     const requestedStatus = String(deliveryStatus).toUpperCase()
     const { data: items, error: itemsError } = await supabase
       .from('sales_items')
-      .select('id, status, order_type, product_code, sales_orders(payment_status), products(category)')
+      .select('id, status, order_type, product_code, sales_orders(invoice_number, payment_status), products(category)')
       .eq('so_id', soId)
 
     if (itemsError) throw itemsError
@@ -243,6 +264,14 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
         .in('id', pendingIds)
 
       if (updateError) throw updateError
+
+      await createAdminNotification(supabase, {
+        notificationType: 'DELIVERY_STATUS',
+        title: 'Pesanan diserahterimakan',
+        message: `${order?.invoice_number || 'Pesanan'} berubah menjadi ${nextStatus}.`,
+        href: '/dashboard/production/shipping',
+        entityId: soId
+      })
     }
 
     revalidatePath('/dashboard/production')

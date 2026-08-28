@@ -10,30 +10,35 @@ export default async function PurchasesPage({ searchParams }) {
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })()
 
-  // Ambil PO terbaru
-  const { data: purchaseOrders } = await supabase
-    .from('purchase_orders')
-    .select(`
-      *,
-      purchase_items(total_price)
-    `)
-    .limit(1000)
-    .order('date', { ascending: false })
+  const [purchaseOrdersResult, rawItemsResult, suppliersResult, productsResult, workshopsResult, settingsResult] = await Promise.all([
+    supabase
+      .from('purchase_orders')
+      .select(`
+        *,
+        purchase_items(id, product_code, qty, unit, unit_multiplier, unit_price, total_price)
+      `)
+      .limit(1000)
+      .order('date', { ascending: false }),
+    supabase
+      .from('purchase_items')
+      .select(`
+        *,
+        purchase_orders!inner(po_number, date, status, supplier),
+        products(name)
+      `)
+      .order('id', { ascending: false })
+      .limit(500),
+    supabase.from('suppliers').select('*'),
+    supabase.from('products').select('*, product_units(id, unit_name, multiplier)'),
+    supabase.from('workshops').select('*'),
+    supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
+  ])
 
-  const allPOs = purchaseOrders || []
-
-  // Ambil purchase items terbaru
-  const { data: rawItems } = await supabase
-    .from('purchase_items')
-    .select(`
-      *,
-      purchase_orders!inner(po_number, date, status, supplier),
-      products(name)
-    `)
-    .order('id', { ascending: false })
-    .limit(500)
-
-  const purchaseItems = rawItems || [];
+  const allPOs = purchaseOrdersResult.data || []
+  const purchaseItems = rawItemsResult.data || []
+  const suppliers = suppliersResult.data || []
+  const products = productsResult.data || []
+  const workshops = workshopsResult.data || []
 
   // Hitung Laporan Ringkasan
   const summary = {
@@ -67,8 +72,7 @@ export default async function PurchasesPage({ searchParams }) {
     }
   })
 
-  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
-  const dropdownConfig = settings?.value || {}
+  const dropdownConfig = settingsResult.data?.value || {}
 
-  return <PurchasesClient purchaseOrders={allPOs} purchaseItems={purchaseItems} summary={summary} selectedMonth={selectedMonth} dropdownConfig={dropdownConfig} />
+  return <PurchasesClient purchaseOrders={allPOs} purchaseItems={purchaseItems} summary={summary} selectedMonth={selectedMonth} dropdownConfig={dropdownConfig} suppliers={suppliers} products={products} workshops={workshops} />
 }

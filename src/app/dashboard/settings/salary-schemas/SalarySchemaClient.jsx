@@ -145,7 +145,7 @@ export default function SalarySchemaClient({ initialSchemas }) {
       </div>
 
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onMouseDown={event => event.target === event.currentTarget && setIsModalOpen(false)}>
           <div className="bg-background border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
             <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex justify-between items-center z-10">
               <h2 className="text-xl font-bold">{formData.id ? 'Edit' : 'Tambah'} Skema Gaji</h2>

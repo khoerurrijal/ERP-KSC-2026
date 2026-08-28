@@ -9,6 +9,7 @@ import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import CurrencyInput from '@/components/CurrencyInput'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 
@@ -326,23 +327,23 @@ export default function SalesClient({
       </div>}
 
       {/* KPI Cards */}
-      {!embedded && <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        <div className="glass-card p-4 rounded-xl flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary/20 rounded-full flex items-center justify-center text-primary">
-            <TrendingUp className="w-6 h-6" />
+      {!embedded && <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="glass-card p-3 rounded-xl flex items-center gap-3">
+          <div className="w-10 h-10 bg-primary/20 rounded-full flex items-center justify-center text-primary shrink-0">
+            <TrendingUp className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-sm text-foreground/60 font-medium">Total Omset (Bulan Terpilih)</p>
-            <p className="text-xl font-bold text-white">Rp {totalOmset.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-foreground/60 font-medium">Total Omset (Bulan Terpilih)</p>
+            <p className="text-lg font-bold text-white">Rp {totalOmset.toLocaleString('id-ID')}</p>
           </div>
         </div>
-        <div className="glass-card p-4 rounded-xl flex items-center gap-4">
-          <div className="w-12 h-12 bg-red-500/20 rounded-full flex items-center justify-center text-red-500">
-            <Clock className="w-6 h-6" />
+        <div className="glass-card p-3 rounded-xl flex items-center gap-3">
+          <div className="w-10 h-10 bg-red-500/20 rounded-full flex items-center justify-center text-red-500 shrink-0">
+            <Clock className="w-5 h-5" />
           </div>
           <div>
-            <p className="text-sm text-foreground/60 font-medium">Total Piutang Berjalan</p>
-            <p className="text-xl font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID')}</p>
+            <p className="text-xs text-foreground/60 font-medium">Total Piutang Berjalan</p>
+            <p className="text-lg font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID')}</p>
           </div>
         </div>
       </div>}
@@ -469,39 +470,50 @@ export default function SalesClient({
                 ) : filteredAndSortedOrders.map((item) => {
                   return (
                     <tr key={item.id} className="hover:bg-white/5 transition-colors group">
-                      <td className="px-6 py-4 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
-                      <td className="px-6 py-4 text-foreground/90 font-medium">
+                      <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
+                      <td className="px-4 py-3 text-foreground/90 font-medium">
                         {item.customers?.name}
                         <br/><span className="text-[10px] text-foreground/50">{item.invoice_number}</span>
                       </td>
-                      <td className="px-6 py-4 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
-                      <td className="px-6 py-4">
+                      <td className="px-4 py-3 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'BATAL' ? 'bg-red-500/20 text-red-500' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                           {item.payment_status}
                         </span>
                       </td>
-                      <td className="px-6 py-4 text-right flex flex-wrap items-center justify-end gap-3">
-                        <a href={`/track/${item.invoice_number || item.id}`} target="_blank" className="text-white/40 hover:text-white font-medium text-xs flex items-center gap-1 transition-colors">
-                          <Navigation className="w-3 h-3" /> Track
-                        </a>
-                        {item.payment_status !== 'BATAL' && (
-                          <>
-                            {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
-                              <Link href={`/sales/edit/${item.id}`} className="text-blue-400 hover:text-blue-300 font-medium text-xs flex items-center gap-1 transition-colors">
-                                <Edit3 className="w-3 h-3" /> Edit
-                              </Link>
-                            )}
+                      <td className="px-4 py-3 text-right">
+                        <div className="flex items-center justify-end gap-2">
+                          {item.payment_status !== 'BATAL' && (
                             <button onClick={() => handleEditClick(item)} className="text-primary hover:text-primary/80 font-medium text-xs flex items-center gap-1 transition-colors">
                               <Clock className="w-3 h-3" /> Bayar
                             </button>
-                            <button onClick={() => handleCancelSalesOrder(item.id, item.invoice_number)} disabled={updatingItem === item.id} className="text-red-500 hover:text-red-400 font-medium text-xs flex items-center gap-1 transition-colors disabled:opacity-50">
-                              <XCircle className="w-3 h-3" /> {updatingItem === item.id ? 'Loading...' : 'Batal'}
-                            </button>
-                            <Link href={`/sales/${item.id}/invoice`} className="text-purple-400 hover:text-purple-300 font-medium text-xs flex items-center gap-1 transition-colors">
-                              <Printer className="w-3 h-3" /> Print
-                            </Link>
-                          </>
-                        )}
+                          )}
+                          <details className="relative">
+                            <summary className="list-none cursor-pointer text-foreground/60 hover:text-foreground font-medium text-xs inline-flex items-center gap-1 select-none">
+                              Lainnya <ChevronDown className="w-3 h-3" />
+                            </summary>
+                            <div className="absolute right-0 top-full mt-1 z-20 min-w-28 rounded-lg border border-white/10 bg-background p-1 shadow-xl text-left">
+                              <a href={`/track/${item.invoice_number || item.id}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-foreground/70 hover:bg-white/10 hover:text-foreground">
+                                <Navigation className="w-3 h-3" /> Track
+                              </a>
+                              {item.payment_status !== 'BATAL' && (
+                                <>
+                                  {(item.payment_status === 'BELUM LUNAS' || item.payment_status === 'DP') && (
+                                    <Link href={`/sales/edit/${item.id}`} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-blue-400 hover:bg-white/10 hover:text-blue-300">
+                                      <Edit3 className="w-3 h-3" /> Edit
+                                    </Link>
+                                  )}
+                                  <button onClick={() => handleCancelSalesOrder(item.id, item.invoice_number)} disabled={updatingItem === item.id} className="w-full flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-red-400 hover:bg-white/10 hover:text-red-300 disabled:opacity-50">
+                                    <XCircle className="w-3 h-3" /> {updatingItem === item.id ? 'Loading...' : 'Batal'}
+                                  </button>
+                                  <Link href={`/sales/${item.id}/invoice`} className="flex items-center gap-2 rounded-md px-2.5 py-2 text-xs text-purple-400 hover:bg-white/10 hover:text-purple-300">
+                                    <Printer className="w-3 h-3" /> Print
+                                  </Link>
+                                </>
+                              )}
+                            </div>
+                          </details>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -683,7 +695,7 @@ export default function SalesClient({
 
       {/* Modal Edit Pembayaran (Unchanged) */}
       {editingOrder && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && closeEditModal()}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
               <h3 className="font-bold text-foreground">Riwayat & Tambah Pembayaran</h3>
@@ -746,8 +758,7 @@ export default function SalesClient({
                   </div>
                   <div className="space-y-2">
                     <label className="text-xs font-medium text-foreground/80">Nominal Pembayaran Baru (Rp)</label>
-                    <input 
-                      type="number" 
+                    <CurrencyInput
                       value={newPaymentAmount} 
                       onChange={e => setNewPaymentAmount(e.target.value)} 
                       placeholder="Masukkan nominal..."
@@ -772,7 +783,7 @@ export default function SalesClient({
 
       {/* Modal Koreksi Status Mundur */}
       {correctionModal.isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' })}>
           <div className="bg-background border border-red-500/30 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.15)] w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-red-500/20 flex justify-between items-center bg-red-500/5">
               <h3 className="font-bold text-red-400">Koreksi Status & Qty</h3>

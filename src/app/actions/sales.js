@@ -4,12 +4,14 @@ import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
+import { createAdminNotification } from '@/lib/adminNotifications'
 
 export async function createSalesOrder(payload) {
   const supabase = await createClient()
+  let createdSoId = null
 
   try {
-    const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt } = payload
+    const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt, sourceRequestId, designService } = payload
 
     // Generate Invoice Number
     const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '')
@@ -28,7 +30,7 @@ export async function createSalesOrder(payload) {
         itemTotal += 250 * actualQty;
       }
       return sum + itemTotal;
-    }, 0)
+    }, 0) + (designService ? 50000 : 0)
     const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get customer name
@@ -75,24 +77,31 @@ export async function createSalesOrder(payload) {
     const finalBeliGlobal = totalHppGlobal + virtualRoyaltyGlobal;
 
     // 1. Insert Sales Order
+    const salesOrderData = {
+      invoice_number: invoiceNumber,
+      marketplace_receipt: marketplaceReceipt || null,
+      date: orderDate,
+      customer_code: customerId,
+      notes: notes,
+      total_amount: grandTotal,
+      dp_amount: dpAmount,
+      payment_method: paymentAccount,
+      payment_status: paymentStatus,
+      status: 'PROSES'
+    }
+    if (sourceRequestId) salesOrderData.source_request_id = sourceRequestId
+
+    const orderNotes = [notes, designService ? 'Jasa Desain Logo: Rp 50.000' : ''].filter(Boolean).join('\n')
+    salesOrderData.notes = orderNotes
+
     const { data: so, error: soError } = await supabase
       .from('sales_orders')
-      .insert({
-        invoice_number: invoiceNumber,
-        marketplace_receipt: marketplaceReceipt || null,
-        date: orderDate,
-        customer_code: customerId,
-        notes: notes,
-        total_amount: grandTotal,
-        dp_amount: dpAmount,
-        payment_method: paymentAccount,
-        payment_status: paymentStatus,
-        status: 'PROSES'
-      })
+      .insert(salesOrderData)
       .select()
       .single()
 
     if (soError) throw new Error('Gagal membuat pesanan: ' + soError.message)
+    createdSoId = so.id
 
     // 2. Process Items
     const soItems = [];
@@ -222,6 +231,14 @@ export async function createSalesOrder(payload) {
     return { success: true, invoice_number: invoiceNumber }
 
   } catch (error) {
+    if (createdSoId) {
+      try {
+        await supabase.from('transactions').delete().eq('so_id', createdSoId)
+        await supabase.from('sales_orders').delete().eq('id', createdSoId)
+      } catch (rollbackError) {
+        console.error('Create Sales Order rollback error:', rollbackError)
+      }
+    }
     console.error('Create Sales Order Error:', error)
     return { success: false, error: error.message }
   }
@@ -257,6 +274,16 @@ export async function addSalesPayment(soId, paymentData) {
       dp_amount: newDpAmount,
       payment_status: paymentStatus
     }).eq('id', soId)
+
+    if (paymentStatus !== so.payment_status) {
+      await createAdminNotification(supabase, {
+        notificationType: 'PAYMENT_STATUS',
+        title: paymentStatus === 'LUNAS' ? 'Pelunasan dicatat' : 'Pembayaran pesanan berubah',
+        message: `${so.invoice_number}: ${so.payment_status || 'BELUM LUNAS'} → ${paymentStatus}.`,
+        href: `/sales?search=${encodeURIComponent(so.invoice_number || soId)}`,
+        entityId: soId
+      })
+    }
 
 
     // Insert Transaction

@@ -6,6 +6,7 @@ import { createManualTransaction, updateTransaction, deleteTransaction } from '.
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import CurrencyInput from '@/components/CurrencyInput'
 
 export default function TransactionsClient({ transactions = [], dropdownConfig = {} }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -220,7 +221,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       </div>
 
       {showFilters && (
-        <div className="glass-card p-4 grid grid-cols-1 sm:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-2 relative z-50">
+        <div className="glass-card p-3 grid grid-cols-1 sm:grid-cols-4 gap-3 animate-in fade-in slide-in-from-top-2 relative z-50">
           <div className="block sm:hidden space-y-1">
              <label className="text-xs text-foreground/60 block">Periode</label>
              <MonthFilter value={filterMonth} onChange={setFilterMonth} />
@@ -263,7 +264,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="glass-card p-4 flex items-center gap-4 border-l-4 border-green-500">
+        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-green-500">
           <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
             <ArrowDownRight className="w-6 h-6" />
           </div>
@@ -272,7 +273,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
             <p className="text-2xl font-bold text-foreground">Rp {totalIn.toLocaleString('id-ID')}</p>
           </div>
         </div>
-        <div className="glass-card p-4 flex items-center gap-4 border-l-4 border-red-500">
+        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-red-500">
           <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
             <ArrowUpRight className="w-6 h-6" />
           </div>
@@ -281,7 +282,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
             <p className="text-2xl font-bold text-foreground">Rp {totalOut.toLocaleString('id-ID')}</p>
           </div>
         </div>
-        <div className="glass-card p-4 flex items-center gap-4 border-l-4 border-primary">
+        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-primary">
           <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
             <BookOpen className="w-6 h-6" />
           </div>
@@ -297,12 +298,12 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
           <table className="w-full text-sm text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('description')}>Keterangan / Pelanggan {renderSortIcon('description')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop_code')}>Workshop {renderSortIcon('workshop_code')}</th>
-                <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_method')}>Metode {renderSortIcon('payment_method')}</th>
-                <th className="px-6 py-4 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('amount_out')}>Kas Keluar {renderSortIcon('amount_out')}</th>
-                <th className="px-6 py-4 font-medium text-right">Aksi</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('date')}>Tanggal {renderSortIcon('date')}</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('description')}>Keterangan / Pelanggan {renderSortIcon('description')}</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('workshop_code')}>Workshop {renderSortIcon('workshop_code')}</th>
+                <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('payment_method')}>Metode {renderSortIcon('payment_method')}</th>
+                <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleSort('amount_out')}>Kas Keluar {renderSortIcon('amount_out')}</th>
+                <th className="px-4 py-3 font-medium text-right">Aksi</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -312,21 +313,21 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                  </tr>
               ) : paginatedTransactions.map((trx) => (
                 <tr key={trx.id} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
-                  <td className="px-6 py-4 font-medium text-foreground/90">
+                  <td className="px-4 py-3 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
+                  <td className="px-4 py-3 font-medium text-foreground/90">
                     {trx.description && trx.description !== '-' 
                       ? trx.description 
                       : (trx.sales_orders ? trx.sales_orders.customers?.name || 'Unknown Pelanggan' : 'Sistem ERP')}
                   </td>
-                  <td className="px-6 py-4 text-foreground/80">{trx.workshop_code || '-'}</td>
-                  <td className="px-6 py-4 text-foreground/80">{trx.payment_method || '-'}</td>
-                  <td className="px-6 py-4 text-right font-medium text-green-400">
+                  <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
+                  <td className="px-4 py-3 text-foreground/80">{trx.payment_method || '-'}</td>
+                  <td className="px-4 py-3 text-right font-medium text-green-400">
                     {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID')}` : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right font-medium text-red-400">
+                  <td className="px-4 py-3 text-right font-medium text-red-400">
                     {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID')}` : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-4 py-3 text-right">
                     <button onClick={() => handleEditTransaction(trx)} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>
                     <button onClick={() => handleDeleteTransaction(trx.id)} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
                   </td>
@@ -365,7 +366,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
       {/* Modal Input Transaksi */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setIsModalOpen(false)}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 bg-white/5">
               <h3 className="font-bold text-foreground">{editId ? 'Edit Transaksi' : 'Tambah Transaksi Manual'}</h3>
@@ -440,8 +441,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
               <div className="space-y-2">
                 <label className="text-xs font-medium text-foreground/80">Nominal (Rp)</label>
-                <input 
-                  type="number" 
+                <CurrencyInput
                   value={formAmount} 
                   onChange={e => setFormAmount(e.target.value)} 
                   placeholder="0"

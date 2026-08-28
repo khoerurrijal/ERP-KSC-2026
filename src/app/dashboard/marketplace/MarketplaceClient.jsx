@@ -7,17 +7,10 @@ import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previe
 import { previewBulkMarketplaceSettlement, processBulkMarketplaceSettlement } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
+import CurrencyInput from '@/components/CurrencyInput'
 
 export default function MarketplaceClient({ marketplaceOrders = [], dropdownConfig = {} }) {
-  const [filterStatus, setFilterStatus] = useState('BELUM_LUNAS') // 'ALL' | 'BELUM_LUNAS' | 'LUNAS'
-  
-  const filteredOrders = useMemo(() => {
-    return marketplaceOrders.filter(item => {
-      if (filterStatus === 'ALL') return true
-      if (filterStatus === 'BELUM_LUNAS') return item.payment_status !== 'LUNAS'
-      return item.payment_status === 'LUNAS'
-    })
-  }, [marketplaceOrders, filterStatus])
+  const filteredOrders = marketplaceOrders
 
   const router = useRouter()
   const [isSaving, setIsSaving] = useState(false)
@@ -30,7 +23,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   const [savingReceiptId, setSavingReceiptId] = useState(null)
 
   // Dynamic Summary Stats
-  const activeOrders = useMemo(() => marketplaceOrders.filter(o => o.payment_status !== 'LUNAS'), [marketplaceOrders])
+  const activeOrders = useMemo(() => marketplaceOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL'), [marketplaceOrders])
   const shopeeCount = activeOrders.filter(o => (o.customers?.name || '').toLowerCase().includes('shopee')).length
   const topedCount = activeOrders.filter(o => (o.customers?.name || '').toLowerCase().includes('tokopedia')).length
   const tiktokCount = activeOrders.filter(o => (o.customers?.name || '').toLowerCase().includes('tiktok')).length
@@ -93,7 +86,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       const numVal = Number(val)
       if (numVal > 0) {
         // Ensure the order is actually BELUM_LUNAS
-        const order = marketplaceOrders.find(o => o.id.toString() === id.toString() && o.payment_status !== 'LUNAS')
+        const order = marketplaceOrders.find(o => o.id.toString() === id.toString() && o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL')
         if (order) {
           data.push({ orderId: order.id, amount: numVal, invoice_number: order.invoice_number })
         }
@@ -152,8 +145,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
     try {
       const res = await processQuickMarketplaceSettlement(quickCutoffDate, quickPlatform, settlementMethod, quickSettlementDate)
       if (res.success) {
-        const backfillNote = res.payoutBackfilled > 0 ? ` (${res.payoutBackfilled} payout lama dilengkapi)` : ''
-        alert(`Rekonsiliasi cepat berhasil untuk ${res.processed} pesanan${backfillNote}.`)
+        alert(`Rekonsiliasi cepat berhasil untuk ${res.processed} pesanan.`)
         setIsQuickModalOpen(false)
         setQuickPreview(null)
         router.refresh()
@@ -260,17 +252,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
             <TrendingUp className="w-5 h-5 text-primary" /> 
             Daftar Pesanan Marketplace
           </h2>
-          <div className="w-48">
-            <CustomSelect 
-              value={filterStatus} 
-              onChange={e => setFilterStatus(e.target.value)} 
-              options={[
-                { value: "ALL", label: "Semua Status Cair" },
-                { value: "BELUM_LUNAS", label: "Belum Cair (Belum Lunas)" },
-                { value: "LUNAS", label: "Sudah Cair (Lunas)" }
-              ]}
-            />
-          </div>
+          <span className="text-xs text-foreground/50">Hanya pesanan aktif</span>
         </div>
         <div className="overflow-x-auto p-4">
           <table className="w-full text-sm text-left">
@@ -314,8 +296,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                         Rp {Number(item.marketplace_pencairan || 0).toLocaleString('id-ID')}
                       </span>
                     ) : (
-                      <input 
-                        type="number" 
+                      <CurrencyInput
                         placeholder="Isi Nominal..."
                         className="glass-input w-32 h-9 text-xs px-2 text-right focus:ring-primary focus:border-primary border-white/20 bg-background/50"
                         value={inputPencairan[item.id] || ''}
@@ -369,16 +350,20 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
 
       {/* Modal Settlement Confirmation */}
       {isSettlementModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <h3 className="font-bold text-foreground">Konfirmasi Pencairan Dana</h3>
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onMouseDown={event => event.target === event.currentTarget && setIsSettlementModalOpen(false)}
+          role="presentation"
+        >
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-visible flex flex-col" role="dialog" aria-modal="true" aria-labelledby="settlement-modal-title">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
+              <h3 id="settlement-modal-title" className="font-bold text-foreground">Konfirmasi Pencairan Dana</h3>
               <button onClick={() => setIsSettlementModalOpen(false)} className="text-foreground/50 hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 min-h-0 overflow-y-auto">
               <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-center mb-4">
                 <p className="text-sm text-foreground/80 mb-1">Total Uang Masuk Kas</p>
                 <p className="text-3xl font-black text-green-400">Rp {totalBersihCair.toLocaleString('id-ID')}</p>
@@ -407,7 +392,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               </p>
             </div>
 
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5">
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 shrink-0">
               <button onClick={() => setIsSettlementModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
               <button onClick={handleProcessSettlement} disabled={isSaving} className="btn-primary px-4 h-10 text-sm flex items-center gap-2">
                 <Save className="w-4 h-4" /> {isSaving ? 'Memproses...' : 'Simpan & Lunas'}
@@ -418,11 +403,15 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       )}
 
       {isBulkModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-background/95 backdrop-blur-xl sticky top-0 z-20">
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onMouseDown={event => event.target === event.currentTarget && setIsBulkModalOpen(false)}
+          role="presentation"
+        >
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-visible flex flex-col" role="dialog" aria-modal="true" aria-labelledby="bulk-marketplace-modal-title">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-background/95 backdrop-blur-xl shrink-0">
               <div>
-                <h3 className="font-bold text-foreground flex items-center gap-2"><ClipboardPaste className="w-4 h-4 text-green-400" /> Pencairan Massal Marketplace</h3>
+                <h3 id="bulk-marketplace-modal-title" className="font-bold text-foreground flex items-center gap-2"><ClipboardPaste className="w-4 h-4 text-green-400" /> Pencairan Massal Marketplace</h3>
                 <p className="text-xs text-foreground/50 mt-1">Paste tabel dua kolom: total pencairan dan nomor pesanan marketplace.</p>
               </div>
               <button onClick={() => setIsBulkModalOpen(false)} className="text-foreground/50 hover:text-foreground">
@@ -430,7 +419,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 min-h-0 overflow-y-auto">
               <textarea
                 value={bulkText}
                 onChange={e => {
@@ -507,7 +496,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               )}
             </div>
 
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 sticky bottom-0">
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 shrink-0">
               <button onClick={() => setIsBulkModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
               {!bulkPreview ? (
                 <button onClick={handleBulkPreview} disabled={isBulkLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-green-500 hover:bg-green-600 text-black border-none">
@@ -524,19 +513,23 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       )}
 
       {isQuickModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg overflow-visible">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
+        <div
+          className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          onMouseDown={event => event.target === event.currentTarget && setIsQuickModalOpen(false)}
+          role="presentation"
+        >
+          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-lg max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-visible flex flex-col" role="dialog" aria-modal="true" aria-labelledby="quick-marketplace-modal-title">
+            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5 shrink-0">
               <div>
-                <h3 className="font-bold text-foreground">Rekonsiliasi Cepat Marketplace</h3>
-                <p className="text-xs text-foreground/50 mt-1">Gunakan hanya untuk pencairan lama yang memang sudah masuk rekening.</p>
+                <h3 id="quick-marketplace-modal-title" className="font-bold text-foreground">Rekonsiliasi Cepat Marketplace</h3>
+                <p className="text-xs text-foreground/50 mt-1">Hanya memproses pesanan aktif yang belum lunas.</p>
               </div>
               <button onClick={() => setIsQuickModalOpen(false)} className="text-foreground/50 hover:text-foreground">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
+            <div className="p-4 sm:p-6 space-y-4 min-h-0 overflow-y-auto">
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground/80">Order sampai tanggal</label>
@@ -581,6 +574,9 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                   <p className="text-sm font-bold text-amber-300">Preview pencairan</p>
                   <p className="text-sm text-foreground/80">{quickPreview.count} pesanan</p>
                   <p className="text-xl font-black text-amber-300">Rp {quickPreview.total.toLocaleString('id-ID')}</p>
+                  {quickPreview.count === 0 && (
+                    <p className="text-xs text-red-300">Tidak ada pesanan untuk filter ini. Pilih tanggal order yang lebih akhir atau platform yang sesuai.</p>
+                  )}
                   {quickPreview.invoices?.length > 0 && (
                     <p className="text-xs text-foreground/50">Contoh invoice: {quickPreview.invoices.join(', ')}{quickPreview.count > quickPreview.invoices.length ? ' ...' : ''}</p>
                   )}
@@ -592,15 +588,20 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               )}
             </div>
 
-            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5">
+            <div className="p-4 border-t border-white/10 flex justify-end gap-3 bg-white/5 shrink-0">
               <button onClick={() => setIsQuickModalOpen(false)} className="btn-secondary px-4 h-10 text-sm">Batal</button>
               {!quickPreview ? (
                 <button onClick={handleQuickPreview} disabled={isQuickLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none">
                   <Zap className="w-4 h-4" /> {isQuickLoading ? 'Memuat...' : 'Lihat Preview'}
                 </button>
               ) : (
-                <button onClick={handleQuickSettlement} disabled={isQuickLoading} className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none">
-                  <Save className="w-4 h-4" /> {isQuickLoading ? 'Memproses...' : 'Konfirmasi & Lunas'}
+                <button
+                  onClick={handleQuickSettlement}
+                  disabled={isQuickLoading || !quickPreview.count}
+                  className="btn-primary px-4 h-10 text-sm flex items-center gap-2 bg-amber-500 hover:bg-amber-600 text-black border-none disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Save className="w-4 h-4" />
+                  {isQuickLoading ? 'Memproses...' : quickPreview.count ? 'Konfirmasi & Lunas' : 'Tidak ada pesanan'}
                 </button>
               )}
             </div>

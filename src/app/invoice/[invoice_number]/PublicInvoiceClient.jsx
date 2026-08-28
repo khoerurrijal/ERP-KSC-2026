@@ -70,7 +70,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
   return (
     <>
       {isQrisOpen && (
-        <div className="fixed inset-0 z-[100] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={() => setIsQrisOpen(false)}>
+        <div className="fixed inset-0 z-[1200] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={event => event.target === event.currentTarget && setIsQrisOpen(false)}>
           <img src="/qris.png" alt="QRIS Full" className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a href="/qris.png" download="QRIS-KingSablon.png" className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-primary/20" onClick={e => e.stopPropagation()}>

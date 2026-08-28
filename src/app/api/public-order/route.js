@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing';
+import { createHash } from 'crypto';
 import { normalizePhone } from '@/utils/phone';
 
 
@@ -22,6 +22,26 @@ export async function POST(req) {
     }
 
     const normalizedInputPhone = normalizePhone(finalWaNumber);
+    const requestFingerprint = createHash('sha256').update(JSON.stringify({
+      phone: normalizedInputPhone,
+      brandName: String(brandName).trim().toLowerCase(),
+      items,
+      designService: Boolean(designService),
+      grandTotal: Number(grandTotal || 0)
+    })).digest('hex');
+
+    const { data: duplicateRequest } = await supabase
+      .from('customer_order_requests')
+      .select('id, request_number')
+      .eq('request_fingerprint', requestFingerprint)
+      .is('sales_order_id', null)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (duplicateRequest) {
+      return NextResponse.json({ success: true, data: { request_number: duplicateRequest.request_number } });
+    }
 
     // 1. Process Customer (Lookup by WA phone first, then fall back to brand name but verify WA)
     let customerId;
@@ -51,105 +71,35 @@ export async function POST(req) {
       customerId = newCustomerCode;
     }
 
-    // 2. Generate Invoice Number & Unique Code
-    const randomSuffix = Math.floor(1000 + Math.random() * 9000);
-    const invoiceNumber = `INV-WEB-${randomSuffix}`;
-    const uniqueCode = Math.floor(Math.random() * 900) + 100; // 100-999
-    
-    const finalGrandTotal = parseInt(grandTotal) + uniqueCode;
-
-    // Fetch pricelist settings to calculate financial snapshots
-    const { data: settings } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'pricelist_config')
-      .single();
-    const pricelistConfig = settings?.value || {};
-    const profitGudangNom = Number(pricelistConfig.profit_gudang_nominal || 0);
-    const profitGlobalPct = Number(pricelistConfig.profit_global_percent || 0);
-
-    // 3. Create Sales Order
-    let notes = `Order via Web Calculator.\nUnik: Rp ${uniqueCode}\nSubtotal: Rp ${subtotal}\n`;
-    const totalFastTrack = items.filter(i => i.isFastTrack).length;
-    if (totalFastTrack > 0) notes += `- Fast Track (${totalFastTrack} item) (+Rp ${totalFastTrack * 100000})\n`;
-    if (designService) notes += `- Jasa Desain (+Rp 50.000)\n`;
-
-    const { data: order, error: orderError } = await supabase
-      .from('sales_orders')
+    // Hanya simpan request. Sales Order, item, invoice, stok, dan transaksi
+    // baru dibuat setelah Admin membuka form Sales Order lalu mengonfirmasi.
+    const requestNumber = `REQ-WEB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
+    const notes = [
+      `Order via Web Calculator.`,
+      `Subtotal customer: Rp ${subtotal}`,
+      `Total customer: Rp ${grandTotal}`,
+      designService ? 'Jasa Desain Logo: Rp 50.000' : ''
+    ].filter(Boolean).join('\n');
+    const { data: request, error: requestError } = await supabase
+      .from('customer_order_requests')
       .insert([{
-        invoice_number: invoiceNumber,
-        customer_code: customerId, 
-        date: new Date().toISOString().split('T')[0],
-        status: 'DRAFT',
-        payment_status: 'BELUM LUNAS',
-        payment_method: 'TRANSFER',
-        dp_amount: 0,
-        total_amount: finalGrandTotal,
-        notes: notes
+        request_number: requestNumber,
+        customer_code: customerId,
+        brand_name: brandName,
+        whatsapp_number: normalizedInputPhone,
+        request_fingerprint: requestFingerprint,
+        payload: { items, designService: Boolean(designService), subtotal, grandTotal, notes }
       }])
-      .select()
+      .select('id, request_number')
       .single();
 
-    if (orderError) throw orderError;
+    if (requestError) throw requestError;
 
-    // 4. Create Sales Items
-    const soItems = [];
-    for (const item of items) {
-      let itemNotes = '';
-      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
-      if (item.isTwoColor) itemNotes += '🎨 2 Warna\n';
-      if (item.printingColors) itemNotes += `🎨 ${item.printingColors}\n`;
-
-      // Get product details
-      const { data: product } = await supabase
-        .from('products')
-        .select('workshop_code, base_price, category')
-        .eq('product_code', item.productId)
-        .single();
-
-      const dynamicHPP = await calculateDynamicHPP(supabase, item.productId, product?.base_price || 0);
-
-      const snapshot = calculateCostSnapshot({
-        product,
-        orderType: item.orderType,
-        qty: item.qty,
-        unitMultiplier: 1,
-        dynamicHPP,
-        profitGudangNom,
-        profitGlobalPct
-      });
-      
-      soItems.push({
-        so_id: order.id,
-        order_type: item.orderType,
-        product_code: item.productId,
-        qty: parseInt(item.qty),
-        unit: 'PCS',
-        unit_multiplier: 1,
-        unit_price: parseFloat(item.unitPrice),
-        total_price: parseFloat(item.unitPrice) * parseInt(item.qty),
-        hpp_price: dynamicHPP,
-        beli_gudang: snapshot.beliGudang,
-        beli_global: snapshot.beliGlobal,
-        royalty_fee: snapshot.royaltyFee,
-        notes: itemNotes.trim()
-      });
-    }
-
-    const { error: itemError } = await supabase
-      .from('sales_items')
-      .insert(soItems);
-
-    if (itemError) throw itemError;
-
-    // Return success
     return NextResponse.json({ 
       success: true, 
       data: {
         brand_name: brandName,
-        invoice_number: invoiceNumber,
-        grand_total: finalGrandTotal,
-        uniqueCode: uniqueCode 
+        request_number: request.request_number
       }
     });
 

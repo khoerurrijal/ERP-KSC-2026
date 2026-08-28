@@ -225,7 +225,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
               placeholder="Cari nomor Invoice/Job..." 
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
-              className="glass-input !pl-10 h-10 w-64 text-sm"
+              className="glass-input !pl-10 h-10 w-full sm:w-64 text-sm"
             />
           </div>
         </div>
@@ -316,13 +316,13 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customer')}>Nama / Brand {renderSortIcon('customer')}</th>
-                  <th className="px-6 py-4 font-medium">Mockup / Desain</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('product')}>Produk & Qty Target {renderSortIcon('product')}</th>
-                  <th className="px-6 py-4 font-medium">Progress (Selesai)</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Tgl Order & Target {renderSortIcon('target_date')}</th>
-                  <th className="px-6 py-4 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('item_status')}>Status Item {renderSortIcon('item_status')}</th>
-                  <th className="px-6 py-4 font-medium text-right">Aksi</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customer')}>Nama / Brand {renderSortIcon('customer')}</th>
+                  <th className="px-4 py-3 font-medium">Mockup / Desain</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('product')}>Produk & Qty Target {renderSortIcon('product')}</th>
+                  <th className="px-4 py-3 font-medium">Progress (Selesai)</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Tgl Order & Target {renderSortIcon('target_date')}</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('item_status')}>Status Item {renderSortIcon('item_status')}</th>
+                  <th className="px-4 py-3 font-medium text-right">Aksi</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">
@@ -334,11 +334,11 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                   </tr>
                 ) : paginatedProdJobs?.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
-                    <td className="px-6 py-4 font-medium text-purple-400">
+                    <td className="px-4 py-3 font-medium text-purple-400">
                       {item.sales_order_items?.sales_orders?.customers?.name || '-'}
                       <div className="text-xs text-foreground/50">{item.sales_order_items?.sales_orders?.invoice_number}</div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       {item.mockup_url ? (
                         <button onClick={() => setZoomImage(item.mockup_url)} className="relative w-12 h-12 rounded-md border border-white/20 overflow-hidden block hover:opacity-80 transition-opacity" title="Lihat Mockup">
                           <Image src={item.mockup_url} fill className="object-cover" alt="Mockup" sizes="48px" />
@@ -347,16 +347,16 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                         <span className="text-[10px] text-foreground/40 italic">-</span>
                       )}
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <p className="font-medium text-foreground/90">{item.sales_order_items?.products?.name || '-'}</p>
                       {item.notes && <p className="text-[10px] text-foreground/60 italic mt-0.5 whitespace-pre-line">{item.notes}</p>}
                       <p className="text-xs text-foreground/60 mt-1">{item.qty_target} {item.unit || 'pcs'}</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <p className="font-bold text-green-400">{item.qty_processed} pcs</p>
                       <p className="text-xs text-orange-400">Kurang: {Math.max(0, item.qty_target - item.qty_processed)} pcs</p>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
                         <div className="text-xs text-foreground/60 flex items-center gap-1">
                           <span className="font-medium text-foreground/80">Order:</span> 
@@ -376,12 +376,12 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 py-3">
                       <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border ${getStatusColor(item.item_status)}`}>
                         {getDisplayStatus(item.item_status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-right">
+                    <td className="px-4 py-3 text-right">
                       <button onClick={() => handleOpenModal(item)} className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 font-medium text-xs rounded-lg transition-all">
                         Input Qty
                       </button>
@@ -421,7 +421,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
       {/* Modal Input Qty Operator */}
       {isModalOpen && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && handleCloseModal()}>
           <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
               <h3 className="font-bold text-foreground">Update Progress Produksi</h3>
@@ -497,7 +497,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
       {/* Modal Koreksi Qty */}
       {isCorrectionModalOpen && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setIsCorrectionModalOpen(false)}>
           <div className="bg-background border border-red-500/30 rounded-2xl shadow-[0_0_50px_rgba(239,68,68,0.15)] w-full max-w-md overflow-hidden">
             <div className="p-4 border-b border-red-500/20 flex justify-between items-center bg-red-500/5">
               <h3 className="font-bold text-red-400">Koreksi Qty Dikerjakan (Revisi)</h3>
