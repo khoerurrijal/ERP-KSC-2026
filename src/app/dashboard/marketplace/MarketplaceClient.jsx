@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { TrendingUp, Wallet, Save, X, Zap, ClipboardPaste } from 'lucide-react'
 import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
@@ -402,13 +403,13 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
         </div>
       )}
 
-      {isBulkModalOpen && (
+      {isBulkModalOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[1000] flex items-center justify-center overflow-y-auto p-3 sm:p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+          className="fixed inset-0 z-[1100] bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
           onMouseDown={event => event.target === event.currentTarget && setIsBulkModalOpen(false)}
           role="presentation"
         >
-          <div className="bg-background border border-white/10 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[calc(100dvh-1.5rem)] sm:max-h-[calc(100dvh-2rem)] overflow-visible flex flex-col" role="dialog" aria-modal="true" aria-labelledby="bulk-marketplace-modal-title">
+          <div className="po-drawer-enter relative ml-auto flex h-full w-[92%] max-w-md flex-col border-l border-white/10 bg-background shadow-2xl" role="dialog" aria-modal="true" aria-labelledby="bulk-marketplace-modal-title">
             <div className="p-4 border-b border-white/10 flex justify-between items-center bg-background/95 backdrop-blur-xl shrink-0">
               <div>
                 <h3 id="bulk-marketplace-modal-title" className="font-bold text-foreground flex items-center gap-2"><ClipboardPaste className="w-4 h-4 text-green-400" /> Pencairan Massal Marketplace</h3>
@@ -419,7 +420,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               </button>
             </div>
 
-            <div className="p-4 sm:p-6 space-y-4 min-h-0 overflow-y-auto">
+            <div className="p-4 space-y-4 min-h-0 overflow-y-auto">
               <textarea
                 value={bulkText}
                 onChange={e => {
@@ -509,7 +510,8 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               )}
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {isQuickModalOpen && (
