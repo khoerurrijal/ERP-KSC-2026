@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import ProductionTable from '@/components/ProductionTable'
+import { handleAutoStatusUpdate } from './actions'
 
 export default async function ProductionData({ mode = 'production', embedded = false } = {}) {
   const supabase = await createClient()
@@ -14,10 +15,9 @@ export default async function ProductionData({ mode = 'production', embedded = f
       .limit(10000)
 
     if (!paidItemsError && paidDeliveryItems?.length) {
-      await supabase
-        .from('sales_items')
-        .update({ status: 'SELESAI' })
-        .in('id', paidDeliveryItems.map(item => item.id))
+      for (const item of paidDeliveryItems) {
+        await handleAutoStatusUpdate(item.id)
+      }
     }
   }
   

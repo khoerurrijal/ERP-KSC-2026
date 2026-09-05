@@ -36,12 +36,11 @@ export default async function PublicTrackingPage({ params }) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black text-white p-8">
         <div className="max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-4 text-red-500">Pesanan Tidak Ditemukan</h1>
-          <p className="text-gray-400 mb-2">ID: {id}</p>
-          <p className="text-gray-500 text-sm">{error?.message || 'Data kosong'}</p>
-          <pre className="text-left bg-white/10 p-4 rounded-xl mt-4 text-xs overflow-auto">
-            {JSON.stringify(error, null, 2)}
-          </pre>
+          <h1 className="text-2xl font-bold mb-4 text-red-500">Pesanan Belum Ditemukan</h1>
+          <p className="text-gray-400 mb-6">Link tracking tidak valid atau pesanan belum tersedia. Periksa kembali link dari invoice Anda.</p>
+          <a href="/order" className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-black hover:bg-yellow-400 transition-colors">
+            Kembali ke halaman order
+          </a>
         </div>
       </div>
     )

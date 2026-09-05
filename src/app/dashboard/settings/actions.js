@@ -3,6 +3,16 @@
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { chooseLatestAiModel, DEFAULT_AI_MODEL } from '@/utils/aiAgent'
+import { requireAdminOrOwner } from '@/lib/adminAuth'
+
+async function checkSettingsAccess(supabase) {
+  try {
+    await requireAdminOrOwner(supabase)
+    return null
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
 
 export async function getSettings() {
   const supabase = await createClient()
@@ -152,6 +162,8 @@ export async function refreshAiAgentModel() {
 
 export async function updateDropdownConfig(newConfig) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'dropdown_config',
     value: newConfig,
@@ -165,6 +177,8 @@ export async function updateDropdownConfig(newConfig) {
 
 export async function updateCategoryImagesConfig(newConfig) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'category_images_config',
     value: newConfig,
@@ -178,6 +192,8 @@ export async function updateCategoryImagesConfig(newConfig) {
 
 export async function updateCashflowConfig(newConfig) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'cashflow_config',
     value: newConfig,
@@ -191,6 +207,8 @@ export async function updateCashflowConfig(newConfig) {
 
 export async function updateStoreConfig(newConfig) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'store_config',
     value: newConfig,
@@ -204,6 +222,8 @@ export async function updateStoreConfig(newConfig) {
 
 export async function updateRolePermissions(newPermissions) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'role_permissions',
     value: newPermissions,
@@ -217,6 +237,8 @@ export async function updateRolePermissions(newPermissions) {
 
 export async function updateUserRoles(newRoles) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'user_roles',
     value: newRoles,
@@ -230,6 +252,8 @@ export async function updateUserRoles(newRoles) {
 
 export async function updatePricelistConfig(newConfig) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   
   // Keep sablon_matrix and printing_matrix in system_settings
   const matrixObj = newConfig.sablon_matrix
@@ -305,6 +329,8 @@ export async function getWaBotStatus() {
 
 export async function toggleWaBotStatus(isActive) {
   const supabase = await createClient()
+  const accessError = await checkSettingsAccess(supabase)
+  if (accessError) return accessError
   const { error } = await supabase.from('system_settings').upsert({
     key: 'GLOBAL_BOT_ACTIVE',
     value: isActive ? 'true' : 'false',

@@ -185,6 +185,15 @@ export async function POST(req) {
     let sender = body.sender; 
     const message = body.message || body.text || ''; 
     const pushname = body.pushname || body.name || 'Kakak'; 
+    let afterHoursNoticeSent = false;
+    const sendReply = async (target, reply) => {
+      const shouldAddNotice = isOutsideBusinessHours() && !afterHoursNoticeSent;
+      const outgoingReply = shouldAddNotice
+        ? `Saat ini toko sedang tutup. Jam operasional King Sablon Cup: Senin-Sabtu, pukul 09.00-17.00 WIB.\n\n${reply}`
+        : reply;
+      if (shouldAddNotice) afterHoursNoticeSent = true;
+      return sendFonnteMessage(target, outgoingReply);
+    };
 
     if (!sender || !message) {
       return NextResponse.json({ success: false, error: 'Missing sender or message' }, { status: 400 });
@@ -202,17 +211,17 @@ export async function POST(req) {
       const lowerMsg = message.toLowerCase().trim();
       if (lowerMsg === '/bot on' || lowerMsg === '/bot auto') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'auto', updated_at: new Date().toISOString() });
-        await sendFonnteMessage(sender, "Sistem Otomatis / AI diatur ke mode AUTO (Aktif di luar jam operasional & hari libur).");
+        await sendReply(sender, "Sistem Otomatis / AI diatur ke mode AUTO (Aktif di luar jam operasional & hari libur).");
         return NextResponse.json({ success: true, message: 'Global bot set to auto' });
       }
       if (lowerMsg === '/bot off') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'false', updated_at: new Date().toISOString() });
-        await sendFonnteMessage(sender, "Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
+        await sendReply(sender, "Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
         return NextResponse.json({ success: true, message: 'Global bot turned off' });
       }
       if (lowerMsg === '/bot always') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'always', updated_at: new Date().toISOString() });
-        await sendFonnteMessage(sender, "Sistem Otomatis / AI diatur ke mode ALWAYS (Aktif 24/7).");
+        await sendReply(sender, "Sistem Otomatis / AI diatur ke mode ALWAYS (Aktif 24/7).");
         return NextResponse.json({ success: true, message: 'Global bot set to always on' });
       }
     }
@@ -274,7 +283,7 @@ export async function POST(req) {
     }
 
     if (templateReply) {
-      await sendFonnteMessage(sender, templateReply);
+      await sendReply(sender, templateReply);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: templateReply }]);
       return NextResponse.json({ success: true, reply: templateReply });
@@ -284,7 +293,7 @@ export async function POST(req) {
     // Handle non-text messages statically
     if (msgLower === 'non-text message' || msgLower === '') {
       const reply = "Maaf kak, saat ini Ina baru bisa membalas chat berupa teks. Ada yang bisa Ina bantu mengenai produk, harga, atau cek status pesanan? 🙏";
-      await sendFonnteMessage(sender, reply);
+      await sendReply(sender, reply);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
@@ -293,7 +302,7 @@ export async function POST(req) {
     // Handle closing phrases (thank you)
     if (msgLower.match(/^(terima kasih|makasih|thank you|thx|suwun|hatur nuhun|tq|makasi|thanks)$/)) {
       const reply = "Sama-sama kak! Senang bisa membantu. Jika ada hal lain yang perlu ditanyakan, silakan chat Ina lagi ya. 😊";
-      await sendFonnteMessage(sender, reply);
+      await sendReply(sender, reply);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
@@ -302,7 +311,7 @@ export async function POST(req) {
     // Handle quick acknowledgments (ok, oke, siap)
     if (msgLower.match(/^(ok|oke|siap|sip|okey|yoi|ready|noted)$/)) {
       const reply = "Siap kak! 👍";
-      await sendFonnteMessage(sender, reply);
+      await sendReply(sender, reply);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
@@ -311,7 +320,7 @@ export async function POST(req) {
     // --- 3. FAST-TRACK ORDER STATUS (BYPASS GEMINI) ---
     // If the message is a simple tracking intent, bypass AI completely!
     if (msgLower.match(/^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/)) {
-      await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu berdasarkan nama WA kakak... ⏳");
+      await sendReply(sender, "Sebentar ya kak, Ina cek datanya dulu berdasarkan nama WA kakak... ⏳");
       
       const orders = await searchOrdersWithPhoneLinking(sender, pushname);
       
@@ -321,13 +330,13 @@ export async function POST(req) {
         ).join('\\n\\n');
         
         const reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
-        await sendFonnteMessage(sender, reply);
+        await sendReply(sender, reply);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
       } else {
         const reply = "Wah maaf kak, Ina coba cari pesanan aktif atas nama WA kakak belum ketemu nih datanya. Boleh diinfokan nama brand-nya apa kak? Biar Ina bantu cari lagi 🙏";
-        await sendFonnteMessage(sender, reply);
+        await sendReply(sender, reply);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
@@ -475,7 +484,7 @@ export async function POST(req) {
           } catch (error) {
             if (error.message === 'TIMEOUT') {
               const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya. Tunggu sebentar ya... 🙏";
-              await sendFonnteMessage(sender, fallbackMsg);
+              await sendReply(sender, fallbackMsg);
               return;
             }
             lastAiError = error;
@@ -489,7 +498,7 @@ export async function POST(req) {
         const functionCall = result.response.functionCalls()?.[0];
         
         if (functionCall && functionCall.name === "cek_pesanan") {
-          await sendFonnteMessage(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
+          await sendReply(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
           const orders = await searchOrdersWithPhoneLinking(sender, functionCall.args.search_query);
 
           let functionResponseData;
@@ -521,7 +530,7 @@ export async function POST(req) {
           } catch (error) {
             if (error.message === 'TIMEOUT') {
               const fallbackMsg = "Maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
-              await sendFonnteMessage(sender, fallbackMsg);
+              await sendReply(sender, fallbackMsg);
               return;
             }
             throw error;
@@ -530,7 +539,7 @@ export async function POST(req) {
 
         const aiResponseText = result.response.text();
 
-        await sendFonnteMessage(sender, aiResponseText);
+        await sendReply(sender, aiResponseText);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: aiResponseText }]);
 
       } catch (error) {
@@ -543,7 +552,7 @@ export async function POST(req) {
         } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota exceeded')) {
           fallbackMsg = "Maaf kak, saat ini antrean pesan sedang padat. Pesan kakak sudah masuk antrean dan akan segera dibalas oleh tim kami ya kak 🙏";
         }
-        await sendFonnteMessage(sender, fallbackMsg).catch(console.error);
+        await sendReply(sender, fallbackMsg).catch(console.error);
       }
     })());
 

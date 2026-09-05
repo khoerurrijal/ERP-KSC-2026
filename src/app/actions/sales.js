@@ -555,7 +555,7 @@ export async function updateSalesItemStatus(itemId, newStatus) {
   try {
     const { data: item, error: fetchErr } = await supabase
       .from('sales_items')
-      .select('*, sales_orders(payment_status)')
+      .select('*, sales_orders(invoice_number, payment_status)')
       .eq('id', itemId)
       .single()
     
@@ -582,6 +582,16 @@ export async function updateSalesItemStatus(itemId, newStatus) {
       .eq('id', itemId)
     
     if (error) throw new Error(error.message)
+
+    if (oldStatus !== targetStatus) {
+      await createAdminNotification(supabase, {
+        notificationType: 'PRODUCTION_STATUS',
+        title: 'Status produksi berubah',
+        message: `${item?.sales_orders?.invoice_number || 'Pesanan'}: ${oldStatus} → ${targetStatus}.`,
+        href: '/dashboard/production',
+        entityId: itemId
+      })
+    }
 
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/production')
