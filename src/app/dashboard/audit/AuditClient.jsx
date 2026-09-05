@@ -36,21 +36,48 @@ export default function AuditClient({ initialReport }) {
     setMessages(prev => [...prev, { role: 'user', text: trimmed }])
     setIsAsking(true)
 
+    let timeoutId
     try {
+      const controller = new AbortController()
+      timeoutId = setTimeout(() => controller.abort(), 25000)
       const response = await fetch('/api/dashboard/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: trimmed })
+        signal: controller.signal,
+        body: JSON.stringify({
+          message: trimmed,
+          history: messages.slice(-8),
+          auditReport: {
+            generatedAt: report.generatedAt,
+            summary: report.summary,
+            issues: report.issues.slice(0, 80)
+          }
+        })
       })
       const result = await response.json()
+      if (!response.ok) {
+        const accessMessage = response.status === 401
+          ? 'Sesi login tidak ditemukan. Silakan masuk kembali.'
+          : response.status === 403
+            ? 'Akses Audit Assistant hanya tersedia untuk Admin dan Owner.'
+            : result.error || 'Permintaan assistant gagal.'
+        throw new Error(accessMessage)
+      }
+      const fallbackNote = result.provider === 'rule-based-fallback'
+        ? '\n\nCatatan: Gemini sedang tidak tersedia, jadi ini adalah ringkasan cadangan.'
+        : ''
       setMessages(prev => [...prev, {
         role: 'assistant',
-        text: result.answer || result.error || 'Belum ada jawaban dari assistant.'
+        text: (result.answer || 'Belum ada jawaban dari assistant.') + fallbackNote
       }])
     } catch (error) {
       console.error(error)
-      setMessages(prev => [...prev, { role: 'assistant', text: 'Assistant sedang tidak tersedia. Gunakan daftar temuan audit di bawah.' }])
+      const message = error?.name === 'AbortError'
+        ? 'Respons assistant terlalu lama. Coba ulangi dengan pertanyaan yang lebih spesifik.'
+        : error?.message || 'Assistant sedang tidak tersedia. Gunakan daftar temuan audit di bawah.'
+      setMessages(prev => [...prev, { role: 'assistant', text: message }])
     } finally {
+      if (timeoutId) clearTimeout(timeoutId)
       setIsAsking(false)
     }
   }

@@ -1,9 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon } from 'lucide-react'
-import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig } from './actions'
+import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon, Bot, RefreshCw } from 'lucide-react'
+import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig, refreshAiAgentModel } from './actions'
 import CurrencyInput from '@/components/CurrencyInput'
+import { DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 
 export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false }) {
   const [activeTab, setActiveTab] = useState(onlyAccess ? 'access' : 'dropdowns')
@@ -74,6 +75,13 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
   
   // State for Category Images
   const [categoryImages, setCategoryImages] = useState(initialSettings.category_images_config || {})
+  const [aiAgent, setAiAgent] = useState({
+    model: initialSettings.ai_agent_config?.model || DEFAULT_AI_MODEL,
+    availableModels: initialSettings.ai_agent_config?.available_models || [],
+    refreshedAt: initialSettings.ai_agent_config?.refreshed_at || null,
+    apiKeyConfigured: Boolean(initialSettings.gemini_api_key_configured)
+  })
+  const [isRefreshingAi, setIsRefreshingAi] = useState(false)
   
   const allCategoriesSet = new Set()
   Object.values(dropdowns.category_mapping || {}).forEach(arr => {
@@ -222,6 +230,24 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
     setIsSaving(false)
   }
 
+  const handleRefreshAiAgent = async () => {
+    setIsRefreshingAi(true)
+    setError(null)
+    const result = await refreshAiAgentModel()
+    if (result.success) {
+      setAiAgent(prev => ({
+        ...prev,
+        model: result.model,
+        availableModels: result.availableModels || [],
+        refreshedAt: result.refreshedAt,
+        apiKeyConfigured: result.apiKeyConfigured
+      }))
+    } else {
+      setError(result.error)
+    }
+    setIsRefreshingAi(false)
+  }
+
   const handleSaveAccess = async () => {
     setIsSaving(true)
     setError(null)
@@ -309,6 +335,17 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
         >
           <ImageIcon className="w-4 h-4" />
           Foto Kategori (Katalog)
+        </button>
+        <button
+          onClick={() => setActiveTab('ai_agent')}
+          className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
+            activeTab === 'ai_agent'
+              ? 'border-violet-400 text-violet-400'
+              : 'border-transparent text-foreground/50 hover:text-foreground/80'
+          }`}
+        >
+          <Bot className="w-4 h-4" />
+          AI & Chatbot
         </button>
         <button
           onClick={() => setActiveTab('access')}
@@ -939,7 +976,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
             <div className="space-y-4">
               {allCategoriesList.length === 0 ? (
                 <div className="text-center py-8 text-foreground/40 italic bg-white/5 rounded-xl border border-white/5">
-                  Belum ada kategori yang dikonfigurasi di "List Dropdown Form".
+                  Belum ada kategori yang dikonfigurasi di &quot;List Dropdown Form&quot;.
                 </div>
               ) : (
                 allCategoriesList.map(cat => (
@@ -971,6 +1008,53 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
               <Save className="w-5 h-5" />
               {isSaving ? 'Menyimpan...' : 'Simpan Foto Kategori'}
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* Tab Content: AI & Chatbot */}
+      {activeTab === 'ai_agent' && !onlyAccess && (
+        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl">
+          <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
+            <div className="flex items-start justify-between gap-4 mb-6">
+              <div>
+                <h2 className="text-xl font-bold flex items-center gap-2 text-violet-300">
+                  <Bot className="w-6 h-6" />
+                  Konfigurasi AI & Chatbot
+                </h2>
+                <p className="text-foreground/60 text-sm mt-1">Pantau koneksi Gemini dan model yang digunakan Audit Assistant serta WhatsApp Bot.</p>
+              </div>
+              <button
+                onClick={handleRefreshAiAgent}
+                disabled={isRefreshingAi}
+                className="btn-secondary text-xs px-3 h-9 flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+              >
+                <RefreshCw className={`w-4 h-4 ${isRefreshingAi ? 'animate-spin' : ''}`} />
+                {isRefreshingAi ? 'Memeriksa...' : 'Refresh Model Agent'}
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-white/10 bg-black/20 p-4">
+                <p className="text-xs text-foreground/50 uppercase tracking-wider font-bold">Gemini API Key</p>
+                <p className={`text-lg font-black mt-2 ${aiAgent.apiKeyConfigured ? 'text-green-400' : 'text-red-400'}`}>
+                  {aiAgent.apiKeyConfigured ? 'Terpasang' : 'Belum terpasang'}
+                </p>
+                <p className="text-[11px] text-foreground/45 mt-1">Nilai key dirahasiakan dan hanya digunakan di server.</p>
+              </div>
+              <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4">
+                <p className="text-xs text-foreground/50 uppercase tracking-wider font-bold">Model Agent Aktif</p>
+                <p className="text-lg font-black mt-2 text-primary break-all">{aiAgent.model}</p>
+                <p className="text-[11px] text-foreground/45 mt-1">
+                  {aiAgent.refreshedAt ? `Diperbarui ${new Date(aiAgent.refreshedAt).toLocaleString('id-ID')}` : 'Menggunakan konfigurasi default'}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 rounded-xl border border-white/10 bg-white/[0.02] p-3 text-xs text-foreground/60">
+              <p className="font-bold text-foreground/80">Model yang ditemukan</p>
+              <p className="mt-1 break-words">{aiAgent.availableModels.length > 0 ? aiAgent.availableModels.join(', ') : 'Belum diperbarui. Tekan Refresh Model Agent.'}</p>
+            </div>
           </div>
         </div>
       )}

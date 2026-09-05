@@ -24,7 +24,7 @@ export default async function AuditPage() {
   })
   const userRole = matchedUser?.role || 'Operator'
 
-  if (!['Admin', 'Owner'].includes(userRole)) {
+  if (!['ADMIN', 'OWNER'].includes(String(userRole).trim().toUpperCase())) {
     redirect('/production')
   }
 

@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { createClient } from '@supabase/supabase-js';
 import { waitUntil } from '@vercel/functions';
 import { normalizePhone } from '@/utils/phone';
+import { getAiModelCandidates, getConfiguredAiModel, isRetryableAiError } from '@/utils/aiAgent';
 
 
 export const maxDuration = 60; // Allow API route to run for up to 60 seconds on Vercel
@@ -440,38 +441,50 @@ export async function POST(req) {
           }
         }
 
-        const model = genAI.getGenerativeModel({
-          model: "gemini-3.7-flash",
-          systemInstruction: SYSTEM_PROMPT(pushname),
-          tools: [{
-            functionDeclarations: [{
-              name: "cek_pesanan",
-              description: "Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.",
-              parameters: {
-                type: "object",
-                properties: {
-                  search_query: { type: "string" }
-                },
-                required: ["search_query"]
-              }
-            }]
-          }]
-        });
-
-        const chat = model.startChat({ history: formattedHistory });
+        const agentModel = await getConfiguredAiModel(supabase);
+        const modelCandidates = getAiModelCandidates(agentModel);
+        let chat;
         let result;
-        
-        try {
-          // Allow up to 55 seconds for Gemini
-          result = await runWithTimeout(chat.sendMessage(message), 55000);
-        } catch (error) {
-          if (error.message === 'TIMEOUT') {
-            const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya. Tunggu sebentar ya... 🙏";
-            await sendFonnteMessage(sender, fallbackMsg);
-            return;
+        let lastAiError;
+
+        for (const modelName of modelCandidates.slice(0, 2)) {
+          const model = genAI.getGenerativeModel({
+            model: modelName,
+            systemInstruction: SYSTEM_PROMPT(pushname),
+            tools: [{
+              functionDeclarations: [{
+                name: "cek_pesanan",
+                description: "Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.",
+                parameters: {
+                  type: "object",
+                  properties: {
+                    search_query: { type: "string" }
+                  },
+                  required: ["search_query"]
+                }
+              }]
+            }]
+          });
+          const candidateChat = model.startChat({ history: formattedHistory });
+
+          try {
+            result = await runWithTimeout(candidateChat.sendMessage(message), 55000);
+            chat = candidateChat;
+            console.log(`[Webhook] Gemini response completed with ${modelName}.`);
+            break;
+          } catch (error) {
+            if (error.message === 'TIMEOUT') {
+              const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya. Tunggu sebentar ya... 🙏";
+              await sendFonnteMessage(sender, fallbackMsg);
+              return;
+            }
+            lastAiError = error;
+            if (!isRetryableAiError(error)) throw error;
+            console.warn(`[Webhook] Gemini ${modelName} unavailable, trying fallback model.`);
           }
-          throw error;
         }
+
+        if (!result) throw lastAiError || new Error('Semua model Gemini tidak tersedia');
 
         const functionCall = result.response.functionCalls()?.[0];
         

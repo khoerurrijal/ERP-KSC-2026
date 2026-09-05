@@ -2,6 +2,7 @@
 
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { chooseLatestAiModel, DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 
 export async function getSettings() {
   const supabase = await createClient()
@@ -35,6 +36,7 @@ export async function getSettings() {
     "Operator": ["dashboard", "produksi"]
   }
   const user_roles = data.find(d => d.key === 'user_roles')?.value || []
+  const ai_agent_config = data.find(d => d.key === 'ai_agent_config')?.value || { model: DEFAULT_AI_MODEL }
   
   // Inject sablon_matrix from the dedicated table
   const { data: matrixData } = await supabase.from('sablon_matrix').select('*')
@@ -70,7 +72,82 @@ export async function getSettings() {
   }
   pricelist_config.printing_matrix = printing_matrix
 
-  return { dropdown_config, cashflow_config, store_config, pricelist_config, role_permissions, user_roles, category_images_config }
+  return {
+    dropdown_config,
+    cashflow_config,
+    store_config,
+    pricelist_config,
+    role_permissions,
+    user_roles,
+    category_images_config,
+    ai_agent_config,
+    gemini_api_key_configured: Boolean(process.env.GEMINI_API_KEY)
+  }
+}
+
+export async function refreshAiAgentModel() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Sesi login tidak ditemukan.' }
+
+  const { data: rolesData } = await supabase
+    .from('system_settings')
+    .select('value')
+    .eq('key', 'user_roles')
+    .single()
+  const userEmail = user.email?.toLowerCase() || ''
+  const matchedUser = (rolesData?.value || []).find(role => {
+    const inputEmail = (role.email || '').trim().toLowerCase()
+    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+  })
+  const userRole = String(matchedUser?.role || 'Operator').trim().toUpperCase()
+  if (!['ADMIN', 'OWNER'].includes(userRole)) {
+    return { success: false, error: 'Hanya Admin/Owner yang dapat memperbarui model agent.' }
+  }
+
+  const apiKey = process.env.GEMINI_API_KEY
+  if (!apiKey) return { success: false, error: 'GEMINI_API_KEY belum terpasang di server.' }
+
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`, {
+      cache: 'no-store'
+    })
+    const payload = await response.json()
+    if (!response.ok) {
+      console.error('[ai-agent] model refresh failed', { status: response.status })
+      return { success: false, error: 'Daftar model Gemini tidak dapat dibaca. Periksa API key atau kuota Google.' }
+    }
+
+    const supportedModels = (payload.models || [])
+      .filter(model => Array.isArray(model.supportedGenerationMethods) && model.supportedGenerationMethods.includes('generateContent'))
+      .map(model => String(model.name || '').replace(/^models\//, ''))
+      .filter(Boolean)
+      .slice(0, 40)
+    const selectedModel = chooseLatestAiModel(supportedModels.map(name => ({ name })))
+    const refreshedAt = new Date().toISOString()
+    const { error } = await supabase.from('system_settings').upsert({
+      key: 'ai_agent_config',
+      value: {
+        model: selectedModel,
+        available_models: supportedModels,
+        refreshed_at: refreshedAt
+      },
+      updated_at: refreshedAt
+    })
+    if (error) return { success: false, error: error.message }
+
+    revalidatePath('/settings')
+    return {
+      success: true,
+      model: selectedModel,
+      availableModels: supportedModels,
+      refreshedAt,
+      apiKeyConfigured: true
+    }
+  } catch (error) {
+    console.error('[ai-agent] model refresh error', error)
+    return { success: false, error: 'Gagal menghubungi layanan model Gemini.' }
+  }
 }
 
 export async function updateDropdownConfig(newConfig) {
