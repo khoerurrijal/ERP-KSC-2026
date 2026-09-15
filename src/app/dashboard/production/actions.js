@@ -1,11 +1,11 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { createAdminNotification } from '@/lib/adminNotifications'
 
 export async function saveProductionProgress(payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
     const { error } = await supabase
@@ -37,7 +37,7 @@ export async function saveProductionProgress(payload) {
 }
 
 export async function handleAutoStatusUpdate(itemId) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   // Ambil data item dan invoice
   const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
@@ -141,7 +141,7 @@ export async function handleAutoStatusUpdate(itemId) {
 }
 
 export async function updateSalesOrderStatus(itemId, status) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
     const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status)').eq('id', itemId).single()
@@ -196,31 +196,9 @@ const LEGACY_SERVICE_CODES = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WAR
 const normalizeRelation = (value) => Array.isArray(value) ? value[0] : value
 
 export async function confirmInvoiceDelivery(soId, deliveryStatus) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'], 'Hanya Admin/Owner yang dapat mengonfirmasi pengiriman.')
 
   try {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) throw new Error('Sesi login tidak ditemukan.')
-
-    const { data: rolesData, error: rolesError } = await supabase
-      .from('system_settings')
-      .select('value')
-      .eq('key', 'user_roles')
-      .single()
-
-    if (rolesError) throw rolesError
-
-    const userEmail = user.email?.toLowerCase() || ''
-    const matchedUser = (rolesData?.value || []).find(role => {
-      const inputEmail = (role.email || '').trim().toLowerCase()
-      return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
-    })
-    const userRole = matchedUser?.role || 'Operator'
-
-    if (!['ADMIN', 'OWNER'].includes(String(userRole).toUpperCase())) {
-      throw new Error('Hanya Admin/Owner yang dapat mengonfirmasi pengiriman.')
-    }
-
     if (!soId || !['DIKIRIM', 'SUDAH DIAMBIL'].includes(String(deliveryStatus).toUpperCase())) {
       throw new Error('Invoice atau jenis serah-terima tidak valid.')
     }
@@ -286,7 +264,7 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
 }
 
 export async function correctProductionProgress(jobId, newTotalQty, employeeId) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', jobId)

@@ -1,17 +1,33 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
 import { createAdminNotification } from '@/lib/adminNotifications'
 
 export async function createSalesOrder(payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   let createdSoId = null
 
   try {
     const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt, sourceRequestId, designService } = payload
+
+    if (!customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
+      throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
+    }
+    const normalizedDpAmount = Number(dpAmount || 0)
+    if (!Number.isFinite(normalizedDpAmount) || normalizedDpAmount < 0) {
+      throw new Error('Nominal DP tidak valid.')
+    }
+    for (const item of items) {
+      const qty = Number(item.qty)
+      const price = Number(item.price)
+      const multiplier = Number(item.unit_multiplier || 1)
+      if (!item.product_id || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0 || !Number.isFinite(multiplier) || multiplier <= 0) {
+        throw new Error('Detail item pesanan tidak valid.')
+      }
+    }
 
     // Generate Invoice Number
     const dateStr = new Date().toISOString().split('T')[0].replace(/-/g, '')
@@ -31,7 +47,8 @@ export async function createSalesOrder(payload) {
       }
       return sum + itemTotal;
     }, 0) + (designService ? 50000 : 0)
-    const paymentStatus = dpAmount >= grandTotal ? 'LUNAS' : (dpAmount > 0 ? 'DP' : 'BELUM LUNAS')
+    if (normalizedDpAmount > grandTotal) throw new Error('DP tidak boleh melebihi total pesanan.')
+    const paymentStatus = normalizedDpAmount >= grandTotal ? 'LUNAS' : (normalizedDpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Get customer name
     const { data: cust } = await supabase.from('customers').select('name').eq('customer_code', customerId).single()
@@ -84,10 +101,9 @@ export async function createSalesOrder(payload) {
       customer_code: customerId,
       notes: notes,
       total_amount: grandTotal,
-      dp_amount: dpAmount,
+      dp_amount: normalizedDpAmount,
       payment_method: paymentAccount,
       payment_status: paymentStatus,
-      status: 'PROSES'
     }
     if (sourceRequestId) salesOrderData.source_request_id = sourceRequestId
 
@@ -154,24 +170,25 @@ export async function createSalesOrder(payload) {
 
     // 3. Transactions Splitting Logic (If any payment is made)
     // We record the incoming cash to KING
-    if (dpAmount > 0) {
-      await supabase.from('transactions').insert({
+    if (normalizedDpAmount > 0) {
+      const { error: paymentError } = await supabase.from('transactions').insert({
         date: orderDate,
         reference: 'PENJUALAN',
         description: `Pembayaran ${paymentStatus} - ${customerName}`,
         payment_method: paymentAccount,
-        amount_in: dpAmount,
+        amount_in: normalizedDpAmount,
         amount_out: 0,
         workshop_code: 'KING',
         so_id: so.id
       })
+      if (paymentError) throw new Error('Gagal mencatat pembayaran: ' + paymentError.message)
     }
 
     // If fully paid, we distribute the HPP to Gudang & Global + Virtual Royalty
     if (paymentStatus === 'LUNAS') {
       // Record HPP to Gudang
       if (totalHppGudang > 0) {
-        await supabase.from('transactions').insert({
+        const { error: hppInError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
           description: `Alokasi HPP Cup/Barang Gudang - ${invoiceNumber}`,
@@ -180,8 +197,9 @@ export async function createSalesOrder(payload) {
           workshop_code: 'GUDANG',
           so_id: so.id
         })
+        if (hppInError) throw new Error('Gagal mencatat alokasi HPP Gudang: ' + hppInError.message)
         // King effectively "pays" this from its balance
-        await supabase.from('transactions').insert({
+        const { error: hppOutError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
           description: `Potongan HPP untuk Gudang - ${invoiceNumber}`,
@@ -190,12 +208,13 @@ export async function createSalesOrder(payload) {
           workshop_code: 'KING',
           so_id: so.id
         })
+        if (hppOutError) throw new Error('Gagal mencatat potongan HPP Gudang: ' + hppOutError.message)
       }
 
       // Record HPP & Royalty to Global
       const totalUntukGlobal = totalHppGlobal + virtualRoyaltyGlobal
       if (totalUntukGlobal > 0) {
-        await supabase.from('transactions').insert({
+        const { error: globalInError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
           description: `Alokasi HPP Bahan & Royalty - ${invoiceNumber}`,
@@ -204,7 +223,8 @@ export async function createSalesOrder(payload) {
           workshop_code: 'GLOBAL',
           so_id: so.id
         })
-        await supabase.from('transactions').insert({
+        if (globalInError) throw new Error('Gagal mencatat alokasi HPP Global: ' + globalInError.message)
+        const { error: globalOutError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
           description: `Potongan HPP/Royalty untuk Global - ${invoiceNumber}`,
@@ -213,6 +233,7 @@ export async function createSalesOrder(payload) {
           workshop_code: 'KING',
           so_id: so.id
         })
+        if (globalOutError) throw new Error('Gagal mencatat potongan HPP Global: ' + globalOutError.message)
       }
     }
 
@@ -246,8 +267,13 @@ export async function createSalesOrder(payload) {
 
 export async function addSalesPayment(soId, paymentData) {
   const { amount: paymentAmount, method: paymentMethod, date: paymentDate } = paymentData;
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
+    if (!soId || !paymentMethod || !paymentDate) throw new Error('Data pembayaran belum lengkap.')
+    const normalizedPaymentAmount = Number(paymentAmount)
+    if (!Number.isFinite(normalizedPaymentAmount) || normalizedPaymentAmount <= 0) {
+      throw new Error('Nominal pembayaran harus lebih dari 0.')
+    }
     const { data: so, error: soError } = await supabase.from('sales_orders').select('*, customers(name)').eq('id', soId).single()
     if (soError) throw soError
 
@@ -261,19 +287,20 @@ export async function addSalesPayment(soId, paymentData) {
     }
 
     // Guard 2: Overpayment — pembayaran melebihi sisa tagihan
-    if (Number(paymentAmount) > remaining) {
-      throw new Error(`Pembayaran (Rp ${Number(paymentAmount).toLocaleString('id-ID')}) melebihi sisa tagihan (Rp ${remaining.toLocaleString('id-ID')}). Kurangi nominal pembayaran.`)
+    if (normalizedPaymentAmount > remaining) {
+      throw new Error(`Pembayaran (Rp ${normalizedPaymentAmount.toLocaleString('id-ID')}) melebihi sisa tagihan (Rp ${remaining.toLocaleString('id-ID')}). Kurangi nominal pembayaran.`)
     }
 
-    const newDpAmount = currentPaid + Number(paymentAmount)
+    const newDpAmount = currentPaid + normalizedPaymentAmount
     // Gunakan exact payment_status values yang ada di sistem: BELUM LUNAS / DP / LUNAS
     const paymentStatus = newDpAmount >= totalAmount ? 'LUNAS' : (newDpAmount > 0 ? 'DP' : 'BELUM LUNAS')
 
     // Update SO
-    await supabase.from('sales_orders').update({
+    const { error: paymentUpdateError } = await supabase.from('sales_orders').update({
       dp_amount: newDpAmount,
       payment_status: paymentStatus
     }).eq('id', soId)
+    if (paymentUpdateError) throw paymentUpdateError
 
     if (paymentStatus !== so.payment_status) {
       await createAdminNotification(supabase, {
@@ -288,16 +315,17 @@ export async function addSalesPayment(soId, paymentData) {
 
     // Insert Transaction
     const custName = so.customers?.name || so.customer_code
-    await supabase.from('transactions').insert({
+    const { error: paymentTransactionError } = await supabase.from('transactions').insert({
       date: paymentDate,
       reference: 'PENJUALAN',
       description: `Pembayaran ${paymentStatus} - ${custName}`,
       payment_method: paymentMethod,
-      amount_in: paymentAmount,
+      amount_in: normalizedPaymentAmount,
       amount_out: 0,
       workshop_code: 'KING',
       so_id: so.id
     })
+    if (paymentTransactionError) throw paymentTransactionError
 
     // If it becomes LUNAS just now, distribute HPP!
     if (paymentStatus === 'LUNAS' && so.payment_status !== 'LUNAS') {
@@ -348,10 +376,22 @@ export async function addSalesPayment(soId, paymentData) {
 }
 
 export async function updateSalesOrder(soId, payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt } = payload
+
+    if (!soId || !customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
+      throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
+    }
+    for (const item of items) {
+      const qty = Number(item.qty)
+      const price = Number(item.price)
+      const multiplier = Number(item.unit_multiplier || 1)
+      if (!item.product_id || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0 || !Number.isFinite(multiplier) || multiplier <= 0) {
+        throw new Error('Detail item pesanan tidak valid.')
+      }
+    }
 
     const grandTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price);
@@ -532,8 +572,9 @@ export async function updateSalesOrder(soId, payload) {
 }
 
 export async function updateMockupUrl(itemId, mockupUrl) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
+    if (!itemId || typeof mockupUrl !== 'string' || mockupUrl.length > 2000) throw new Error('URL mockup tidak valid.')
     const { error } = await supabase
       .from('sales_items')
       .update({ mockup_url: mockupUrl })
@@ -551,8 +592,9 @@ export async function updateMockupUrl(itemId, mockupUrl) {
 }
 
 export async function updateSalesItemStatus(itemId, newStatus) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
+    if (!itemId || typeof newStatus !== 'string' || !newStatus.trim()) throw new Error('Status item tidak valid.')
     const { data: item, error: fetchErr } = await supabase
       .from('sales_items')
       .select('*, sales_orders(invoice_number, payment_status)')
@@ -604,7 +646,7 @@ export async function updateSalesItemStatus(itemId, newStatus) {
 }
 
 export async function cancelSalesOrder(soId) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     // 1. Ubah status semua item menjadi BATAL
