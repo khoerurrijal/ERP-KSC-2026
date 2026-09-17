@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { AlertTriangle, Bot, CheckCircle2, ChevronDown, ExternalLink, RefreshCw, ShieldCheck, Sparkles, XCircle } from 'lucide-react'
@@ -25,6 +25,11 @@ export default function AuditClient({ initialReport }) {
     { role: 'assistant', text: 'Saya bisa membantu membaca hasil audit ini. Tanyakan masalah paling kritis atau data yang perlu diperiksa.' }
   ])
   const [isAsking, setIsAsking] = useState(false)
+  const isMounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false
+  )
 
   const report = initialReport || { summary: { total: 0, critical: 0, warning: 0, info: 0 }, issues: [] }
 
@@ -110,7 +115,7 @@ export default function AuditClient({ initialReport }) {
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="font-bold text-foreground flex items-center gap-2"><AlertTriangle className="w-5 h-5 text-amber-400" /> Temuan Audit</h2>
-              <p className="text-xs text-foreground/50 mt-1">Audit terakhir: {report.generatedAt ? new Date(report.generatedAt).toLocaleString('id-ID') : '-'}</p>
+              <p className="text-xs text-foreground/50 mt-1">Audit terakhir: {isMounted && report.generatedAt ? new Date(report.generatedAt).toLocaleString('id-ID') : '-'}</p>
             </div>
             <span className="text-xs text-foreground/50">{report.issues.length} ditampilkan</span>
           </div>
