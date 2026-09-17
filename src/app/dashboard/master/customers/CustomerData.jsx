@@ -1,8 +1,8 @@
-import { createAuthorizedAdminClient } from '@/lib/adminAuth'
+import { createClient } from '@/utils/supabase/server'
 import CustomersClient from './CustomersClient'
 
 export default async function CustomerData({ searchParams = {} }) {
-  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
+  const supabase = await createClient()
 
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
@@ -36,7 +36,6 @@ export default async function CustomerData({ searchParams = {} }) {
 
   return (
     <CustomersClient
-      key={`${page}-${pageSize}-${search}`}
       initialCustomers={customers}
       totalCount={totalCount}
       page={page}

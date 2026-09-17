@@ -4,17 +4,8 @@ import { randomUUID } from 'node:crypto'
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
-async function getCustomerAdminClient() {
-  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
-  return supabase
-}
-
 function mapCustomer(customer) {
   return customer ? { ...customer, city: customer.address || '' } : customer
-}
-
-function generateCustomerCode() {
-  return `CUST-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`
 }
 
 function getCustomerPayload(data = {}, includeCode = false) {
@@ -26,7 +17,7 @@ function getCustomerPayload(data = {}, includeCode = false) {
     address: address ? String(address).trim() : ''
   }
 
-  if (includeCode) payload.customer_code = generateCustomerCode()
+  if (includeCode) payload.customer_code = `CUST-${randomUUID().replaceAll('-', '').slice(0, 10).toUpperCase()}`
   return payload
 }
 
@@ -35,7 +26,7 @@ export async function addCustomer(data = {}) {
     const payload = getCustomerPayload(data, true)
     if (!payload.name) return { error: 'Nama pelanggan wajib diisi.' }
 
-    const supabase = await getCustomerAdminClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { data: customer, error } = await supabase
       .from('customers')
       .insert([payload])
@@ -56,7 +47,7 @@ export async function addCustomer(data = {}) {
 
 export async function deleteCustomer(id) {
   try {
-    const supabase = await getCustomerAdminClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { error } = await supabase.from('customers').delete().eq('id', id)
 
     if (error) {
@@ -76,7 +67,7 @@ export async function updateCustomer(id, data = {}) {
     const payload = getCustomerPayload(data)
     if (!payload.name) return { error: 'Nama pelanggan wajib diisi.' }
 
-    const supabase = await getCustomerAdminClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { data: customer, error } = await supabase
       .from('customers')
       .update(payload)
