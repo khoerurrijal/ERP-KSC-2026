@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { waitUntil } from '@vercel/functions';
 import { normalizePhone } from '@/utils/phone';
@@ -20,6 +21,36 @@ const FONNTE_API_URL = 'https://api.fonnte.com/send';
 const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 
 const ADMIN_NUMBER = '6282121316926';
+
+function getWebhookDedupeKey(body, sender, message) {
+  const providerId = [
+    body.message_id,
+    body.messageId,
+    body.id,
+    body.uid,
+    body.key?.id,
+    body.data?.id,
+  ].find(value => typeof value === 'string' && value.trim());
+
+  const source = providerId
+    ? `provider:${providerId}`
+    : `fallback:${sender}:${message}:${Math.floor(Date.now() / 60000)}`;
+
+  return `wa:${createHash('sha256').update(source).digest('hex')}`;
+}
+
+async function claimIncomingMessage(body, sender, message) {
+  const dedupeKey = getWebhookDedupeKey(body, sender, message);
+  const { data, error } = await supabase
+    .from('wa_chat_history')
+    .insert([{ phone_number: sender, role: 'user', content: message, dedupe_key: dedupeKey }])
+    .select('id, created_at')
+    .single();
+
+  if (error?.code === '23505') return { duplicate: true, data: null, error: null };
+  if (error) return { duplicate: false, data: null, error };
+  return { duplicate: false, data, error: null };
+}
 
 const SYSTEM_PROMPT = (pushname) => `
   Kamu adalah Admin King Sablon Cup. Namamu adalah Ina.
@@ -234,26 +265,17 @@ export async function POST(req) {
       return NextResponse.json({ success: true, message: 'Global bot is inactive' });
     }
 
-    // --- IDEMPOTENCY CHECK (ANTI-RETRY LOOP) ---
-    // Fetch recent user messages to see if this is a Fonnte webhook retry
-    const { data: recentMsgs } = await supabase
-      .from('wa_chat_history')
-      .select('created_at, content, role')
-      .eq('phone_number', sender)
-      .eq('role', 'user')
-      .order('created_at', { ascending: false })
-      .limit(5);
-      
-    if (recentMsgs && recentMsgs.length > 0) {
-      const now = new Date();
-      const isDuplicate = recentMsgs.some(msg => {
-        const timeDiff = now - new Date(msg.created_at);
-        return msg.content === message && timeDiff < 60000; // 60 seconds window
-      });
-      if (isDuplicate) {
-        console.log(`[Webhook] Ignored duplicate message from ${sender} (Fonnte retry loop protection)`);
-        return NextResponse.json({ success: true, message: 'Duplicate ignored' });
-      }
+    // Claim the webhook atomically before any WhatsApp response is sent.
+    // A retry with the same provider ID (or same fallback fingerprint) hits
+    // the unique index and exits without sending a second response.
+    const { data: insertedMsg, duplicate, error: claimError } = await claimIncomingMessage(body, sender, message);
+    if (claimError) {
+      console.error('[Webhook] Could not claim incoming message:', claimError);
+      return NextResponse.json({ success: false, error: 'Webhook dedupe unavailable' }, { status: 503 });
+    }
+    if (duplicate) {
+      console.log(`[Webhook] Ignored duplicate message from ${sender}`);
+      return NextResponse.json({ success: true, message: 'Duplicate ignored' });
     }
 
     // --- 2. FAST-TRACK AUTO REPLY (TEMPLATES) ---
@@ -284,7 +306,6 @@ export async function POST(req) {
 
     if (templateReply) {
       await sendReply(sender, templateReply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: templateReply }]);
       return NextResponse.json({ success: true, reply: templateReply });
     }
@@ -294,7 +315,6 @@ export async function POST(req) {
     if (msgLower === 'non-text message' || msgLower === '') {
       const reply = "Maaf kak, saat ini Ina baru bisa membalas chat berupa teks. Ada yang bisa Ina bantu mengenai produk, harga, atau cek status pesanan? 🙏";
       await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
     }
@@ -303,7 +323,6 @@ export async function POST(req) {
     if (msgLower.match(/^(terima kasih|makasih|thank you|thx|suwun|hatur nuhun|tq|makasi|thanks)$/)) {
       const reply = "Sama-sama kak! Senang bisa membantu. Jika ada hal lain yang perlu ditanyakan, silakan chat Ina lagi ya. 😊";
       await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
     }
@@ -312,7 +331,6 @@ export async function POST(req) {
     if (msgLower.match(/^(ok|oke|siap|sip|okey|yoi|ready|noted)$/)) {
       const reply = "Siap kak! 👍";
       await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
       await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
       return NextResponse.json({ success: true, reply });
     }
@@ -320,8 +338,6 @@ export async function POST(req) {
     // --- 3. FAST-TRACK ORDER STATUS (BYPASS GEMINI) ---
     // If the message is a simple tracking intent, bypass AI completely!
     if (msgLower.match(/^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/)) {
-      await sendReply(sender, "Sebentar ya kak, Ina cek datanya dulu berdasarkan nama WA kakak... ⏳");
-      
       const orders = await searchOrdersWithPhoneLinking(sender, pushname);
       
       if (orders && orders.length > 0) {
@@ -331,13 +347,11 @@ export async function POST(req) {
         
         const reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
         await sendReply(sender, reply);
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
       } else {
         const reply = "Wah maaf kak, Ina coba cari pesanan aktif atas nama WA kakak belum ketemu nih datanya. Boleh diinfokan nama brand-nya apa kak? Biar Ina bantu cari lagi 🙏";
         await sendReply(sender, reply);
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
         return NextResponse.json({ success: true, reply });
       }
@@ -346,8 +360,6 @@ export async function POST(req) {
     // --- 3.5 BUSINESS HOURS FILTER (BEFORE GEMINI FALLBACK) ---
     if (globalBotValue === 'true' || globalBotValue === 'auto') {
       if (!isOutsideBusinessHours()) {
-        // Insert user message so history remains complete
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'user', content: message }]);
         console.log(`[Webhook] Inside business hours. Ignored fallback Gemini request from ${sender}.`);
         return NextResponse.json({ success: true, message: 'Inside business hours, ignored fallback' });
       }
@@ -381,17 +393,6 @@ export async function POST(req) {
     }
 
     if (!session?.is_bot_active) return NextResponse.json({ success: true, message: 'Local bot inactive' });
-
-    // Insert user message synchronously BEFORE starting background task
-    const { data: insertedMsg, error: insertErr } = await supabase
-      .from('wa_chat_history')
-      .insert([{ phone_number: sender, role: 'user', content: message }])
-      .select('id, created_at')
-      .single();
-
-    if (insertErr) {
-      console.error('[Webhook] Error inserting user message:', insertErr);
-    }
 
     waitUntil((async () => {
       try {
@@ -498,7 +499,6 @@ export async function POST(req) {
         const functionCall = result.response.functionCalls()?.[0];
         
         if (functionCall && functionCall.name === "cek_pesanan") {
-          await sendReply(sender, "Sebentar ya kak, Ina cek datanya dulu... ⏳");
           const orders = await searchOrdersWithPhoneLinking(sender, functionCall.args.search_query);
 
           let functionResponseData;
