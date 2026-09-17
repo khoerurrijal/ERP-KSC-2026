@@ -1,17 +1,17 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createClient } from '@supabase/supabase-js';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { waitUntil } from '@vercel/functions';
 import { normalizePhone } from '@/utils/phone';
 import { getAiModelCandidates, getConfiguredAiModel, isRetryableAiError } from '@/utils/aiAgent';
-
+const supabase = new Proxy({}, {
+  get(_target, property) {
+    const client = createAdminClient()
+    return typeof client[property] === 'function' ? client[property].bind(client) : client[property]
+  }
+});
 
 export const maxDuration = 60; // Allow API route to run for up to 60 seconds on Vercel
-
-// Initialize Supabase client
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Initialize Gemini API
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);

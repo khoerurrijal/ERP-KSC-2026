@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { chooseLatestAiModel, DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 import { requireAdminOrOwner } from '@/lib/adminAuth'
@@ -318,19 +319,20 @@ export async function updatePricelistConfig(newConfig) {
 }
 
 export async function getWaBotStatus() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
   const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single()
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching WA Bot status:', error)
     return true // Default active if error
   }
-  return data ? data.value === 'true' : true // Default to true if not set
+  return data ? data.value !== 'false' : true // auto/always are active; only explicit false turns it off
 }
 
 export async function toggleWaBotStatus(isActive) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
+  const userSupabase = await createClient()
+  const accessError = await checkSettingsAccess(userSupabase)
   if (accessError) return accessError
+  const supabase = createAdminClient()
   const { error } = await supabase.from('system_settings').upsert({
     key: 'GLOBAL_BOT_ACTIVE',
     value: isActive ? 'true' : 'false',
