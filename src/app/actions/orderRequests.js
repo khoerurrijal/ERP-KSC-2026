@@ -1,16 +1,13 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { createSalesOrder } from '@/app/actions/sales'
-import { requireAdminOrOwner } from '@/lib/adminAuth'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { createAdminNotification } from '@/lib/adminNotifications'
 
 export async function approveCustomerOrderRequest(requestId, payload) {
-  const supabase = await createClient()
-
   try {
-    const { user } = await requireAdminOrOwner(supabase)
+    const { supabase, user } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { data: request, error: requestError } = await supabase
       .from('customer_order_requests')
       .select('id, request_number, customer_code, sales_order_id')

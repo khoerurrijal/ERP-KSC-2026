@@ -1,14 +1,11 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
-import { requireAdminOrOwner } from '@/lib/adminAuth'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function getAdminNotifications() {
-  const supabase = await createClient()
-
   try {
-    await requireAdminOrOwner(supabase)
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { data, error } = await supabase
       .from('admin_notifications')
       .select('id, notification_type, title, message, href, entity_id, read_at, created_at')
@@ -27,10 +24,8 @@ export async function getAdminNotifications() {
 }
 
 export async function markAdminNotificationRead(notificationId) {
-  const supabase = await createClient()
-
   try {
-    await requireAdminOrOwner(supabase)
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
     const { error } = await supabase
       .from('admin_notifications')
       .update({ read_at: new Date().toISOString() })

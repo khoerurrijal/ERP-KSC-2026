@@ -1,31 +1,14 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 
-async function requireMarketplaceAdmin(supabase) {
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) throw new Error('Sesi login tidak ditemukan.')
-
-  const { data: rolesData, error: rolesError } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'user_roles')
-    .single()
-
-  if (rolesError) throw rolesError
-
-  const userEmail = user.email?.toLowerCase() || ''
-  const matchedUser = (rolesData?.value || []).find(role => {
-    const inputEmail = (role.email || '').trim().toLowerCase()
-    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
-  })
-  const userRole = matchedUser?.role || 'Operator'
-
-  if (!['ADMIN', 'OWNER'].includes(String(userRole).toUpperCase())) {
-    throw new Error('Hanya Admin/Owner yang dapat memproses pencairan marketplace.')
-  }
+async function requireMarketplaceAdmin() {
+  return createAuthorizedAdminClient(
+    ['ADMIN', 'OWNER'],
+    'Hanya Admin/Owner yang dapat memproses pencairan marketplace.'
+  )
 }
 
 function normalizeMarketplaceReceipt(value) {
@@ -79,9 +62,15 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
 }
 
 export async function processMarketplaceSettlement(settlementData, paymentMethod, settlementDate) {
-  const supabase = await createClient()
   try {
-    await requireMarketplaceAdmin(supabase)
+    const { supabase } = await requireMarketplaceAdmin()
+
+    if (!Array.isArray(settlementData) || settlementData.length === 0 || !paymentMethod || !settlementDate) {
+      throw new Error('Data pencairan marketplace belum lengkap.')
+    }
+    if (settlementData.length > 500 || settlementData.some(item => !item?.orderId || !Number.isFinite(Number(item.amount)) || Number(item.amount) <= 0)) {
+      throw new Error('Data pencairan marketplace tidak valid.')
+    }
 
     const orderIds = settlementData.map(d => d.orderId)
 
@@ -91,9 +80,10 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
       .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, dp_amount, customers (name)')
       .in('id', orderIds)
     if (ordersErr) throw ordersErr
+    const fetchedOrders = orders || []
 
     // Duplicate guard: filter hanya SO yang belum settled (payment_status !== 'LUNAS')
-    const pendingOrders = orders.filter(o => {
+    const pendingOrders = fetchedOrders.filter(o => {
       const paymentStatus = String(o.payment_status || '').toUpperCase()
       return paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL'
     })
@@ -104,7 +94,13 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     // Hanya proses pendingOrders — abaikan yang sudah LUNAS
     const pendingIds = new Set(pendingOrders.map(o => o.id))
     const activePencairan = settlementData.filter(d => pendingIds.has(d.orderId))
-    const totalPencairan = activePencairan.reduce((acc, curr) => acc + curr.amount, 0)
+    for (const order of pendingOrders) {
+      const amount = Number(activePencairan.find(item => item.orderId === order.id)?.amount || 0)
+      if (amount <= 0 || amount > Number(order.total_amount || 0)) {
+        throw new Error(`Nominal pencairan untuk ${order.invoice_number} tidak valid.`)
+      }
+    }
+    const totalPencairan = activePencairan.reduce((acc, curr) => acc + Number(curr.amount), 0)
 
     // Resolve marketplace name dari customer
     const marketplaceNames = new Set()
@@ -236,7 +232,7 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     return {
       success: true,
       processed: pendingOrders.length,
-      skipped: orders.length - pendingOrders.length
+      skipped: fetchedOrders.length - pendingOrders.length
     }
   } catch (err) {
     console.error(err)
@@ -245,10 +241,8 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
 }
 
 export async function previewQuickMarketplaceSettlement(cutoffDate, platform = 'ALL') {
-  const supabase = await createClient()
-
   try {
-    await requireMarketplaceAdmin(supabase)
+    const { supabase } = await requireMarketplaceAdmin()
     const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
 
     return {
@@ -265,10 +259,8 @@ export async function previewQuickMarketplaceSettlement(cutoffDate, platform = '
 }
 
 export async function processQuickMarketplaceSettlement(cutoffDate, platform, paymentMethod, settlementDate) {
-  const supabase = await createClient()
-
   try {
-    await requireMarketplaceAdmin(supabase)
+    const { supabase } = await requireMarketplaceAdmin()
     const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
     if (orders.length === 0) throw new Error('Tidak ada pesanan marketplace yang memenuhi filter.')
 
@@ -399,9 +391,8 @@ async function buildBulkSettlementPreview(supabase, rawText) {
 }
 
 export async function previewBulkMarketplaceSettlement(rawText) {
-  const supabase = await createClient()
   try {
-    await requireMarketplaceAdmin(supabase)
+    const { supabase } = await requireMarketplaceAdmin()
     const preview = await buildBulkSettlementPreview(supabase, rawText)
     return { success: true, ...preview }
   } catch (err) {
@@ -411,9 +402,8 @@ export async function previewBulkMarketplaceSettlement(rawText) {
 }
 
 export async function processBulkMarketplaceSettlement(rawText, paymentMethod, settlementDate) {
-  const supabase = await createClient()
   try {
-    await requireMarketplaceAdmin(supabase)
+    const { supabase } = await requireMarketplaceAdmin()
     const preview = await buildBulkSettlementPreview(supabase, rawText)
     const matchedRows = preview.rows.filter(row => row.status === 'COCOK')
     if (matchedRows.length === 0) throw new Error('Tidak ada baris yang cocok untuk diproses.')
@@ -438,10 +428,14 @@ export async function processBulkMarketplaceSettlement(rawText, paymentMethod, s
 }
 
 export async function updateMarketplaceReceipt(orderId, receipt) {
-  const supabase = await createClient();
-  const { error } = await supabase.from('sales_orders').update({ marketplace_receipt: receipt }).eq('id', orderId);
-  if (error) return { success: false, error: error.message };
-  revalidatePath('/dashboard/marketplace');
-  revalidatePath('/dashboard/sales');
-  return { success: true };
+  try {
+    const { supabase } = await requireMarketplaceAdmin()
+    const { error } = await supabase.from('sales_orders').update({ marketplace_receipt: receipt }).eq('id', orderId)
+    if (error) throw error
+    revalidatePath('/dashboard/marketplace')
+    revalidatePath('/dashboard/sales')
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
 }

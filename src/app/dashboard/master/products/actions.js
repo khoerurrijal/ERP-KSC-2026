@@ -1,11 +1,11 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function addProduct(payload) {
   const { units, ...productData } = payload
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   const { data: product, error } = await supabase
     .from('products')
@@ -29,7 +29,7 @@ export async function addProduct(payload) {
 }
 
 export async function deleteProduct(id) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   const { error } = await supabase
     .from('products')
@@ -47,7 +47,7 @@ export async function deleteProduct(id) {
 
 export async function updateProduct(id, payload) {
   const { units, ...productData } = payload
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   const { data: product, error } = await supabase
     .from('products')
@@ -75,7 +75,7 @@ export async function updateProduct(id, payload) {
 }
 
 export async function updateStock(product_code, new_stock) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   // Ambil stok saat ini
   const { data: prod } = await supabase.from('products').select('physical_stock').eq('product_code', product_code).single()
@@ -102,7 +102,7 @@ export async function updateStock(product_code, new_stock) {
 }
 
 export async function upsertProductsBulk(products) {
-  const supabase = await createClient();
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   const updatePromises = products.map(async (prod) => {
     const { product_code, ...updateData } = prod;

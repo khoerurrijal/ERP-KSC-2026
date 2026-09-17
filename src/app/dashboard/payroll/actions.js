@@ -1,10 +1,10 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function calculatePayroll(startDate, endDate) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     // Ambil log produksi di rentang tanggal (inklusif)
@@ -66,11 +66,10 @@ export async function calculatePayroll(startDate, endDate) {
 }
 
 export async function savePayroll(payload) {
-  const supabase = await createClient()
+  const { supabase, user } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
-    const { data: userData } = await supabase.auth.getUser()
-    const userId = userData?.user?.id
+    const userId = user?.id
 
     // 0. Duplicate period guard
     const { data: existingPayroll } = await supabase
@@ -113,7 +112,7 @@ export async function savePayroll(payload) {
         .eq('status', 'BELUM LUNAS')
         .order('created_at', { ascending: true })
 
-      let totalPinjamanWajib = 0
+      let maxPinjamanAvailable = 0
       let maxKasbonAvailable = 0
       
       const pinjamanLoans = []

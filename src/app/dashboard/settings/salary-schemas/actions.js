@@ -1,10 +1,10 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function saveSalarySchema(payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     if (payload.id) {
@@ -51,7 +51,7 @@ export async function saveSalarySchema(payload) {
 }
 
 export async function deleteSalarySchema(id) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     const { error } = await supabase.from('salary_schemas').delete().eq('id', id)

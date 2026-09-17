@@ -1,10 +1,10 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function saveEmployee(payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     if (payload.id) {
@@ -102,7 +102,7 @@ export async function saveEmployee(payload) {
 }
 
 export async function deleteEmployee(id) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     // Fetch username first before deleting

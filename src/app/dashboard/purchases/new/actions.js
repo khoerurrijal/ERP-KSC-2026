@@ -1,13 +1,34 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function createPurchaseOrder(payload) {
   try {
+    if (!payload?.poDate || !payload.paymentAccount || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 500) {
+      return { success: false, error: 'Data purchase order belum lengkap.' }
+    }
+    if (!['LUNAS', 'TEMPO'].includes(payload.paymentStatus)) {
+      return { success: false, error: 'Status pembayaran purchase order tidak valid.' }
+    }
+    const normalizedItems = payload.items.map(item => ({
+      ...item,
+      qty: Number(item.qty),
+      unit_multiplier: Number(item.unit_multiplier || 1),
+      unit_cost: Number(item.unit_cost)
+    }))
+    if (normalizedItems.some(item => !item.product_id || !Number.isInteger(item.qty) || item.qty <= 0 || !Number.isFinite(item.unit_multiplier) || item.unit_multiplier <= 0 || !Number.isFinite(item.unit_cost) || item.unit_cost < 0)) {
+      return { success: false, error: 'Detail item purchase order tidak valid.' }
+    }
+    const normalizedGrandTotal = normalizedItems.reduce((sum, item) => sum + item.qty * item.unit_multiplier * item.unit_cost, 0)
+    if (Math.abs(Number(payload.grandTotal || 0) - normalizedGrandTotal) > 0.01) {
+      return { success: false, error: 'Total purchase order tidak sesuai detail item.' }
+    }
+    payload = { ...payload, items: normalizedItems, grandTotal: normalizedGrandTotal }
+
     // Dynamically import to avoid circular dependencies if any
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
-    const supabase = await createClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     // 1. Generate PO Number
     const poNumber = `PO-${Date.now().toString().slice(-6)}`
@@ -131,7 +152,7 @@ export async function createPurchaseOrder(payload) {
 export async function updatePurchaseOrder(id, payload) {
   try {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
-    const supabase = await createClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     const { data: poInfo } = await supabase
       .from('purchase_orders')
@@ -288,7 +309,7 @@ export async function updatePurchaseOrder(id, payload) {
 export async function deletePurchaseOrder(id) {
   try {
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
-    const supabase = await createClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     // 1. Ambil PO sebelum dihapus untuk rollback cash dan pricing
     const { data: po, error: poFetchErr } = await supabase
@@ -335,7 +356,7 @@ export async function deletePurchaseOrder(id) {
 
 export async function payPurchaseOrder(id, paymentMethod) {
   try {
-    const supabase = await createClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     // 1. Ambil data PO
     const { data: po, error: poError } = await supabase
