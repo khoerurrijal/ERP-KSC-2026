@@ -28,7 +28,10 @@ export default async function CustomerData({ searchParams = {} }) {
   ])
 
   const dropdownConfig = settingsRes.data?.value || {}
-  const customers = customersRes.data || []
+  const customers = (customersRes.data || []).map(customer => ({
+    ...customer,
+    city: customer.city || customer.address || ''
+  }))
   const totalCount = customersRes.count || 0
 
   return (

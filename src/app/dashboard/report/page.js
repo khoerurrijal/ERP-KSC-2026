@@ -28,10 +28,10 @@ export default async function ReportPage({ searchParams }) {
   // Fetch sales items to compute Pemakaian Gudang & Global dynamically
   const { data: salesItems } = await supabase
     .from('sales_items')
-    .select('order_type, hpp_price, total_price, qty, unit_multiplier, beli_gudang, beli_global, royalty_fee, products(category), sales_orders!inner(date, payment_status, status)')
+    .select('order_type, hpp_price, total_price, qty, unit_multiplier, beli_gudang, beli_global, royalty_fee, products(category), sales_orders!inner(date, payment_status)')
     .gte('sales_orders.date', `${selectedMonth}-01`)
     .lte('sales_orders.date', maxDate)
-    .neq('sales_orders.status', 'BATAL')
+    .neq('status', 'BATAL')
 
   const allTransactions = transactions || []
   const validTransactions = allTransactions.filter(t => t.date && t.date.startsWith(selectedMonth))

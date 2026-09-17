@@ -1,22 +1,22 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
 import { revalidatePath } from 'next/cache'
 import { chooseLatestAiModel, DEFAULT_AI_MODEL } from '@/utils/aiAgent'
-import { requireAdminOrOwner } from '@/lib/adminAuth'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 
-async function checkSettingsAccess(supabase) {
+async function checkSettingsAccess() {
   try {
-    await requireAdminOrOwner(supabase)
-    return null
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
+    return { supabase }
   } catch (error) {
-    return { success: false, error: error.message }
+    return { error: { success: false, error: error.message } }
   }
 }
 
 export async function getSettings() {
-  const supabase = await createClient()
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { data, error } = await supabase.from('system_settings').select('*')
   
   if (error) {
@@ -97,24 +97,9 @@ export async function getSettings() {
 }
 
 export async function refreshAiAgentModel() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Sesi login tidak ditemukan.' }
-
-  const { data: rolesData } = await supabase
-    .from('system_settings')
-    .select('value')
-    .eq('key', 'user_roles')
-    .single()
-  const userEmail = user.email?.toLowerCase() || ''
-  const matchedUser = (rolesData?.value || []).find(role => {
-    const inputEmail = (role.email || '').trim().toLowerCase()
-    return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
-  })
-  const userRole = String(matchedUser?.role || 'Operator').trim().toUpperCase()
-  if (!['ADMIN', 'OWNER'].includes(userRole)) {
-    return { success: false, error: 'Hanya Admin/Owner yang dapat memperbarui model agent.' }
-  }
+  const access = await checkSettingsAccess()
+  if (access.error) return { ...access.error, error: 'Hanya Admin/Owner yang dapat memperbarui model agent.' }
+  const { supabase } = access
 
   const apiKey = process.env.GEMINI_API_KEY
   if (!apiKey) return { success: false, error: 'GEMINI_API_KEY belum terpasang di server.' }
@@ -162,9 +147,9 @@ export async function refreshAiAgentModel() {
 }
 
 export async function updateDropdownConfig(newConfig) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'dropdown_config',
     value: newConfig,
@@ -177,9 +162,9 @@ export async function updateDropdownConfig(newConfig) {
 }
 
 export async function updateCategoryImagesConfig(newConfig) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'category_images_config',
     value: newConfig,
@@ -192,9 +177,9 @@ export async function updateCategoryImagesConfig(newConfig) {
 }
 
 export async function updateCashflowConfig(newConfig) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'cashflow_config',
     value: newConfig,
@@ -207,9 +192,9 @@ export async function updateCashflowConfig(newConfig) {
 }
 
 export async function updateStoreConfig(newConfig) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'store_config',
     value: newConfig,
@@ -222,9 +207,9 @@ export async function updateStoreConfig(newConfig) {
 }
 
 export async function updateRolePermissions(newPermissions) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'role_permissions',
     value: newPermissions,
@@ -237,9 +222,9 @@ export async function updateRolePermissions(newPermissions) {
 }
 
 export async function updateUserRoles(newRoles) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'user_roles',
     value: newRoles,
@@ -252,9 +237,9 @@ export async function updateUserRoles(newRoles) {
 }
 
 export async function updatePricelistConfig(newConfig) {
-  const supabase = await createClient()
-  const accessError = await checkSettingsAccess(supabase)
-  if (accessError) return accessError
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   
   // Keep sablon_matrix and printing_matrix in system_settings
   const matrixObj = newConfig.sablon_matrix
@@ -319,7 +304,9 @@ export async function updatePricelistConfig(newConfig) {
 }
 
 export async function getWaBotStatus() {
-  const supabase = createAdminClient()
+  const access = await checkSettingsAccess()
+  if (access.error) return false
+  const { supabase } = access
   const { data, error } = await supabase.from('system_settings').select('value').eq('key', 'GLOBAL_BOT_ACTIVE').single()
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching WA Bot status:', error)
@@ -329,10 +316,9 @@ export async function getWaBotStatus() {
 }
 
 export async function toggleWaBotStatus(isActive) {
-  const userSupabase = await createClient()
-  const accessError = await checkSettingsAccess(userSupabase)
-  if (accessError) return accessError
-  const supabase = createAdminClient()
+  const access = await checkSettingsAccess()
+  if (access.error) return access.error
+  const { supabase } = access
   const { error } = await supabase.from('system_settings').upsert({
     key: 'GLOBAL_BOT_ACTIVE',
     value: isActive ? 'true' : 'false',

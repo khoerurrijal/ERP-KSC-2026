@@ -5,6 +5,7 @@ import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, X, Save, Clock, Package, FileText, Camera, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { addSalesPayment, updateSalesItemStatus, cancelSalesOrder } from '@/app/actions/sales'
+import { correctProductionProgress } from '@/app/dashboard/production/actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
@@ -175,22 +176,15 @@ export default function SalesClient({
     
     setIsCorrecting(true);
     try {
-      const supabase = await createClient();
-      await updateSalesItemStatus(correctionModal.itemId, correctionModal.targetStatus);
-      
-      const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', correctionModal.itemId);
-      const currentTotal = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0);
-      const adjustment = Number(correctionModal.targetQty) - currentTotal;
-      
-      if (adjustment !== 0) {
-        await supabase.from('production_logs').insert([{
-          job_id: correctionModal.itemId,
-          qty_processed: adjustment,
-          qty_defect: 0,
-          notes: `Koreksi Status Mundur (${correctionModal.currentStatus} -> ${correctionModal.targetStatus})`,
-          processed_date: new Date().toISOString()
-        }]);
-      }
+      const statusResult = await updateSalesItemStatus(correctionModal.itemId, correctionModal.targetStatus)
+      if (!statusResult.success) throw new Error(statusResult.error)
+
+      const progressResult = await correctProductionProgress(
+        correctionModal.itemId,
+        Number(correctionModal.targetQty),
+        null
+      )
+      if (!progressResult.success) throw new Error(progressResult.error)
       
       setCorrectionModal({ isOpen: false, itemId: null, currentStatus: '', targetStatus: '', targetQty: '' });
       window.location.reload();

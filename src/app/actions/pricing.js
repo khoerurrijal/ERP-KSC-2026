@@ -1,4 +1,6 @@
-import { createClient } from '@/utils/supabase/server'
+'use server'
+
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 
 /**
  * Menghitung ulang HPP dan Harga Jual untuk suatu produk
@@ -6,7 +8,7 @@ import { createClient } from '@/utils/supabase/server'
  */
 export async function recalculateProductPrices(productCode) {
   try {
-    const supabase = await createClient()
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'])
 
     // 1. Dapatkan detail produk (khususnya workshop_code untuk mark-up)
     const { data: product, error: prodErr } = await supabase

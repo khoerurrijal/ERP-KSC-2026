@@ -1,18 +1,19 @@
 'use server'
 
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function createManualTransaction(payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     const { type, reference, workshop_code, payment_method, amount, description } = payload
     
     // Validasi
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new Error("Nominal transaksi harus lebih dari 0")
     }
+    const normalizedAmount = Number(amount)
 
     const isMasuk = type === 'MASUK'
 
@@ -22,8 +23,8 @@ export async function createManualTransaction(payload) {
       description,
       payment_method,
       workshop_code,
-      amount_in: isMasuk ? amount : 0,
-      amount_out: isMasuk ? 0 : amount
+      amount_in: isMasuk ? normalizedAmount : 0,
+      amount_out: isMasuk ? 0 : normalizedAmount
     }])
 
     if (error) throw error
@@ -38,14 +39,15 @@ export async function createManualTransaction(payload) {
 }
 
 export async function updateTransaction(id, payload) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
     const { date, type, reference, workshop_code, payment_method, amount, description } = payload
     
-    if (!amount || amount <= 0) {
+    if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new Error("Nominal transaksi harus lebih dari 0")
     }
+    const normalizedAmount = Number(amount)
 
     const isMasuk = type === 'MASUK'
 
@@ -56,8 +58,8 @@ export async function updateTransaction(id, payload) {
         description,
         payment_method,
         workshop_code,
-        amount_in: isMasuk ? amount : 0,
-        amount_out: isMasuk ? 0 : amount
+        amount_in: isMasuk ? normalizedAmount : 0,
+        amount_out: isMasuk ? 0 : normalizedAmount
       })
       .eq('id', id)
 
@@ -73,7 +75,7 @@ export async function updateTransaction(id, payload) {
 }
 
 export async function deleteTransaction(id) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) throw error

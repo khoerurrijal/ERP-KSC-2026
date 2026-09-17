@@ -69,7 +69,6 @@ export default function CustomersClient({
       })
     } else {
       res = await addCustomer({
-        customer_code: 'CUST-' + Math.floor(Math.random() * 10000),
         name, phone, type, city,
       })
     }
