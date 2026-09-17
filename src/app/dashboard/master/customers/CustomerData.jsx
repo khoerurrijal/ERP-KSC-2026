@@ -1,8 +1,8 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import CustomersClient from './CustomersClient'
 
 export default async function CustomerData({ searchParams = {} }) {
-  const supabase = await createClient()
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
@@ -28,11 +28,15 @@ export default async function CustomerData({ searchParams = {} }) {
   ])
 
   const dropdownConfig = settingsRes.data?.value || {}
-  const customers = customersRes.data || []
+  const customers = (customersRes.data || []).map(customer => ({
+    ...customer,
+    city: customer.city || customer.address || ''
+  }))
   const totalCount = customersRes.count || 0
 
   return (
     <CustomersClient
+      key={`${page}-${pageSize}-${search}`}
       initialCustomers={customers}
       totalCount={totalCount}
       page={page}

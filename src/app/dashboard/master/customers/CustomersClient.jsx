@@ -18,15 +18,15 @@ export default function CustomersClient({
   const router = useRouter()
   const pathname = usePathname()
   const currentSearchParams = useSearchParams()
+  const customerTypes = Array.isArray(dropdownConfig?.customer_type)
+    ? dropdownConfig.customer_type.filter(type => typeof type === 'string' && type.trim())
+    : []
+  const defaultCustomerType = customerTypes[0] || ''
 
   const [customers, setCustomers] = useState(initialCustomers)
   const [searchQuery, setSearchQuery] = useState(passedSearchParams.search || '')
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
-
-  useEffect(() => {
-    setCustomers(initialCustomers)
-  }, [initialCustomers])
 
   const updateQueryParams = useCallback((newParams) => {
     const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
@@ -53,39 +53,32 @@ export default function CustomersClient({
   // Form State
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
-  const [type, setType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
+  const [type, setType] = useState(defaultCustomerType)
   const [city, setCity] = useState('')
   const [isPending, setIsPending] = useState(false)
 
   const handleSubmit = async () => {
-    if (!name) return alert('Nama pelanggan wajib diisi.')
+    if (!name.trim()) return alert('Nama pelanggan wajib diisi.')
     
     setIsPending(true)
-    let res;
+    try {
+      const res = editingId
+        ? await updateCustomer(editingId, { name, phone, type, city })
+        : await addCustomer({ name, phone, type, city })
 
-    if (editingId) {
-      res = await updateCustomer(editingId, {
-        name, phone, type, city
-      })
-    } else {
-      res = await addCustomer({
-        customer_code: 'CUST-' + Math.floor(Math.random() * 10000),
-        name, phone, type, city,
-      })
+      if (res?.error) return alert(res.error)
+
+      if (editingId) {
+        setCustomers(current => current.map(c => c.id === editingId ? res.customer : c))
+      } else {
+        setCustomers(current => [res.customer, ...current])
+      }
+      closeModal()
+    } catch (error) {
+      alert(error.message || 'Gagal menyimpan pelanggan.')
+    } finally {
+      setIsPending(false)
     }
-
-    setIsPending(false)
-
-    if (res.error) {
-      return alert(res.error)
-    }
-
-    if (editingId) {
-      setCustomers(customers.map(c => c.id === editingId ? res.customer : c))
-    } else {
-      setCustomers([...customers, res.customer])
-    }
-    closeModal()
   }
 
   const closeModal = () => {
@@ -93,7 +86,7 @@ export default function CustomersClient({
     setEditingId(null)
     setName('')
     setPhone('')
-    setType((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
+    setType(defaultCustomerType)
     setCity('')
   }
 
@@ -101,8 +94,8 @@ export default function CustomersClient({
     setEditingId(customer.id)
     setName(customer.name)
     setPhone(customer.phone || '')
-    setType(customer.type || ((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER"))
-    setCity(customer.city || '')
+    setType(customer.type || defaultCustomerType)
+    setCity(customer.city || customer.address || '')
     setShowModal(true)
   }
 
@@ -169,7 +162,7 @@ export default function CustomersClient({
                   <td className="px-6 py-4 text-foreground/90 font-medium">{item.name}</td>
                   <td className="px-6 py-4 text-foreground/60">{item.type || 'Reguler'}</td>
                   <td className="px-6 py-4 text-foreground/60">{item.phone || '-'}</td>
-                  <td className="px-6 py-4 text-foreground/60">{item.city || '-'}</td>
+                  <td className="px-6 py-4 text-foreground/60">{item.city || item.address || '-'}</td>
                   <td className="px-6 py-4 text-right flex items-center justify-end gap-3">
                     <button onClick={() => openEditModal(item)} className="text-accent hover:text-accent/80 font-medium text-xs flex items-center gap-1">
                       Edit
@@ -247,9 +240,7 @@ export default function CustomersClient({
                   <CustomSelect 
                     value={type} 
                     onChange={e => setType(e.target.value)} 
-                    options={[
-                      ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
-                    ]}
+                    options={customerTypes.map(customerType => ({ value: customerType, label: customerType }))}
                   />
                 </div>
               </div>
