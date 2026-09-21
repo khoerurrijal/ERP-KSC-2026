@@ -1,11 +1,11 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import TrackClient from './TrackClient'
 
 export const dynamic = 'force-dynamic'
 
 export default async function PublicTrackingPage({ params }) {
   const { id } = await params
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Determine if ID is UUID or invoice_number
   const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
@@ -15,7 +15,13 @@ export default async function PublicTrackingPage({ params }) {
   const { data: order, error } = await supabase
     .from('sales_orders')
     .select(`
-      *,
+      id,
+      invoice_number,
+      date,
+      total_amount,
+      dp_amount,
+      payment_status,
+      payment_url,
       customers (name, phone, address),
       sales_items (
         id,
@@ -52,18 +58,11 @@ export default async function PublicTrackingPage({ params }) {
   if (itemIds.length > 0) {
     const { data } = await supabase
       .from('production_logs')
-      .select('*')
+      .select('job_id, employee_id, qty_processed, created_at')
       .in('job_id', itemIds)
       .order('created_at', { ascending: false })
     if (data) logs = data
   }
-
-  // Find company settings to get the brand logo/name
-  const { data: settings } = await supabase
-    .from('settings')
-    .select('*')
-    .limit(1)
-    .single()
 
   // Find store config settings (banks, email, address, slogan, etc.)
   const { data: storeConfigData } = await supabase
@@ -73,18 +72,12 @@ export default async function PublicTrackingPage({ params }) {
     .single()
   const storeConfig = storeConfigData?.value || null
 
-  // Fetch employees for mapping names
-  const { data: employees } = await supabase
-    .from('employees')
-    .select('id, full_name')
-
   return (
     <TrackClient 
       order={order} 
       logs={logs || []} 
-      settings={settings || {}} 
-      storeConfig={storeConfig} 
-      employees={employees || []} 
+      settings={storeConfig || {}}
+      storeConfig={storeConfig}
     />
   )
 }
