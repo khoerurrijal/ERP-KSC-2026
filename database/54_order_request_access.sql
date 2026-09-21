@@ -36,8 +36,10 @@ ALTER TABLE public.admin_notifications ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS customer_order_requests_public_insert ON public.customer_order_requests;
 DROP POLICY IF EXISTS customer_order_requests_authenticated_access ON public.customer_order_requests;
 DROP POLICY IF EXISTS customer_order_requests_admin_access ON public.customer_order_requests;
+DROP POLICY IF EXISTS app_authenticated_read ON public.customer_order_requests;
 DROP POLICY IF EXISTS admin_notifications_authenticated_access ON public.admin_notifications;
 DROP POLICY IF EXISTS admin_notifications_admin_access ON public.admin_notifications;
+DROP POLICY IF EXISTS app_authenticated_read ON public.admin_notifications;
 
 REVOKE ALL ON TABLE public.customer_order_requests FROM anon, authenticated;
 REVOKE ALL ON TABLE public.admin_notifications FROM anon, authenticated;
@@ -56,4 +58,3 @@ CREATE POLICY admin_notifications_admin_access
   FOR SELECT
   TO authenticated
   USING (public.app_is_admin());
-
