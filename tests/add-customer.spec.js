@@ -2,6 +2,10 @@ const { test, expect } = require('@playwright/test');
 
 test.describe('Master Data Customers', () => {
   test('Should login and successfully add a new customer', async ({ page }) => {
+    const testUsername = process.env.E2E_USERNAME;
+    const testPassword = process.env.E2E_PASSWORD;
+    test.skip(!testUsername || !testPassword, 'Set E2E_USERNAME and E2E_PASSWORD to run this integration test.');
+
     // Set a very high timeout (3 minutes) to accommodate slow network responses from the remote database
     test.setTimeout(180000);
 
@@ -15,8 +19,8 @@ test.describe('Master Data Customers', () => {
     await page.goto('/login', { waitUntil: 'domcontentloaded' });
 
     // 2. Perform Login
-    await page.fill('input[name="username"]', 'test-playwright');
-    await page.fill('input[name="password"]', 'PlaywrightTest123!');
+    await page.fill('input[name="username"]', testUsername);
+    await page.fill('input[name="password"]', testPassword);
     await page.click('button[type="submit"]');
 
     // Wait for URL redirection to dashboard
