@@ -1,13 +1,12 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { Printer, Download, MapPin, Phone, Mail, CreditCard, CheckCircle, Navigation } from 'lucide-react'
+import { Printer, Download, MapPin, Phone, Mail, CheckCircle, Navigation } from 'lucide-react'
 import { useState } from 'react'
 import { getInvoiceAdditionalCharges, getInvoiceBaseItems } from '@/utils/invoiceTotals'
 
 export default function PublicInvoiceClient({ order, storeConfig }) {
   const router = useRouter()
-  const [isProcessing, setIsProcessing] = useState(false)
   const [isQrisOpen, setIsQrisOpen] = useState(false)
 
   if (!order) {
@@ -44,27 +43,6 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
       { bank_name: 'Bank BCA', account_number: '123-456-7890', account_name: 'PT KING SABLON NUSANTARA' },
       { bank_name: 'Bank Mandiri', account_number: '098-765-4321', account_name: 'PT KING SABLON NUSANTARA' }
     ]
-  }
-
-  const handleDokuPayment = async (amount) => {
-    setIsProcessing(true)
-    try {
-      const res = await fetch('/api/doku/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, amount })
-      });
-      const data = await res.json();
-      if (data.success) {
-        window.location.href = data.payment_url;
-      } else {
-        alert('Gagal memproses pembayaran: ' + data.error);
-        setIsProcessing(false)
-      }
-    } catch(err) {
-      alert('Terjadi kesalahan sistem.');
-      setIsProcessing(false)
-    }
   }
 
   return (
@@ -254,29 +232,6 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
                   </p>
                 </div>
 
-                <p className="text-xs text-gray-500 font-bold uppercase tracking-widest pt-2">Atau Bayar via Virtual Account / Link:</p>
-                {order.payment_url ? (
-                  <a href={order.payment_url} target="_blank" rel="noopener noreferrer" className="w-full flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-3 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20">
-                    <CreditCard className="w-5 h-5" /> Lanjutkan Pembayaran (DOKU)
-                  </a>
-                ) : (
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    <button 
-                      disabled={isProcessing || Number(order.dp_amount) > 0}
-                      onClick={() => handleDokuPayment(Number(order.total_amount) / 2)}
-                      className="flex-1 flex items-center justify-center gap-2 bg-gray-800 hover:bg-gray-900 text-white py-2.5 rounded-xl font-bold transition-all text-sm disabled:opacity-50"
-                    >
-                      Bayar DP 50% (DOKU)
-                    </button>
-                    <button 
-                      disabled={isProcessing}
-                      onClick={() => handleDokuPayment(sisaBayar)}
-                      className="flex-1 flex items-center justify-center gap-2 bg-red-600 hover:bg-red-700 text-white py-2.5 rounded-xl font-bold transition-all shadow-lg shadow-red-500/20 text-sm disabled:opacity-50"
-                    >
-                      <CreditCard className="w-4 h-4" /> Bayar Lunas (DOKU)
-                    </button>
-                  </div>
-                )}
               </div>
             )}
 

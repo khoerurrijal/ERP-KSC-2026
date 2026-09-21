@@ -40,7 +40,25 @@ export async function approveCustomerOrderRequest(requestId, payload) {
     }
 
     const result = await createSalesOrder({ ...payload, sourceRequestId: requestId })
-    if (!result.success) throw new Error(result.error)
+    if (!result.success) {
+      // A concurrent confirmation can lose the race after the pre-check but
+      // before the unique source_request_id insert. Treat that as already
+      // approved instead of surfacing a false failure to the second click.
+      const { data: concurrentOrder } = await supabase
+        .from('sales_orders')
+        .select('id')
+        .eq('source_request_id', requestId)
+        .maybeSingle()
+      if (concurrentOrder?.id) {
+        await supabase.from('customer_order_requests').update({
+          sales_order_id: concurrentOrder.id,
+          approved_at: new Date().toISOString(),
+          approved_by: user.email
+        }).eq('id', requestId).is('sales_order_id', null)
+        return { success: true, alreadyApproved: true, salesOrderId: concurrentOrder.id }
+      }
+      throw new Error(result.error)
+    }
 
     const { data: linkedOrder, error: linkError } = await supabase
       .from('sales_orders')

@@ -22,7 +22,7 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 
 const ADMIN_NUMBER = '6282121316926';
 
-function getWebhookDedupeKey(body, sender, message) {
+function getWebhookDedupeKey(body) {
   const providerId = [
     body.message_id,
     body.messageId,
@@ -32,18 +32,18 @@ function getWebhookDedupeKey(body, sender, message) {
     body.data?.id,
   ].find(value => typeof value === 'string' && value.trim());
 
-  const source = providerId
-    ? `provider:${providerId}`
-    : `fallback:${sender}:${message}:${Math.floor(Date.now() / 60000)}`;
+  if (!providerId) return null;
 
-  return `wa:${createHash('sha256').update(source).digest('hex')}`;
+  return `wa:${createHash('sha256').update(`provider:${providerId}`).digest('hex')}`;
 }
 
 async function claimIncomingMessage(body, sender, message) {
-  const dedupeKey = getWebhookDedupeKey(body, sender, message);
+  const dedupeKey = getWebhookDedupeKey(body);
+  const incomingMessage = { phone_number: sender, role: 'user', content: message };
+  if (dedupeKey) incomingMessage.dedupe_key = dedupeKey;
   const { data, error } = await supabase
     .from('wa_chat_history')
-    .insert([{ phone_number: sender, role: 'user', content: message, dedupe_key: dedupeKey }])
+    .insert([incomingMessage])
     .select('id, created_at')
     .single();
 
@@ -217,12 +217,16 @@ export async function POST(req) {
     const message = body.message || body.text || ''; 
     const pushname = body.pushname || body.name || 'Kakak'; 
     let afterHoursNoticeSent = false;
+    let replySent = false;
     const sendReply = async (target, reply) => {
       const shouldAddNotice = isOutsideBusinessHours() && !afterHoursNoticeSent;
       const outgoingReply = shouldAddNotice
         ? `Saat ini toko sedang tutup. Jam operasional King Sablon Cup: Senin-Sabtu, pukul 09.00-17.00 WIB.\n\n${reply}`
         : reply;
       if (shouldAddNotice) afterHoursNoticeSent = true;
+      // Once an outbound attempt starts, never send a second fallback for the
+      // same webhook even if a later history write or provider response fails.
+      replySent = true;
       return sendFonnteMessage(target, outgoingReply);
     };
 
@@ -232,6 +236,18 @@ export async function POST(req) {
 
     if (sender.includes('-')) {
       return NextResponse.json({ success: true, message: 'Ignored group message' });
+    }
+
+    // Claim before any branch that can send a response, including admin
+    // commands. Provider retries therefore exit before sending again.
+    const { data: insertedMsg, duplicate, error: claimError } = await claimIncomingMessage(body, sender, message);
+    if (claimError) {
+      console.error('[Webhook] Could not claim incoming message:', claimError);
+      return NextResponse.json({ success: false, error: 'Webhook dedupe unavailable' }, { status: 503 });
+    }
+    if (duplicate) {
+      console.log(`[Webhook] Ignored duplicate message from ${sender}`);
+      return NextResponse.json({ success: true, message: 'Duplicate ignored' });
     }
     
     // Normalize sender for admin check
@@ -263,19 +279,6 @@ export async function POST(req) {
 
     if (globalBotValue === 'false') {
       return NextResponse.json({ success: true, message: 'Global bot is inactive' });
-    }
-
-    // Claim the webhook atomically before any WhatsApp response is sent.
-    // A retry with the same provider ID (or same fallback fingerprint) hits
-    // the unique index and exits without sending a second response.
-    const { data: insertedMsg, duplicate, error: claimError } = await claimIncomingMessage(body, sender, message);
-    if (claimError) {
-      console.error('[Webhook] Could not claim incoming message:', claimError);
-      return NextResponse.json({ success: false, error: 'Webhook dedupe unavailable' }, { status: 503 });
-    }
-    if (duplicate) {
-      console.log(`[Webhook] Ignored duplicate message from ${sender}`);
-      return NextResponse.json({ success: true, message: 'Duplicate ignored' });
     }
 
     // --- 2. FAST-TRACK AUTO REPLY (TEMPLATES) ---
@@ -484,7 +487,7 @@ export async function POST(req) {
             break;
           } catch (error) {
             if (error.message === 'TIMEOUT') {
-              const fallbackMsg = "Maaf kak, Ina butuh waktu sedikit lebih lama dari biasanya. Tunggu sebentar ya... 🙏";
+              const fallbackMsg = "Maaf kak, sistem sedang sibuk. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
               await sendReply(sender, fallbackMsg);
               return;
             }
@@ -552,7 +555,7 @@ export async function POST(req) {
         } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota exceeded')) {
           fallbackMsg = "Maaf kak, saat ini antrean pesan sedang padat. Pesan kakak sudah masuk antrean dan akan segera dibalas oleh tim kami ya kak 🙏";
         }
-        await sendReply(sender, fallbackMsg).catch(console.error);
+        if (!replySent) await sendReply(sender, fallbackMsg).catch(console.error);
       }
     })());
 

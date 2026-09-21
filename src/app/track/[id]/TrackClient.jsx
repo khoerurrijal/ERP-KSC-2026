@@ -26,7 +26,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
   const [activeTab, setActiveTab] = useState('tracking') // 'tracking' or 'invoice'
   const [expandedItems, setExpandedItems] = useState(items.length === 1 ? [items[0].id] : [])
   const [isQrisOpen, setIsQrisOpen] = useState(false)
-  const [isProcessing, setIsProcessing] = useState(false)
 
   const [scale, setScale] = useState(1)
   const [invoiceHeight, setInvoiceHeight] = useState(0)
@@ -108,27 +107,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
   const copyToClipboard = (text) => {
     navigator.clipboard.writeText(text)
     alert('Disalin: ' + text)
-  }
-
-  const handleDokuPayment = async (amount) => {
-    setIsProcessing(true)
-    try {
-      const res = await fetch('/api/doku/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: order.id, amount })
-      });
-      const data = await res.json();
-      if (data.success) {
-        window.location.href = data.payment_url;
-      } else {
-        alert('Gagal memproses pembayaran: ' + data.error);
-        setIsProcessing(false)
-      }
-    } catch(err) {
-      alert('Terjadi kesalahan sistem.');
-      setIsProcessing(false)
-    }
   }
 
   const store = storeConfig || {

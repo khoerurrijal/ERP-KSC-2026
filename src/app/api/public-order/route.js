@@ -1,24 +1,37 @@
 import { NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
 import { createHash } from 'crypto';
+import { createAdminClient } from '@/utils/supabase/admin';
 import { normalizePhone } from '@/utils/phone';
-
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-const supabase = createClient(supabaseUrl, supabaseKey);
 
 export async function POST(req) {
   try {
+    const supabase = createAdminClient();
     const body = await req.json();
-    console.log("PUBLIC ORDER PAYLOAD:", body);
     const { brandName, whatsappNumber, waNumber, items, designService, subtotal, grandTotal } = body;
     
     const finalWaNumber = whatsappNumber || waNumber;
 
     if (!brandName || !finalWaNumber || !items || items.length === 0) {
-      console.log("Incomplete data details:", { brandName, finalWaNumber, items });
       return NextResponse.json({ success: false, error: 'Incomplete data' }, { status: 400 });
+    }
+
+    const normalizedBrandName = String(brandName).trim();
+    const normalizedPhoneInput = String(finalWaNumber).trim();
+    const hasValidItems = items.every(item => (
+      item &&
+      String(item.productId || '').trim() &&
+      String(item.orderType || '').trim() &&
+      Number.isFinite(Number(item.qty)) && Number(item.qty) > 0 &&
+      Number.isFinite(Number(item.unitPrice)) && Number(item.unitPrice) >= 0
+    ));
+    if (
+      normalizedBrandName.length > 200 ||
+      normalizedPhoneInput.length > 40 ||
+      items.length > 50 ||
+      !hasValidItems ||
+      !/^\+?[0-9][0-9\s().-]{5,39}$/.test(normalizedPhoneInput)
+    ) {
+      return NextResponse.json({ success: false, error: 'Format data pesanan tidak valid.' }, { status: 400 });
     }
 
     const normalizedInputPhone = normalizePhone(finalWaNumber);
@@ -43,36 +56,8 @@ export async function POST(req) {
       return NextResponse.json({ success: true, data: { request_number: duplicateRequest.request_number } });
     }
 
-    // 1. Process Customer (Lookup by WA phone first, then fall back to brand name but verify WA)
-    let customerId;
-    const { data: customers } = await supabase
-      .from('customers')
-      .select('customer_code, phone')
-      .or(`phone.eq.${normalizedInputPhone},phone.eq.${finalWaNumber}`);
-
-    const existingCustomer = customers?.find(c => normalizePhone(c.phone) === normalizedInputPhone);
-
-    if (existingCustomer && existingCustomer.customer_code) {
-      customerId = existingCustomer.customer_code;
-    } else {
-      const newCustomerCode = 'CUST-WEB-' + Math.floor(Math.random() * 100000);
-      const { data: newCustomer, error: custError } = await supabase
-        .from('customers')
-        .insert([{ 
-          name: brandName, 
-          phone: normalizedInputPhone, // Save in normalized canonical format
-          customer_code: newCustomerCode,
-          type: 'Reguler' // Default retail customer type
-        }])
-        .select()
-        .single();
-      
-      if (custError) throw custError;
-      customerId = newCustomerCode;
-    }
-
-    // Hanya simpan request. Sales Order, item, invoice, stok, dan transaksi
-    // baru dibuat setelah Admin membuka form Sales Order lalu mengonfirmasi.
+    // Guest hanya membuat antrean review. Customer, Sales Order, item, stok,
+    // invoice, dan transaksi dibuat setelah Admin mengonfirmasi request.
     const requestNumber = `REQ-WEB-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(1000 + Math.random() * 9000)}`;
     const notes = [
       `Order via Web Calculator.`,
@@ -84,7 +69,7 @@ export async function POST(req) {
       .from('customer_order_requests')
       .insert([{
         request_number: requestNumber,
-        customer_code: customerId,
+        customer_code: null,
         brand_name: brandName,
         whatsapp_number: normalizedInputPhone,
         request_fingerprint: requestFingerprint,

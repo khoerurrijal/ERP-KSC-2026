@@ -28,7 +28,7 @@ export async function updateSession(request) {
   )
 
   // Define public routes
-  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/api/whatsapp/webhook') || request.nextUrl.pathname.startsWith('/pricelist') || request.nextUrl.pathname.startsWith('/order') || request.nextUrl.pathname.startsWith('/api/public-order') || request.nextUrl.pathname.startsWith('/track') || request.nextUrl.pathname.startsWith('/invoice');
+  const isPublicRoute = request.nextUrl.pathname.startsWith('/login') || request.nextUrl.pathname === '/' || request.nextUrl.pathname.startsWith('/api/whatsapp/webhook') || request.nextUrl.pathname.startsWith('/api/webhooks/doku') || request.nextUrl.pathname.startsWith('/api/doku/checkout') || request.nextUrl.pathname.startsWith('/order') || request.nextUrl.pathname.startsWith('/api/public-order') || request.nextUrl.pathname.startsWith('/track') || request.nextUrl.pathname.startsWith('/invoice') || request.nextUrl.pathname.startsWith('/pricelist');
 
   if (isPublicRoute && !request.nextUrl.pathname.startsWith('/login')) {
     return supabaseResponse

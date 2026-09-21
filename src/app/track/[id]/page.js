@@ -21,7 +21,6 @@ export default async function PublicTrackingPage({ params }) {
       total_amount,
       dp_amount,
       payment_status,
-      payment_url,
       customers (name, phone, address),
       sales_items (
         id,

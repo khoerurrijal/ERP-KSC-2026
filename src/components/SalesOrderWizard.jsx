@@ -86,6 +86,8 @@ import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils
 export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {}, onClose, onSaved, onCancel, compact = true }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const itemIdPrefix = useId()
+  const nextItemId = useRef(0)
   const requestedReturnTo = searchParams.get('from')
   const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
     ? requestedReturnTo
@@ -94,8 +96,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
-  const [newCustomerName, setNewCustomerName] = useState("")
-  const [newCustomerPhone, setNewCustomerPhone] = useState("")
+  const [newCustomerName, setNewCustomerName] = useState(initialData?.customer_name || "")
+  const [newCustomerPhone, setNewCustomerPhone] = useState(initialData?.customer_phone || "")
   const [newCustomerType, setNewCustomerType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -122,8 +124,12 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   const handleNextTab1 = () => {
     const custExists = localCustomers.find(c => c.customer_code === customerId)
-    if (!custExists && customerId.trim() !== '') {
-      setNewCustomerName(customerId)
+    if (!custExists) {
+      if (!newCustomerName.trim() && customerId.trim()) setNewCustomerName(customerId)
+      if (!newCustomerName.trim() && !customerId.trim()) {
+        setError('Pilih pelanggan lama atau buat pelanggan baru terlebih dahulu.')
+        return
+      }
       setShowAddCustomer(true)
     } else {
       setCurrentTab(2)
@@ -138,7 +144,6 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setLoading(true);
     
     const newCust = {
-      customer_code: 'CUST-' + Math.floor(Math.random() * 10000),
       name: newCustomerName,
       phone: newCustomerPhone,
       type: newCustomerType
@@ -171,7 +176,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   // Tab 2: Detail Pesanan
   const [items, setItems] = useState(initialData?.items?.length > 0 
     ? initialData.items.map((i, idx) => ({
-        id: i.id || Date.now() + idx,
+        id: i.id || `${itemIdPrefix}-${idx}`,
         order_type: i.order_type || '',
         category: products.find(p => p.product_code === i.product_code)?.category || '',
         product_id: i.product_code || '',
@@ -185,7 +190,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         isTwoColor: /2\s*warna|warna\s*ke-?2/i.test(i.notes || ''),
         notes: i.notes || ''
       }))
-    : [{ id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
+    : [{ id: `${itemIdPrefix}-initial`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
   )
 
   // Tab 3: Pembayaran
@@ -282,7 +287,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const remaining = grandTotal - dpAmount
 
   const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
+    setItems([...items, { id: `${itemIdPrefix}-${nextItemId.current++}`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
   }
 
   const handleRemoveItem = (id) => {

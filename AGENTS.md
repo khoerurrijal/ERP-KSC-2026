@@ -1,4 +1,13 @@
 <!-- BEGIN:nextjs-agent-rules -->
+# Owner-locked ERP decisions
+
+- Guest hanya boleh membuat `customer_order_requests` berstatus pending; guest tidak boleh membuat customer, Sales Order, item, stok, invoice, atau transaksi operasional.
+- `/order`, `/track`, dan `/invoice` adalah public tanpa login. `/pricelist` hanya redirect ke `/order`, bukan public entry point terpisah.
+- DOKU disabled total sampai Owner memberi approval tertulis untuk mengaktifkannya kembali. QRIS dan transfer manual tetap dipakai.
+- Satu event masuk WhatsApp boleh menghasilkan maksimal satu balasan outbound dan satu history model. Retry provider wajib atomic-dedup.
+- Migration harus fokus dan idempotent. Tidak boleh menambah atau menjalankan perubahan RLS global tanpa approval Owner.
+- Setiap dirty change wajib dikategorikan sebelum commit/deploy; file eksperimen, temporary, dan migration yang belum disetujui tidak boleh masuk production.
+
 # Project Instructions for AI Agent
 
 ## Framework

@@ -1,5 +1,7 @@
-import { createClient } from '@/utils/supabase/server'
+import { createAdminClient } from '@/utils/supabase/admin'
 import OrderClient from './OrderClient'
+
+export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Form Pemesanan | King Sablon Cup',
@@ -7,7 +9,7 @@ export const metadata = {
 }
 
 export default async function OrderPage() {
-  const supabase = await createClient()
+  const supabase = createAdminClient()
 
   // Ambil data produk
   const { data: products } = await supabase

@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Box, Users, Package, FileText } from 'lucide-react'
+import { Box, Users, Package } from 'lucide-react'
 
 export default function MasterDataLayout({ children }) {
   const pathname = usePathname()
@@ -12,7 +12,6 @@ export default function MasterDataLayout({ children }) {
     { name: 'Pelanggan', path: '/master/customers', icon: Users },
     { name: 'Supplier', path: '/master/suppliers', icon: Package },
     { name: 'Karyawan', path: '/master/employees', icon: Users },
-    { name: 'Public Pricelist', path: '/pricelist', icon: FileText, external: true },
   ]
 
   return (
