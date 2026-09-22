@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { TrendingUp, Wallet, Save, X, Zap, ClipboardPaste } from 'lucide-react'
-import { processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
+import { markMarketplaceOrdersSettledExternally, processMarketplaceSettlement, processQuickMarketplaceSettlement, previewQuickMarketplaceSettlement, updateMarketplaceReceipt } from './actions'
 import { previewBulkMarketplaceSettlement, processBulkMarketplaceSettlement } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
@@ -22,6 +22,8 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   // State for inline receipt inputs
   const [inputReceipts, setInputReceipts] = useState({})
   const [savingReceiptId, setSavingReceiptId] = useState(null)
+  const [selectedExternalIds, setSelectedExternalIds] = useState([])
+  const [isMarkingExternal, setIsMarkingExternal] = useState(false)
 
   // Dynamic Summary Stats
   const activeOrders = useMemo(() => marketplaceOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL'), [marketplaceOrders])
@@ -97,6 +99,38 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   }, [inputPencairan, marketplaceOrders])
 
   const totalBersihCair = settlementData.reduce((sum, item) => sum + item.amount, 0)
+
+  const toggleExternalSelection = id => {
+    setSelectedExternalIds(previous => previous.includes(id)
+      ? previous.filter(selectedId => selectedId !== id)
+      : [...previous, id])
+  }
+
+  const toggleAllExternalSelection = () => {
+    setSelectedExternalIds(selectedExternalIds.length === filteredOrders.length ? [] : filteredOrders.map(order => order.id))
+  }
+
+  const handleMarkExternal = async () => {
+    if (selectedExternalIds.length === 0) return
+    if (!window.confirm(`Tandai ${selectedExternalIds.length} order sebagai sudah dibayar di luar ERP? Tidak ada transaksi Buku Besar atau perubahan saldo yang dibuat.`)) return
+
+    setIsMarkingExternal(true)
+    try {
+      const res = await markMarketplaceOrdersSettledExternally(selectedExternalIds)
+      if (res.success) {
+        alert(`${res.processed} order ditandai sudah dibayar di luar ERP.`)
+        setSelectedExternalIds([])
+        router.refresh()
+      } else {
+        alert('Gagal menandai order: ' + res.error)
+      }
+    } catch (error) {
+      console.error(error)
+      alert('Terjadi kesalahan saat menandai order')
+    } finally {
+      setIsMarkingExternal(false)
+    }
+  }
 
   const handleProcessSettlement = async () => {
     if (settlementData.length === 0) return alert('Pilih minimal 1 pesanan dengan mengisi nominal pencairan!')
@@ -253,12 +287,31 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
             <TrendingUp className="w-5 h-5 text-primary" /> 
             Daftar Pesanan Marketplace
           </h2>
-          <span className="text-xs text-foreground/50">Hanya pesanan aktif</span>
+          <div className="flex flex-wrap items-center gap-3">
+            {selectedExternalIds.length > 0 && (
+              <button
+                onClick={handleMarkExternal}
+                disabled={isMarkingExternal}
+                className="btn-secondary h-9 px-3 text-xs border-amber-500/40 text-amber-300 disabled:opacity-50"
+              >
+                {isMarkingExternal ? 'Menyimpan...' : `Tandai ${selectedExternalIds.length} sudah dibayar di luar ERP`}
+              </button>
+            )}
+            <span className="text-xs text-foreground/50">Centang hanya order yang sudah diverifikasi</span>
+          </div>
         </div>
         <div className="overflow-x-auto p-4">
           <table className="w-full text-sm text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/60 text-xs uppercase">
               <tr>
+                <th className="px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={filteredOrders.length > 0 && selectedExternalIds.length === filteredOrders.length}
+                    onChange={toggleAllExternalSelection}
+                    aria-label="Pilih semua order marketplace"
+                  />
+                </th>
                 <th className="px-4 py-3">Tanggal Order</th>
                 <th className="px-4 py-3">No. Pesanan / Resi</th>
                 <th className="px-4 py-3">Platform</th>
@@ -270,10 +323,18 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
             <tbody className="divide-y divide-white/5">
               {filteredOrders.length === 0 ? (
                 <tr>
-                  <td colSpan="6" className="px-4 py-8 text-center text-foreground/40">Belum ada data pesanan marketplace.</td>
+                  <td colSpan="7" className="px-4 py-8 text-center text-foreground/40">Belum ada data pesanan marketplace.</td>
                 </tr>
               ) : filteredOrders.map(item => (
                 <tr key={item.id} className={`hover:bg-white/5 ${inputPencairan[item.id] > 0 ? 'bg-primary/5' : ''}`}>
+                  <td className="px-4 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selectedExternalIds.includes(item.id)}
+                      onChange={() => toggleExternalSelection(item.id)}
+                      aria-label={`Pilih ${item.invoice_number || 'order'}`}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-foreground/80">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                   <td className="px-4 py-3 font-medium text-xs">
                     <div className="relative flex items-center">
