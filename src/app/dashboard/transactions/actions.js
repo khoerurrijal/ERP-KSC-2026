@@ -7,18 +7,21 @@ export async function createManualTransaction(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
-    const { type, reference, workshop_code, payment_method, amount, description } = payload
+    const { date, type, reference, workshop_code, payment_method, amount, description } = payload
     
     // Validasi
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new Error("Nominal transaksi harus lebih dari 0")
+    }
+    if (!date) {
+      throw new Error("Tanggal transaksi wajib diisi")
     }
     const normalizedAmount = Number(amount)
 
     const isMasuk = type === 'MASUK'
 
     const { error } = await supabase.from('transactions').insert([{
-      date: new Date().toISOString().split('T')[0],
+      date,
       reference: workshop_code === 'KING' ? reference : 'LAIN-LAIN',
       description,
       payment_method,
