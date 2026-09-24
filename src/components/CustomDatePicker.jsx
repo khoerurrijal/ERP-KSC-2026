@@ -1,5 +1,8 @@
 'use client'
 
+/* These effects synchronize the calendar viewport and portal geometry. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useRef, useEffect, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'

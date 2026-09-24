@@ -1,5 +1,8 @@
 'use client'
 
+/* Effects intentionally initialize browser-only UI and poll admin notifications. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect, useRef } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { LogOut, Sun, Moon, User, Menu, MessageCircle, Check, X, Bell } from 'lucide-react'

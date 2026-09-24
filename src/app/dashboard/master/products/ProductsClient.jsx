@@ -80,7 +80,6 @@ export default function ProductsClient({ products: initialProducts = [], error =
       })
     } else {
       res = await addProduct({
-        product_code: 'PRD-' + Date.now().toString().slice(-6),
         name, category, workshop_code: workshop, price_polos: Number(sellingPrice), is_active: isActive, units
       })
     }

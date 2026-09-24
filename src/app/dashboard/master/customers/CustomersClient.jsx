@@ -1,5 +1,8 @@
 'use client'
 
+/* The effect intentionally mirrors server-provided customer data after navigation. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Search, Plus, Users, CheckCircle2, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'

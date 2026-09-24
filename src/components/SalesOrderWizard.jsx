@@ -86,6 +86,8 @@ import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils
 export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {}, onClose, onSaved, onCancel, compact = true }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const itemIdPrefix = useId()
+  const nextItemId = useRef(0)
   const requestedReturnTo = searchParams.get('from')
   const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
     ? requestedReturnTo
@@ -94,8 +96,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
-  const [newCustomerName, setNewCustomerName] = useState("")
-  const [newCustomerPhone, setNewCustomerPhone] = useState("")
+  const [newCustomerName, setNewCustomerName] = useState(initialData?.customer_name || "")
+  const [newCustomerPhone, setNewCustomerPhone] = useState(initialData?.customer_phone || "")
   const [newCustomerType, setNewCustomerType] = useState((dropdownConfig?.customer_type && dropdownConfig.customer_type.length > 0) ? dropdownConfig.customer_type[0] : "REGULLER")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -122,8 +124,12 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   const handleNextTab1 = () => {
     const custExists = localCustomers.find(c => c.customer_code === customerId)
-    if (!custExists && customerId.trim() !== '') {
-      setNewCustomerName(customerId)
+    if (!custExists) {
+      if (!newCustomerName.trim() && customerId.trim()) setNewCustomerName(customerId)
+      if (!newCustomerName.trim() && !customerId.trim()) {
+        setError('Pilih pelanggan lama atau buat pelanggan baru terlebih dahulu.')
+        return
+      }
       setShowAddCustomer(true)
     } else {
       setCurrentTab(2)
@@ -136,22 +142,21 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       return;
     }
     setLoading(true);
-    
+
     const newCust = {
-      customer_code: 'CUST-' + Math.floor(Math.random() * 10000),
       name: newCustomerName,
       phone: newCustomerPhone,
       type: newCustomerType
     }
-    
+
     const res = await addCustomer(newCust);
     setLoading(false);
-    
+
     if (res.error) {
       alert("Gagal menambahkan pelanggan: " + res.error);
       return;
     }
-    
+
     setLocalCustomers([...localCustomers, res.customer])
     setCustomerId(res.customer.customer_code)
     setShowAddCustomer(false)
@@ -169,9 +174,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
 
   // Tab 2: Detail Pesanan
-  const [items, setItems] = useState(initialData?.items?.length > 0 
+  const [items, setItems] = useState(initialData?.items?.length > 0
     ? initialData.items.map((i, idx) => ({
-        id: i.id || Date.now() + idx,
+        id: i.id || `${itemIdPrefix}-${idx}`,
         order_type: i.order_type || '',
         category: products.find(p => p.product_code === i.product_code)?.category || '',
         product_id: i.product_code || '',
@@ -185,7 +190,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         isTwoColor: /2\s*warna|warna\s*ke-?2/i.test(i.notes || ''),
         notes: i.notes || ''
       }))
-    : [{ id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
+    : [{ id: `${itemIdPrefix}-initial`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
   )
 
   // Tab 3: Pembayaran
@@ -261,7 +266,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     // Fallback: semua kategori
     return [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
   }
-  
+
   const calculateTotal = () => {
     const itemTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price)
@@ -282,7 +287,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const remaining = grandTotal - dpAmount
 
   const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
+    setItems([...items, { id: `${itemIdPrefix}-${nextItemId.current++}`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
   }
 
   const handleRemoveItem = (id) => {
@@ -332,10 +337,10 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
              updated.unit_multiplier = 1
           }
         }
-        
+
         if (['qty', 'product_search', 'order_type', 'category', 'unit', 'printingColors'].includes(field)) {
           const selectedProduct = products.find(p => p.name === updated.product_search)
-          
+
           // Auto adjust Qty based on minimum rules
           const minQty = getMinQty({
             orderType: updated.order_type,
@@ -343,7 +348,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
             printingColors: updated.printingColors || '3 Warna',
             pricelistConfig
           })
-          
+
           if (updated.qty < minQty) {
             // Only auto-correct if it's not currently being typed (i.e. we enforce it when category/order_type changes)
             // But if they are typing qty, we shouldn't hard block them from typing "1" before typing "000".
@@ -362,11 +367,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               printingColors: updated.printingColors || '3 Warna',
               pricelistConfig
             })
-            
+
             updated.price = Math.ceil(basePrice * updated.unit_multiplier)
           }
         }
-        
+
         return updated
       }
       return item
@@ -387,15 +392,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
     setLoading(true)
     setError(null)
-    
+
     try {
-      
+
       const selectedCustomer = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
       if (!selectedCustomer) {
         setLoading(false)
         return setError("Pelanggan tidak ditemukan. Silakan tambahkan di menu Master Data terlebih dahulu.")
       }
-      
+
       const payload = {
         customerId: selectedCustomer.customer_code,
         orderDate,
@@ -415,7 +420,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       } else {
         result = await createSalesOrder(payload)
       }
-      
+
       if (result.success) {
         alert(requestId ? `Request berhasil dikonfirmasi menjadi Sales Order!` : initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
         handleSaved()
@@ -750,7 +755,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   return (
     <div className="max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
-      
+
       {/* Header & Stepper */}
       <div className="mb-8 flex items-center justify-between">
         <button onClick={() => router.back()} className="flex items-center gap-2 text-foreground/60 hover:text-primary transition-colors text-sm">
@@ -779,7 +784,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
       {/* TABS */}
       <div className="glass-card p-6 md:p-8">
-        
+
         {/* TAB 1: INFO UMUM */}
         {currentTab === 1 && (
           <div className="space-y-6 animate-in fade-in">
@@ -792,8 +797,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               <div className="space-y-2 md:col-span-2">
                 <label className="text-sm font-medium text-foreground/80">Nama / Brand</label>
                 <div className="relative">
-                  <CustomSelect 
-                    value={customerId} 
+                  <CustomSelect
+                    value={customerId}
                     onChange={e => {
                       setCustomerId(e.target.value);
                       handleCustomerChange({ target: { value: e.target.value } });
@@ -845,26 +850,26 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     </button>
                   )}
                   <h3 className="text-sm font-semibold mb-4 text-foreground/60">Item #{index + 1}</h3>
-                  
+
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {/* Urutan 1: Jenis Pesanan */}
                     <div className="md:col-span-2">
                       <label className="text-xs font-medium text-foreground/60 mb-1 block">Jenis Pesanan</label>
-                      <CustomSelect 
-                        value={item.order_type} 
-                        onChange={e => handleItemChange(item.id, 'order_type', e.target.value)} 
+                      <CustomSelect
+                        value={item.order_type}
+                        onChange={e => handleItemChange(item.id, 'order_type', e.target.value)}
                         options={[
                           { value: "", label: "- Pilih -" },
                           ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])])).map(v => ({ value: v, label: v }))
-                        ]} 
+                        ]}
                       />
                     </div>
-                    
+
                     <div className="space-y-1">
                       <label className="text-xs text-foreground/60 block">Kategori</label>
-                      <CustomSelect 
-                        value={item.category} 
-                        onChange={e => handleItemChange(item.id, 'category', e.target.value)} 
+                      <CustomSelect
+                        value={item.category}
+                        onChange={e => handleItemChange(item.id, 'category', e.target.value)}
                         options={[
                           { value: "", label: "Semua Kategori" },
                           ...getCategoriesForItem(item.order_type).map(c => ({ value: c, label: c }))
@@ -876,9 +881,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     {/* Urutan 3: Ukuran/Produk */}
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">Ukuran / Produk</label>
-                      <CustomSelect 
-                        value={item.product_search} 
-                        onChange={e => handleItemChange(item.id, 'product_search', e.target.value)} 
+                      <CustomSelect
+                        value={item.product_search}
+                        onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
                         options={[
                           { value: "", label: "Ketik/Pilih Produk..." },
                           ...products.filter(p => p.category === item.category && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: p.name }))
@@ -890,9 +895,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">Qty</label>
-                      <input 
-                        type="text" 
-                        value={formatRp(item.qty)} 
+                      <input
+                        type="text"
+                        value={formatRp(item.qty)}
                         onBlur={(e) => {
                           const val = parseRp(e.target.value);
                           const minQty = getMinQty({
@@ -905,16 +910,16 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                             handleItemChange(item.id, 'qty', minQty);
                           }
                         }}
-                        onChange={e => handleItemChange(item.id, 'qty', parseRp(e.target.value))} 
-                        className="glass-input w-full text-sm px-2" 
+                        onChange={e => handleItemChange(item.id, 'qty', parseRp(e.target.value))}
+                        className="glass-input w-full text-sm px-2"
                       />
                     </div>
 
                     <div className="space-y-1 col-span-2">
                       <label className="text-xs text-foreground/60 block">Satuan</label>
-                      <CustomSelect 
-                        value={item.unit} 
-                        onChange={e => handleItemChange(item.id, 'unit', e.target.value)} 
+                      <CustomSelect
+                        value={item.unit}
+                        onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
                         options={(() => {
                           const p = products.find(prod => prod.name === item.product_search)
                           const base = [{ value: 'PCS', label: 'PCS' }]
@@ -932,7 +937,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                       <input type="text" value={formatRp(item.price)} onChange={e => handleItemChange(item.id, 'price', parseRp(e.target.value))} className="glass-input w-full text-sm" />
                     </div>
                   </div>
-                  
+
                   {(() => {
                     let itemTotal = Number(item.qty) * Number(item.price);
                     if (item.isFastTrack) {
@@ -955,11 +960,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
                       <div className="flex flex-col sm:flex-row gap-4">
                         <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 rounded border-gray-300 text-primary" 
-                            checked={item.isFastTrack || false} 
-                            onChange={(e) => handleItemChange(item.id, 'isFastTrack', e.target.checked)} 
+                          <input
+                            type="checkbox"
+                            className="w-5 h-5 rounded border-gray-300 text-primary"
+                            checked={item.isFastTrack || false}
+                            onChange={(e) => handleItemChange(item.id, 'isFastTrack', e.target.checked)}
                           />
                           <div>
                             <p className="font-bold text-sm text-red-400">🔥 Jalur Fast Track</p>
@@ -967,11 +972,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                           </div>
                         </label>
                         <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
-                          <input 
-                            type="checkbox" 
-                            className="w-5 h-5 rounded border-gray-300 text-yellow-500" 
-                            checked={item.isTwoColor || false} 
-                            onChange={(e) => handleItemChange(item.id, 'isTwoColor', e.target.checked)} 
+                          <input
+                            type="checkbox"
+                            className="w-5 h-5 rounded border-gray-300 text-yellow-500"
+                            checked={item.isTwoColor || false}
+                            onChange={(e) => handleItemChange(item.id, 'isTwoColor', e.target.checked)}
                           />
                           <div>
                             <p className="font-bold text-sm text-yellow-500">🎨 Sablon 2 Warna</p>
@@ -979,7 +984,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                           </div>
                         </label>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-foreground/80 truncate block">URL Mockup / Desain</label>
                         <input type="url" placeholder="https://..." value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input w-full text-sm text-blue-400" />
@@ -991,12 +996,12 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <div className="mt-4 pt-4 border-t border-white/5 space-y-4">
                       <div className="flex flex-col sm:flex-row gap-4">
                         <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
-                          <input 
-                            type="radio" 
+                          <input
+                            type="radio"
                             name={`printingColor_${item.id}`}
-                            className="w-5 h-5 rounded-full border-gray-300 text-blue-500" 
-                            checked={item.printingColors === '3 Warna'} 
-                            onChange={() => handleItemChange(item.id, 'printingColors', '3 Warna')} 
+                            className="w-5 h-5 rounded-full border-gray-300 text-blue-500"
+                            checked={item.printingColors === '3 Warna'}
+                            onChange={() => handleItemChange(item.id, 'printingColors', '3 Warna')}
                           />
                           <div>
                             <p className="font-bold text-sm text-blue-400">🎨 Printing 3 Warna</p>
@@ -1004,12 +1009,12 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                           </div>
                         </label>
                         <label className="flex items-center gap-3 cursor-pointer group bg-white/5 p-3 rounded-xl border border-white/10 flex-1 hover:bg-white/10 transition-colors">
-                          <input 
-                            type="radio" 
+                          <input
+                            type="radio"
                             name={`printingColor_${item.id}`}
-                            className="w-5 h-5 rounded-full border-gray-300 text-purple-500" 
-                            checked={item.printingColors === '4 Warna'} 
-                            onChange={() => handleItemChange(item.id, 'printingColors', '4 Warna')} 
+                            className="w-5 h-5 rounded-full border-gray-300 text-purple-500"
+                            checked={item.printingColors === '4 Warna'}
+                            onChange={() => handleItemChange(item.id, 'printingColors', '4 Warna')}
                           />
                           <div>
                             <p className="font-bold text-sm text-purple-400">🎨 Printing 4 Warna</p>
@@ -1017,7 +1022,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                           </div>
                         </label>
                       </div>
-                      
+
                       <div className="space-y-2">
                         <label className="text-xs font-medium text-foreground/80 truncate block">URL Mockup / Desain</label>
                         <input type="url" placeholder="https://..." value={item.mockup_url || ''} onChange={e => handleItemChange(item.id, 'mockup_url', e.target.value)} className="glass-input w-full text-sm text-blue-400" />
@@ -1062,7 +1067,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         {currentTab === 3 && (
           <div className="space-y-6 animate-in fade-in">
             <h2 className="text-xl font-bold text-primary mb-4">Transaksi & Pembayaran</h2>
-            
+
             <div className="p-6 rounded-xl bg-primary/10 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-primary/80 font-medium">Grand Total Tagihan</p>
@@ -1084,9 +1089,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               {dpAmount > 0 && !isMarketplace && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground/80">Metode Pembayaran DP</label>
-                  <CustomSelect 
-                    value={paymentAccount} 
-                    onChange={e => setPaymentAccount(e.target.value)} 
+                  <CustomSelect
+                    value={paymentAccount}
+                    onChange={e => setPaymentAccount(e.target.value)}
                     options={[
                       { value: "", label: "Pilih Rekening..." },
                       ...(dropdownConfig.payment_method || ["BCA", "MANDIRI", "CASH"]).map(v => ({ value: v, label: v }))
@@ -1136,9 +1141,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               </div>
               <div className="space-y-2">
                 <label className="text-xs font-medium text-foreground/60 block">Tipe Pelanggan</label>
-                <CustomSelect 
-                  value={newCustomerType} 
-                  onChange={e => setNewCustomerType(e.target.value)} 
+                <CustomSelect
+                  value={newCustomerType}
+                  onChange={e => setNewCustomerType(e.target.value)}
                   options={[
                     ...(dropdownConfig.customer_type || ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"]).map(t => ({ value: t, label: t }))
                   ]}
@@ -1155,16 +1160,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     </div>
   )
 }
-
 function StepIndicator({ step, current, icon: Icon, title }) {
   const isCompleted = current > step
   const isActive = current === step
-  
+
   return (
     <div className="flex flex-col items-center gap-2 z-10">
       <div className={`w-12 h-12 rounded-full flex items-center justify-center transition-all duration-300 border-2 ${
-        isActive ? 'bg-primary border-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]' : 
-        isCompleted ? 'bg-primary/20 border-primary text-primary' : 
+        isActive ? 'bg-primary border-primary text-background shadow-[0_0_20px_rgba(212,175,55,0.4)]' :
+        isCompleted ? 'bg-primary/20 border-primary text-primary' :
         'bg-background border-white/10 text-foreground/40'
       }`}>
         {isCompleted ? <CheckCircle2 className="w-6 h-6" /> : <Icon className="w-5 h-5" />}

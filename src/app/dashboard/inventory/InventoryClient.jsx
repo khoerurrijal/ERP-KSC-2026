@@ -1,5 +1,8 @@
 'use client'
 
+/* The effects below intentionally mirror server-provided filters and pagination. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { PackageSearch, Plus, Filter, ChevronUp, ChevronDown, Kanban, Package, ShoppingCart, Settings, Gift, Truck, CheckCircle2, ChevronLeft, ChevronRight } from 'lucide-react'

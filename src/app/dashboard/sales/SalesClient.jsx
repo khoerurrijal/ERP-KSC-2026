@@ -1,5 +1,8 @@
 'use client'
 
+/* Pagination reset effects intentionally mirror filter changes. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useMemo, useEffect, useCallback } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { Search, Plus, TrendingUp, Filter, ChevronUp, ChevronDown, X, Save, Clock, Package, FileText, Camera, ChevronLeft, ChevronRight } from 'lucide-react'

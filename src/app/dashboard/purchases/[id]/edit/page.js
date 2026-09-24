@@ -32,7 +32,7 @@ export default async function EditPurchaseOrderPage({ params }) {
     const product = products.find(p => p.product_code === item.product_code)
     const workshopId = workshops.find(w => w.code === po.workshop_code)?.id || ''
     return {
-      id: item.id || Date.now() + index,
+      id: item.id || `${po.id}-${index}`,
       workshop_id: workshopId,
       category: product?.category || '',
       product_id: item.product_code,

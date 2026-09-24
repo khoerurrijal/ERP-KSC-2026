@@ -33,9 +33,10 @@ export default async function MarketplacePage() {
       .limit(1000)
     rawOrders = (data || []).filter(order => {
       const paymentStatus = String(order.payment_status || '').toUpperCase()
+      const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').toUpperCase()
       return paymentStatus !== 'LUNAS'
         && paymentStatus !== 'BATAL'
-        && order.is_legacy_import !== true
+        && settlementStatus !== 'SETTLED_EXTERNAL'
     })
   }
 

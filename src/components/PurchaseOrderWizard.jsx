@@ -92,6 +92,8 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
 export default function PurchaseOrderWizard({ suppliers, products, workshops, initialData, dropdownConfig = {}, onClose, onSaved }) {
   const router = useRouter()
   const searchParams = useSearchParams()
+  const itemIdPrefix = useId()
+  const nextItemId = useRef(0)
   const requestedReturnTo = searchParams.get('from')
   const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
     ? requestedReturnTo
@@ -126,7 +128,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
 
   // Tab 2: Detail Pembelian
   const [items, setItems] = useState(initialData?.items && initialData.items.length > 0 ? initialData.items : [
-    { id: Date.now(), workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }
+    { id: `${itemIdPrefix}-initial`, workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }
   ])
 
   // Tab 3: Pembayaran
@@ -167,7 +169,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   }
 
   const handleAddItem = () => {
-    setItems([...items, { id: Date.now(), workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }])
+    setItems([...items, { id: `${itemIdPrefix}-${nextItemId.current++}`, workshop_id: '', category: '', product_id: '', product_search: '', qty: 1, unit: 'PCS', unit_multiplier: 1, unit_cost: 0 }])
   }
 
   const handleRemoveItem = (id) => {

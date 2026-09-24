@@ -1,5 +1,4 @@
 'use server'
-
 import { revalidatePath } from 'next/cache'
 import { chooseLatestAiModel, DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
@@ -240,7 +239,7 @@ export async function updatePricelistConfig(newConfig) {
   const access = await checkSettingsAccess()
   if (access.error) return access.error
   const { supabase } = access
-  
+
   // Keep sablon_matrix and printing_matrix in system_settings
   const matrixObj = newConfig.sablon_matrix
   const printMatrixObj = newConfig.printing_matrix

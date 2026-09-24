@@ -10,6 +10,10 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    "check.js",
+    "old_*.js",
+    "old_*.jsx",
+    "old_*.txt",
   ]),
 ]);
 

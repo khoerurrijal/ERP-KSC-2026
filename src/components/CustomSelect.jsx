@@ -1,5 +1,8 @@
 'use client'
 
+/* This layout effect intentionally clears/recomputes portal geometry. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'

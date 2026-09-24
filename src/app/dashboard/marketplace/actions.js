@@ -15,12 +15,19 @@ function normalizeMarketplaceReceipt(value) {
   return String(value || '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 }
 
+function isMarketplaceOrder(order) {
+  const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+  const marketplaceText = `${String(customer?.name || '').toLowerCase()} ${String(customer?.type || '').toLowerCase()}`
+  const isKnownPlatform = ['shopee', 'tokopedia', 'tiktok'].some(name => marketplaceText.includes(name))
+  return marketplaceText.includes('marketplace') || isKnownPlatform || Boolean(normalizeMarketplaceReceipt(order.marketplace_receipt))
+}
+
 async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') {
   if (!cutoffDate) throw new Error('Tanggal batas order wajib diisi.')
 
   const { data: orders, error } = await supabase
     .from('sales_orders')
-    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, date, marketplace_receipt, customers(name, type)')
+    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, marketplace_settlement_status, date, marketplace_receipt, customers(name, type)')
     .lte('date', cutoffDate)
     .order('date', { ascending: true })
     .limit(5000)
@@ -31,14 +38,13 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
   const candidateOrders = (orders || []).filter(order => {
     const paymentStatus = String(order.payment_status || '').toUpperCase()
     const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
-    const customerName = String(customer?.name || '').toLowerCase()
-    const customerType = String(customer?.type || '').toLowerCase()
-    const marketplaceText = `${customerName} ${customerType}`
+    const marketplaceText = `${String(customer?.name || '').toLowerCase()} ${String(customer?.type || '').toLowerCase()}`
     const isKnownPlatform = ['shopee', 'tokopedia', 'tiktok'].some(name => marketplaceText.includes(name))
-    const isMarketplaceCustomer = marketplaceText.includes('marketplace') || isKnownPlatform || Boolean(normalizeMarketplaceReceipt(order.marketplace_receipt))
+    const isMarketplaceCustomer = isMarketplaceOrder(order)
     const needsReconciliation = paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL'
+    const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').toUpperCase()
 
-    if (!needsReconciliation || !isMarketplaceCustomer || Number(order.total_amount || 0) <= 0) return false
+    if (!needsReconciliation || settlementStatus === 'SETTLED_EXTERNAL' || !isMarketplaceCustomer || Number(order.total_amount || 0) <= 0) return false
     if (selectedPlatform === 'ALL') return true
     if (selectedPlatform === 'LAINNYA') return !isKnownPlatform
     return marketplaceText.includes(selectedPlatform.toLowerCase())
@@ -77,7 +83,7 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     // 1. Fetch orders — termasuk payment_status untuk duplicate guard
     const { data: orders, error: ordersErr } = await supabase
       .from('sales_orders')
-      .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, dp_amount, customers (name)')
+      .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, marketplace_settlement_status, dp_amount, customers (name)')
       .in('id', orderIds)
     if (ordersErr) throw ordersErr
     const fetchedOrders = orders || []
@@ -85,7 +91,8 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     // Duplicate guard: filter hanya SO yang belum settled (payment_status !== 'LUNAS')
     const pendingOrders = fetchedOrders.filter(o => {
       const paymentStatus = String(o.payment_status || '').toUpperCase()
-      return paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL'
+      const settlementStatus = String(o.marketplace_settlement_status || 'PENDING').toUpperCase()
+      return paymentStatus !== 'LUNAS' && paymentStatus !== 'BATAL' && settlementStatus !== 'SETTLED_EXTERNAL'
     })
     if (pendingOrders.length === 0) {
       throw new Error('Semua pesanan yang dipilih sudah pernah dicairkan (LUNAS). Tidak ada yang diproses.')
@@ -324,7 +331,7 @@ async function buildBulkSettlementPreview(supabase, rawText) {
 
   const { data: orders, error } = await supabase
     .from('sales_orders')
-    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, marketplace_receipt, customers(name)')
+    .select('id, invoice_number, total_amount, payment_status, marketplace_pencairan, marketplace_settlement_status, marketplace_receipt, customers(name)')
     .not('marketplace_receipt', 'is', null)
     .neq('marketplace_receipt', '')
     .limit(5000)
@@ -358,7 +365,7 @@ async function buildBulkSettlementPreview(supabase, rawText) {
     else if ((inputCounts.get(receipt) || 0) > 1) status = 'DUPLIKAT INPUT'
     else if (matches.length === 0) status = 'TIDAK DITEMUKAN'
     else if (matches.length > 1) status = 'DUPLIKAT DATABASE'
-    else if (String(matches[0].payment_status || '').toUpperCase() === 'LUNAS' || Number(matches[0].marketplace_pencairan || 0) > 0) status = 'SUDAH CAIR'
+    else if (String(matches[0].payment_status || '').toUpperCase() === 'LUNAS' || String(matches[0].marketplace_settlement_status || '').toUpperCase() === 'SETTLED_EXTERNAL' || Number(matches[0].marketplace_pencairan || 0) > 0) status = 'SUDAH CAIR'
     else if (row.amount > Number(matches[0].total_amount || 0)) status = 'NOMINAL > TAGIHAN'
 
     return {
@@ -436,6 +443,50 @@ export async function updateMarketplaceReceipt(orderId, receipt) {
     revalidatePath('/dashboard/sales')
     return { success: true }
   } catch (error) {
+    return { success: false, error: error.message }
+  }
+}
+
+export async function markMarketplaceOrdersSettledExternally(orderIds) {
+  try {
+    const { supabase } = await requireMarketplaceAdmin()
+    const uniqueIds = [...new Set(Array.isArray(orderIds) ? orderIds.filter(Boolean) : [])]
+    if (uniqueIds.length === 0 || uniqueIds.length > 500) {
+      throw new Error('Pilih antara 1 sampai 500 order marketplace.')
+    }
+
+    const { data: orders, error: fetchError } = await supabase
+      .from('sales_orders')
+      .select('id, payment_status, marketplace_settlement_status, marketplace_receipt, customers(name, type)')
+      .in('id', uniqueIds)
+    if (fetchError) throw fetchError
+
+    const eligibleIds = (orders || [])
+      .filter(order => {
+        const paymentStatus = String(order.payment_status || '').toUpperCase()
+        const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').toUpperCase()
+        return paymentStatus !== 'LUNAS'
+          && paymentStatus !== 'BATAL'
+          && settlementStatus !== 'SETTLED_EXTERNAL'
+          && isMarketplaceOrder(order)
+      })
+      .map(order => order.id)
+
+    if (eligibleIds.length === 0) {
+      throw new Error('Tidak ada order marketplace pending yang bisa ditandai.')
+    }
+
+    const { error: updateError } = await supabase
+      .from('sales_orders')
+      .update({ marketplace_settlement_status: 'SETTLED_EXTERNAL' })
+      .in('id', eligibleIds)
+    if (updateError) throw updateError
+
+    revalidatePath('/dashboard/marketplace')
+    revalidatePath('/dashboard/sales')
+    return { success: true, processed: eligibleIds.length }
+  } catch (error) {
+    console.error('External marketplace settlement error:', error)
     return { success: false, error: error.message }
   }
 }

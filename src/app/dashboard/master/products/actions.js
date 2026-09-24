@@ -1,15 +1,17 @@
 'use server'
 
+import { randomUUID } from 'node:crypto'
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
 export async function addProduct(payload) {
   const { units, ...productData } = payload
+  const productCode = productData.product_code || `PRD-${randomUUID().replace(/-/g, '').slice(0, 8).toUpperCase()}`
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   const { data: product, error } = await supabase
     .from('products')
-    .insert([productData])
+    .insert([{ ...productData, product_code: productCode }])
     .select('*, workshops(name)')
     .single()
 

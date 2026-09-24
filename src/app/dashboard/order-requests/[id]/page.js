@@ -44,7 +44,9 @@ export default async function CustomerOrderRequestReviewPage({ params }) {
 
   const initialData = {
     date: request.created_at?.slice(0, 10),
-    customer_code: request.customer_code,
+    customer_code: request.customer_code || '',
+    customer_name: request.brand_name,
+    customer_phone: request.whatsapp_number,
     notes: payload.notes || `Request ${request.request_number}`,
     dp_amount: 0,
     payment_method: 'TRANSFER',
@@ -59,7 +61,7 @@ export default async function CustomerOrderRequestReviewPage({ params }) {
   return (
     <div>
       <div className="max-w-4xl mx-auto mb-4 p-3 rounded-xl border border-amber-500/25 bg-amber-500/10 text-sm text-amber-200">
-        Review {request.request_number}. Data belum masuk Sales Order sampai Admin menekan tombol konfirmasi.
+        Review {request.request_number} dari <strong>{request.brand_name}</strong> ({request.whatsapp_number}). Data belum masuk Sales Order sampai Admin menekan tombol konfirmasi.
       </div>
       <SalesOrderWizard
         customers={customers || []}

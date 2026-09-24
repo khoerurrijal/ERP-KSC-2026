@@ -333,15 +333,15 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
 
       {/* 3. MODAL PRODUK */}
       {showProductModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setShowProductModal(false)}>
-          <div className="bg-black/80 backdrop-blur-2xl border border-white/10 w-full max-w-md rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in slide-in-from-bottom-full sm:slide-in-from-bottom-0 sm:zoom-in-95 duration-300">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[1000] flex items-center justify-center p-4 animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setShowProductModal(false)}>
+          <div className="bg-black/80 backdrop-blur-2xl border border-white/10 w-full max-w-md rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-300">
             
-            <div className="p-4 border-b border-white/10 flex justify-between items-center bg-white/5">
-              <div>
+            <div className="p-4 border-b border-white/10 flex items-center justify-center relative bg-white/5">
+              <div className="text-center min-w-0 px-10">
                 <p className="text-[10px] font-bold text-primary tracking-widest uppercase">{modalType}</p>
-                <h3 className="font-black text-lg leading-tight">{modalCategory}</h3>
+                <h3 className="font-black text-lg leading-tight truncate">{modalCategory}</h3>
               </div>
-              <button onClick={() => setShowProductModal(false)} className="w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center font-bold">✕</button>
+              <button onClick={() => setShowProductModal(false)} className="absolute right-4 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/10 hover:bg-white/20 rounded-full flex items-center justify-center font-bold">✕</button>
             </div>
             
             <div className="p-4 sm:p-6 overflow-y-auto flex-1 space-y-5 custom-scrollbar">

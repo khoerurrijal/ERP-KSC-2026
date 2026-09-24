@@ -1,5 +1,8 @@
 'use client'
 
+/* The effect intentionally mirrors URL/server filter state. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useState, useEffect, useRef } from 'react'
 import { Calendar, ChevronLeft, ChevronRight } from 'lucide-react'

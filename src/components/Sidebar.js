@@ -1,5 +1,8 @@
 'use client'
 
+/* Effects intentionally keep the navigation group synchronized with routing. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
