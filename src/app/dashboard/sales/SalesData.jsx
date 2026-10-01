@@ -77,16 +77,32 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     `, { count: 'exact' })
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
-  if (safeSearch) {
-    if (matchedCustCodes.length > 0) {
-      query = query.or(`invoice_number.ilike.%${safeSearch}%,payment_status.ilike.%${safeSearch}%,customer_code.in.(${matchedCustCodes.join(',')})`)
-    } else {
-      query = query.or(`invoice_number.ilike.%${safeSearch}%,payment_status.ilike.%${safeSearch}%`)
-    }
-  }
+  const searchFilters = safeSearch
+    ? [
+        `invoice_number.ilike.%${safeSearch}%`,
+        `payment_status.ilike.%${safeSearch}%`,
+        ...(matchedCustCodes.length > 0 ? [`customer_code.in.(${matchedCustCodes.join(',')})`] : [])
+      ]
+    : []
 
-  if (filterMonth) {
-    query = query.gte('date', startDate).lte('date', endDate)
+  // Keep unpaid orders from earlier months visible in the selected month view.
+  const monthConditionGroups = filterMonth
+    ? [
+        [`date.gte.${startDate}`, `date.lte.${endDate}`],
+        ...(filterStatus === 'LUNAS' ? [] : [[`date.lt.${startDate}`, 'payment_status.in.(BELUM LUNAS,DP)']])
+      ]
+    : []
+
+  const orderFilters = monthConditionGroups.length
+    ? monthConditionGroups.flatMap(group =>
+        searchFilters.length
+          ? searchFilters.map(searchFilter => `and(${[...group, searchFilter].join(',')})`)
+          : [`and(${group.join(',')})`]
+      )
+    : searchFilters
+
+  if (orderFilters.length) {
+    query = query.or(orderFilters.join(','))
   }
 
   if (filterStatus === 'BELUM_LUNAS') {
