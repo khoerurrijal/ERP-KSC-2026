@@ -90,7 +90,7 @@ export async function handleAutoStatusUpdate(itemId) {
         newStatus = ST_SIAP_KIRIM;
       }
     }
-  } else if (item.order_type?.toUpperCase() === 'LAINNYA' || item.order_type?.toUpperCase() === 'JASA') {
+  } else if (['DLL', 'LAINNYA', 'JASA'].includes(item.order_type?.toUpperCase())) {
     // Layanan non-produksi seperti desain/ongkir tidak mengikuti alur produksi.
     newStatus = oldStatus;
   } else {
