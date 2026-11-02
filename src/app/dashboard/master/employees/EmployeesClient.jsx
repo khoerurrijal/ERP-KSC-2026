@@ -102,7 +102,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
   }
 
   const handleDelete = async (id) => {
-    if (confirm('Yakin ingin menghapus karyawan ini? Akses loginnya akan dinonaktifkan.')) {
+    if (confirm('Hapus data karyawan ini? Akun loginnya tetap tersimpan agar riwayat lama tetap terhubung. Anda bisa membuat ulang profil dengan username yang sama dan menetapkan password baru.')) {
       const res = await deleteEmployee(id)
       if (res.success) {
         setEmployees(employees.filter(s => s.id !== id))
@@ -241,9 +241,10 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
                     value={formData.password} 
                     onChange={e => setFormData({...formData, password: e.target.value})} 
                     className="glass-input w-full"
-                    placeholder="Minimal 6 karakter"
+                    placeholder="Password baru, minimal 6 karakter"
                     minLength={6}
                   />
+                  <p className="text-xs text-foreground/50">Jika username sudah pernah dipakai, akun login lama akan ditautkan kembali dan password ini akan menggantikannya.</p>
                 </div>
               )}
 

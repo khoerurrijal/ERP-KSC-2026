@@ -3,6 +3,22 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
+async function findAuthUserByEmail(supabase, email) {
+  const perPage = 1000
+  let page = 1
+
+  while (true) {
+    const { data, error } = await supabase.auth.admin.listUsers({ page, perPage })
+    if (error) throw error
+
+    const existingUser = data.users.find(user => user.email?.toLowerCase() === email)
+    if (existingUser) return existingUser
+    if (data.users.length < perPage) return null
+
+    page += 1
+  }
+}
+
 export async function saveEmployee(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
@@ -23,40 +39,54 @@ export async function saveEmployee(payload) {
       
       if (error) throw error
     } else {
-      // 1. Create Auth User without signing out the current admin
-      const email = `${payload.username}@kingsablon.com`
-      
-      const authRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/signup`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-        },
-        body: JSON.stringify({
-          email: email,
-          password: payload.password,
-          data: { full_name: payload.full_name }
+      const username = String(payload.username || '').trim().toLowerCase()
+      const password = String(payload.password || '')
+      if (!/^[a-z0-9_]+$/.test(username)) throw new Error('Username tidak valid.')
+      if (password.length < 6) throw new Error('Password minimal 6 karakter.')
+
+      const email = `${username}@kingsablon.com`
+      const existingAuthUser = await findAuthUserByEmail(supabase, email)
+      let userId = existingAuthUser?.id
+
+      if (existingAuthUser) {
+        const { data: linkedEmployee, error: linkedEmployeeError } = await supabase
+          .from('employees')
+          .select('id')
+          .eq('user_id', userId)
+          .limit(1)
+          .maybeSingle()
+
+        if (linkedEmployeeError) throw linkedEmployeeError
+        if (linkedEmployee) throw new Error('Akun login ini masih terhubung ke karyawan lain.')
+      } else {
+        // Create Auth user without signing out the current admin.
+        const authRes = await fetch(`${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/signup`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+          },
+          body: JSON.stringify({
+            email,
+            password,
+            data: { full_name: payload.full_name }
+          })
         })
-      });
 
-      const authData = await authRes.json()
+        const authData = await authRes.json()
+        if (!authRes.ok) {
+          throw new Error(authData.error_description || authData.msg || 'Gagal membuat user login.')
+        }
 
-      if (!authRes.ok) {
-        throw new Error(authData.error_description || authData.msg || 'Gagal membuat user login.')
+        userId = authData.user?.id || authData.id
+        if (!userId) throw new Error('Gagal mendapatkan ID user dari sistem auth.')
       }
 
-      const userId = authData.user?.id || authData.id
-
-      if (!userId) {
-        throw new Error('Gagal mendapatkan ID user dari sistem auth.')
-      }
-
-      // 2. Insert into employees
-      const { error: empError } = await supabase
+      const { data: employee, error: empError } = await supabase
         .from('employees')
         .insert([{
           user_id: userId,
-          username: payload.username,
+          username,
           full_name: payload.full_name,
           salary_schema_id: payload.salary_schema_id || null,
           supervisor_id: payload.supervisor_id || null,
@@ -64,8 +94,28 @@ export async function saveEmployee(payload) {
           uang_makan: payload.uang_makan || 0,
           is_active: payload.is_active
         }])
+        .select('id')
+        .single()
 
       if (empError) throw empError
+
+      if (existingAuthUser) {
+        const { error: passwordError } = await supabase.auth.admin.updateUserById(userId, {
+          password,
+          user_metadata: {
+            ...(existingAuthUser.user_metadata || {}),
+            full_name: payload.full_name
+          }
+        })
+
+        if (passwordError) {
+          const { error: rollbackError } = await supabase.from('employees').delete().eq('id', employee.id)
+          if (rollbackError) {
+            throw new Error(`Gagal memperbarui password. Profil karyawan juga gagal dibatalkan: ${rollbackError.message}`)
+          }
+          throw passwordError
+        }
+      }
     }
 
     // Sync to user_roles in system_settings
@@ -108,14 +158,8 @@ export async function deleteEmployee(id) {
     // Fetch username first before deleting
     const { data: emp } = await supabase.from('employees').select('username').eq('id', id).single()
 
-    // Note: We only delete the employee record here, 
-    // to delete the Auth User requires Service Role Key.
-    // Since we added an is_active check in login action, deleted employees won't be able to login
-    // because they won't exist in the employees table, OR we can also remove them from user_roles.
-    // Actually, wait, if they are deleted from employees, our login logic will NOT find them in employees table, 
-    // so they will bypass the is_active check. 
-    // Let's change the login logic to block users if they are not in employees, unless they are Owner.
-    // For now, at least remove them from user_roles.
+    // Keep the Auth identity so existing activity references remain stable.
+    // Re-adding this username reconnects the same account and sets a new password.
     const { error } = await supabase.from('employees').delete().eq('id', id)
     if (error) throw error
     
