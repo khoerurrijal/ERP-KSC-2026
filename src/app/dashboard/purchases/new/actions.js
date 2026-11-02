@@ -5,7 +5,7 @@ import { revalidatePath } from 'next/cache'
 
 export async function createPurchaseOrder(payload) {
   try {
-    if (!payload?.poDate || !payload.paymentAccount || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 500) {
+    if (!payload?.poDate || (payload.paymentStatus === 'LUNAS' && !payload.paymentAccount) || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 500) {
       return { success: false, error: 'Data purchase order belum lengkap.' }
     }
     if (!['LUNAS', 'TEMPO'].includes(payload.paymentStatus)) {
