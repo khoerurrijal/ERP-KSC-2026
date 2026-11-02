@@ -7,7 +7,7 @@ import { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } from '@
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
-function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disabled = false, allowCustom = false }) {
+function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disabled = false, allowCustom = false, numericPrimaryMatch = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
   const fieldRef = useRef(null)
@@ -44,10 +44,27 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
     setIsOpen(false)
   }
 
-  const searchTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const tokenize = text => String(text).toLowerCase().match(/\p{L}+|\p{N}+(?:[.,]\p{N}+)?/gu) || []
+  const searchTerms = tokenize(query)
+  const measurementUnits = new Set(['oz', 'gr', 'g', 'ml', 'l', 'kg'])
+  const isNumericTerm = term => /^\d+(?:[.,]\d+)?$/.test(term)
+  const numericTerms = searchTerms.map((term, queryIndex) => ({ term, queryIndex })).filter(({ term }) => isNumericTerm(term))
+  const textTerms = searchTerms.filter(term => !isNumericTerm(term))
   const filteredOptions = options.filter(option => {
-    const label = String(option.label).toLowerCase()
-    return searchTerms.every(term => label.includes(term))
+    const labelTerms = tokenize(option.label)
+    const valueTerms = tokenize(option.value)
+    const matchesNumbers = numericTerms.every(({ term, queryIndex }, index) => {
+      const nextTerm = searchTerms[queryIndex + 1]
+      if (measurementUnits.has(nextTerm)) {
+        return labelTerms.some((labelTerm, labelIndex) => labelTerm === term && labelTerms[labelIndex + 1] === nextTerm)
+      }
+      if (numericPrimaryMatch && index === 0) {
+        return valueTerms.find(isNumericTerm) === term
+      }
+      return labelTerms.includes(term)
+    })
+    const matchesText = textTerms.every(term => labelTerms.some(labelTerm => labelTerm.includes(term)))
+    return matchesNumbers && matchesText
   })
   const inputValue = isOpen
     ? query
@@ -409,6 +426,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                           value={item.product_search}
                           onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
                           placeholder="Pilih Produk..."
+                          numericPrimaryMatch
                           options={[
                             { value: "", label: "Pilih Produk..." },
                             ...products.filter(p => p.workshop_code === workshops.find(w => w.id === item.workshop_id)?.code && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
