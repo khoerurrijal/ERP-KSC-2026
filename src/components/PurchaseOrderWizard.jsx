@@ -44,9 +44,11 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
     setIsOpen(false)
   }
 
-  const filteredOptions = options.filter(option =>
-    String(option.label).toLowerCase().includes(query.trim().toLowerCase())
-  )
+  const searchTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const filteredOptions = options.filter(option => {
+    const label = String(option.label).toLowerCase()
+    return searchTerms.every(term => label.includes(term))
+  })
   const inputValue = isOpen
     ? query
     : selectedOption?.label || (allowCustom ? String(value || '') : '')
