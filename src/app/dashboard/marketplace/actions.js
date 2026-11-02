@@ -60,10 +60,21 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
     const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     return !receipt || receiptCounts.get(receipt) === 1
   })
+  const excludedDuplicateOrders = candidateOrders
+    .filter(order => {
+      const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
+      return receipt && receiptCounts.get(receipt) > 1
+    })
+    .map(order => ({
+      invoice_number: order.invoice_number,
+      date: order.date,
+      marketplace_receipt: order.marketplace_receipt
+    }))
 
   return {
     orders: ordersToProcess,
-    excludedDuplicateCount: candidateOrders.length - ordersToProcess.length
+    excludedDuplicateCount: excludedDuplicateOrders.length,
+    excludedDuplicateOrders
   }
 }
 
@@ -250,14 +261,16 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
 export async function previewQuickMarketplaceSettlement(cutoffDate, platform = 'ALL') {
   try {
     const { supabase } = await requireMarketplaceAdmin()
-    const { orders, excludedDuplicateCount } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
+    const { orders, excludedDuplicateCount, excludedDuplicateOrders } = await getQuickSettlementOrders(supabase, cutoffDate, platform)
 
     return {
       success: true,
       count: orders.length,
+      candidateCount: orders.length + excludedDuplicateCount,
       total: orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
       invoices: orders.slice(0, 10).map(order => order.invoice_number),
-      excludedDuplicateCount
+      excludedDuplicateCount,
+      excludedDuplicateOrders: excludedDuplicateOrders.slice(0, 20)
     }
   } catch (err) {
     console.error('Quick marketplace preview error:', err)

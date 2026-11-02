@@ -635,16 +635,29 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               {quickPreview && (
                 <div className="bg-amber-500/10 border border-amber-500/25 rounded-xl p-4 space-y-2">
                   <p className="text-sm font-bold text-amber-300">Preview pencairan</p>
-                  <p className="text-sm text-foreground/80">{quickPreview.count} pesanan</p>
+                  <p className="text-sm text-foreground/80">{quickPreview.candidateCount} pesanan aktif cocok dengan tanggal/platform.</p>
+                  <p className="text-sm text-foreground/80">{quickPreview.count} pesanan bisa dicairkan otomatis.</p>
                   <p className="text-xl font-black text-amber-300">Rp {quickPreview.total.toLocaleString('id-ID')}</p>
-                  {quickPreview.count === 0 && (
+                  {quickPreview.candidateCount === 0 && (
                     <p className="text-xs text-red-300">Tidak ada pesanan untuk filter ini. Pilih tanggal order yang lebih akhir atau platform yang sesuai.</p>
                   )}
                   {quickPreview.invoices?.length > 0 && (
-                    <p className="text-xs text-foreground/50">Contoh invoice: {quickPreview.invoices.join(', ')}{quickPreview.count > quickPreview.invoices.length ? ' ...' : ''}</p>
+                    <p className="text-xs text-foreground/50">Invoice yang akan diproses: {quickPreview.invoices.join(', ')}{quickPreview.count > quickPreview.invoices.length ? ' ...' : ''}</p>
                   )}
                   {quickPreview.excludedDuplicateCount > 0 && (
-                    <p className="text-xs text-amber-300">{quickPreview.excludedDuplicateCount} invoice ditunda karena nomor pesanan marketplace dipakai beberapa invoice.</p>
+                    <div className="rounded-lg border border-amber-400/20 bg-black/20 p-3 space-y-1">
+                      <p className="text-xs font-semibold text-amber-300">{quickPreview.excludedDuplicateCount} invoice ditunda karena resinya dipakai lebih dari satu invoice. Perlu cek manual:</p>
+                      <ul className="text-xs text-foreground/70 space-y-1">
+                        {quickPreview.excludedDuplicateOrders?.map((order, index) => (
+                          <li key={`${order.invoice_number || 'invoice'}-${order.marketplace_receipt}-${order.date}-${index}`}>
+                            {order.invoice_number || 'Invoice tanpa nomor'} — {order.date} — Resi {order.marketplace_receipt}
+                          </li>
+                        ))}
+                      </ul>
+                      {quickPreview.excludedDuplicateCount > (quickPreview.excludedDuplicateOrders?.length || 0) && (
+                        <p className="text-xs text-foreground/50">Menampilkan 20 invoice pertama.</p>
+                      )}
+                    </div>
                   )}
                   <p className="text-xs text-red-300">Nominal memakai total invoice, bukan nominal bersih setelah potongan marketplace.</p>
                 </div>
