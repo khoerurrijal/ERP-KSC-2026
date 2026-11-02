@@ -60,7 +60,7 @@ export async function createPurchaseOrder(payload) {
         })
         .select('supplier_code')
         .single()
-        
+
       if (!newSuppError && newSupplier) {
         finalSupplierCode = newSupplier.supplier_code
       }
@@ -72,7 +72,7 @@ export async function createPurchaseOrder(payload) {
       .insert({
         po_number: poNumber,
         date: payload.poDate,
-        supplier: finalSupplierCode,
+        supplier: payload.supplierId,
         total_amount: payload.grandTotal,
         payment_method: payload.paymentAccount,
         status: payload.paymentStatus,
@@ -99,7 +99,7 @@ export async function createPurchaseOrder(payload) {
 
     const { error: itemsError } = await supabase
       .from('purchase_items')
-      .insert(itemsToInsert)
+      .insert(itemsToInsert, { defaultToNull: false })
 
     if (itemsError) {
       console.error('Items Insert Error:', itemsError)
@@ -194,7 +194,7 @@ export async function updatePurchaseOrder(id, payload) {
           })
           .select('supplier_code')
           .single()
-          
+
         if (!newSuppError && newSupplier) {
           finalSupplierCode = newSupplier.supplier_code
         }
@@ -204,7 +204,7 @@ export async function updatePurchaseOrder(id, payload) {
       .from('purchase_orders')
       .update({
         date: payload.poDate,
-        supplier: finalSupplierCode,
+        supplier: payload.supplierId,
         total_amount: payload.grandTotal,
         payment_method: payload.paymentAccount,
         status: payload.paymentStatus,
@@ -241,7 +241,7 @@ export async function updatePurchaseOrder(id, payload) {
       await supabase.from('purchase_items').delete().eq('po_id', id);
     }
 
-    const { error: itemsError } = await supabase.from('purchase_items').upsert(itemsToInsert)
+    const { error: itemsError } = await supabase.from('purchase_items').upsert(itemsToInsert, { defaultToNull: false })
     if (itemsError) throw new Error(itemsError.message)
 
     // 5. Inventory is updated automatically by DB Trigger on purchase_items
