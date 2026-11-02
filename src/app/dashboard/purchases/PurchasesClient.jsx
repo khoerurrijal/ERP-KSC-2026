@@ -6,11 +6,17 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Search, Plus, Filter, ChevronUp, ChevronDown } from 'lucide-react'
-import { payPurchaseOrder } from './new/actions'
+import { getPurchaseOrderPaymentDate, payPurchaseOrder } from './new/actions'
 
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
+import CustomDatePicker from '@/components/CustomDatePicker'
 import PurchaseOrderWizard from '@/components/PurchaseOrderWizard'
+
+const getLocalDateValue = () => {
+  const today = new Date()
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
 
 export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', dropdownConfig = {}, suppliers = [], products = [], workshops = [] }) {
   const router = useRouter()
@@ -26,6 +32,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const [payModalOpen, setPayModalOpen] = useState(false)
   const [payTargetId, setPayTargetId] = useState(null)
   const [payMethod, setPayMethod] = useState('BCA')
+  const [payDate, setPayDate] = useState('')
   const [isPaying, setIsPaying] = useState(false)
 
   // Pagination State
@@ -43,11 +50,21 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const openPayModal = (id) => {
     setPayTargetId(id)
     setPayMethod('BCA')
+    setPayDate(getLocalDateValue())
     setPayModalOpen(true)
   }
 
-  const openPurchaseOrder = (purchaseOrder) => {
-    setPurchaseOrderDrawer(purchaseOrder)
+  const openPurchaseOrder = async (purchaseOrder) => {
+    let paymentDate = null
+    if (purchaseOrder.status === 'LUNAS' || purchaseOrder.payment_status === 'LUNAS') {
+      const result = await getPurchaseOrderPaymentDate(purchaseOrder.id)
+      if (!result.success) {
+        alert('Gagal memuat tanggal pelunasan PO: ' + result.error)
+        return
+      }
+      paymentDate = result.paymentDate
+    }
+    setPurchaseOrderDrawer({ ...purchaseOrder, payment_date: paymentDate })
   }
 
   const openNewPurchaseOrder = () => {
@@ -77,6 +94,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
       notes: purchaseOrder.notes || '',
       status: purchaseOrder.status,
       payment_method: purchaseOrder.payment_method,
+      payment_date: purchaseOrderDrawer.payment_date,
       items: (purchaseOrder.purchase_items || []).map((item, index) => {
         const product = products.find(currentProduct => currentProduct.product_code === item.product_code)
         return {
@@ -105,13 +123,22 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
 
   const submitPay = async () => {
     if (!payTargetId) return
+    if (!payDate) {
+      alert('Tanggal pelunasan wajib diisi.')
+      return
+    }
     setIsPaying(true)
-    const res = await payPurchaseOrder(payTargetId, payMethod)
-    if (res.success) {
-      alert('PO berhasil dilunasi dan tercatat di Buku Besar.')
-      window.location.reload()
-    } else {
-      alert('Gagal melunasi: ' + res.error)
+    try {
+      const res = await payPurchaseOrder(payTargetId, payMethod, payDate)
+      if (res.success) {
+        alert('PO berhasil dilunasi dan tercatat di Buku Besar.')
+        window.location.reload()
+      } else {
+        alert('Gagal melunasi: ' + res.error)
+        setIsPaying(false)
+      }
+    } catch (error) {
+      alert('Gagal melunasi: ' + (error.message || 'Terjadi kesalahan server.'))
       setIsPaying(false)
     }
   }
@@ -438,7 +465,12 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
           <div className="glass-card w-full max-w-md p-6 flex flex-col gap-6 animate-in zoom-in-95 duration-200">
             <div>
               <h3 className="text-lg font-bold text-foreground">Pelunasan PO</h3>
-              <p className="text-sm text-foreground/60 mt-1">Pilih metode pembayaran untuk melunasi tagihan ini.</p>
+              <p className="text-sm text-foreground/60 mt-1">Pilih tanggal dan metode pembayaran untuk melunasi tagihan ini.</p>
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-sm font-medium text-foreground/80">Tanggal Pelunasan</label>
+              <CustomDatePicker value={payDate} onChange={setPayDate} />
             </div>
             
             <div className="flex flex-col gap-2">

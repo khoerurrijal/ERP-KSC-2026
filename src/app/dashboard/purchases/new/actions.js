@@ -3,10 +3,21 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 
+const isValidDateOnly = value => {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  if (year < 1000 || month < 1 || month > 12 || day < 1 || day > 31) return false
+  const parsed = new Date(Date.UTC(year, month - 1, day))
+  return parsed.getUTCFullYear() === year && parsed.getUTCMonth() === month - 1 && parsed.getUTCDate() === day
+}
+
 export async function createPurchaseOrder(payload) {
   try {
     if (!payload?.poDate || (payload.paymentStatus === 'LUNAS' && !payload.paymentAccount) || !Array.isArray(payload.items) || payload.items.length === 0 || payload.items.length > 500) {
       return { success: false, error: 'Data purchase order belum lengkap.' }
+    }
+    if (payload.paymentStatus === 'LUNAS' && !isValidDateOnly(payload.paymentDate)) {
+      return { success: false, error: 'Tanggal pelunasan purchase order tidak valid.' }
     }
     if (!['LUNAS', 'TEMPO'].includes(payload.paymentStatus)) {
       return { success: false, error: 'Status pembayaran purchase order tidak valid.' }
@@ -113,7 +124,7 @@ export async function createPurchaseOrder(payload) {
     // 5.5. Insert transaction log if payment status is LUNAS
     if (payload.paymentStatus === 'LUNAS') {
       const { error: txError } = await supabase.from('transactions').insert({
-        date: payload.poDate,
+        date: payload.paymentDate,
         reference: 'PEMBELIAN',
         description: `PEMBELIAN:${po.po_number} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
         amount_in: 0,
@@ -151,6 +162,9 @@ export async function createPurchaseOrder(payload) {
 
 export async function updatePurchaseOrder(id, payload) {
   try {
+    if (payload?.paymentStatus === 'LUNAS' && !isValidDateOnly(payload.paymentDate)) {
+      return { success: false, error: 'Tanggal pelunasan purchase order tidak valid.' }
+    }
     const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
@@ -252,13 +266,16 @@ export async function updatePurchaseOrder(id, payload) {
         .from('transactions')
         .select('id')
         .eq('po_id', id)
+        .eq('reference', 'PEMBELIAN')
+        .order('date', { ascending: false })
+        .limit(1)
         .maybeSingle()
 
       if (existingTx) {
         const { error: txUpdateError } = await supabase
           .from('transactions')
           .update({
-            date: payload.poDate,
+            date: payload.paymentDate,
             amount_out: Number(payload.grandTotal || 0),
             payment_method: payload.paymentAccount,
             workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
@@ -270,7 +287,7 @@ export async function updatePurchaseOrder(id, payload) {
         const { error: txInsertError } = await supabase
           .from('transactions')
           .insert({
-            date: payload.poDate,
+            date: payload.paymentDate,
             reference: 'PEMBELIAN',
             description: `PEMBELIAN:${poNumber} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
             amount_in: 0,
@@ -354,8 +371,29 @@ export async function deletePurchaseOrder(id) {
   }
 }
 
-export async function payPurchaseOrder(id, paymentMethod) {
+export async function getPurchaseOrderPaymentDate(id) {
   try {
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
+    const { data, error } = await supabase
+      .from('transactions')
+      .select('date')
+      .eq('po_id', id)
+      .eq('reference', 'PEMBELIAN')
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (error) throw error
+    return { success: true, paymentDate: data?.date || null }
+  } catch (error) {
+    console.error('Get PO Payment Date Error:', error)
+    return { success: false, error: error.message || 'Gagal memuat tanggal pelunasan PO.' }
+  }
+}
+
+export async function payPurchaseOrder(id, paymentMethod, paymentDate) {
+  try {
+    if (!isValidDateOnly(paymentDate)) throw new Error('Tanggal pelunasan tidak valid.')
     const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     // 1. Ambil data PO
@@ -374,25 +412,27 @@ export async function payPurchaseOrder(id, paymentMethod) {
       .from('transactions')
       .select('id')
       .eq('po_id', po.id)
-      .gt('amount_out', 0)
+      .eq('reference', 'PEMBELIAN')
       .limit(1)
     if (existingTx && existingTx.length > 0) {
       throw new Error('Transaksi pembayaran untuk PO ini sudah pernah dicatat. Hubungi admin jika perlu koreksi.')
     }
 
-    const paymentDate = new Date().toISOString().split('T')[0]
-
     // 2. Insert tepat 1 transaksi amount_out sebesar total PO penuh
-    const { error: txError } = await supabase.from('transactions').insert({
-      date: paymentDate,
-      reference: 'PEMBELIAN',
-      description: `PEMBELIAN:${po.po_number} - Pelunasan ke ${po.supplier || 'Supplier'}`,
-      amount_in: 0,
-      amount_out: Number(po.total_amount || 0),
-      workshop_code: po.workshop_code || 'GLOBAL',
-      payment_method: paymentMethod || 'KAS GUDANG',
-      po_id: po.id
-    })
+    const { data: paymentTransaction, error: txError } = await supabase
+      .from('transactions')
+      .insert({
+        date: paymentDate,
+        reference: 'PEMBELIAN',
+        description: `PEMBELIAN:${po.po_number} - Pelunasan ke ${po.supplier || 'Supplier'}`,
+        amount_in: 0,
+        amount_out: Number(po.total_amount || 0),
+        workshop_code: po.workshop_code || 'GLOBAL',
+        payment_method: paymentMethod || 'KAS GUDANG',
+        po_id: po.id
+      })
+      .select('id')
+      .single()
 
     if (txError) throw new Error(`Gagal mencatat transaksi pengeluaran: ${txError.message}`)
 
@@ -401,7 +441,16 @@ export async function payPurchaseOrder(id, paymentMethod) {
       .update({ status: 'LUNAS', payment_method: paymentMethod })
       .eq('id', id)
 
-    if (updateError) throw new Error('Gagal update status PO.')
+    if (updateError) {
+      const { error: cleanupError } = await supabase
+        .from('transactions')
+        .delete()
+        .eq('id', paymentTransaction.id)
+      if (cleanupError) console.error('PO Payment Rollback Error:', cleanupError)
+      throw new Error(cleanupError
+        ? `Gagal update status PO dan membatalkan transaksi pelunasan: ${cleanupError.message}`
+        : 'Gagal update status PO.')
+    }
 
     revalidatePath('/dashboard/purchases')
     revalidatePath('/dashboard/report')

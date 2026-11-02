@@ -27,6 +27,19 @@ export default async function EditPurchaseOrderPage({ params }) {
     notFound()
   }
 
+  let paymentDate = null
+  if (po.status === 'LUNAS') {
+    const { data: paymentTransaction } = await supabase
+      .from('transactions')
+      .select('date')
+      .eq('po_id', po.id)
+      .eq('reference', 'PEMBELIAN')
+      .order('date', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+    paymentDate = paymentTransaction?.date || null
+  }
+
   // Transform items to match Wizard state
   const mappedItems = po.purchase_items.map((item, index) => {
     const product = products.find(p => p.product_code === item.product_code)
@@ -52,6 +65,7 @@ export default async function EditPurchaseOrderPage({ params }) {
     notes: po.notes || '',
     status: po.status,
     payment_method: po.payment_method,
+    payment_date: paymentDate,
     items: mappedItems
   }
 

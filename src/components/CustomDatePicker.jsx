@@ -57,9 +57,12 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
       const anchor = popoverRef.current?.getBoundingClientRect()
       if (!anchor) return
 
-      const width = Math.min(288, Math.max(240, window.innerWidth - 24))
+      const width = Math.min(288, window.innerWidth - 24)
       const estimatedHeight = 340
-      const opensAbove = anchor.bottom + estimatedHeight > window.innerHeight && anchor.top > estimatedHeight
+      const spaceBelow = Math.max(0, window.innerHeight - anchor.bottom - 20)
+      const spaceAbove = Math.max(0, anchor.top - 20)
+      const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+      const availableHeight = Math.min(estimatedHeight, opensAbove ? spaceAbove : spaceBelow)
       const left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12)
 
       setMenuStyle({
@@ -67,7 +70,9 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
         left,
         top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
         width,
-        zIndex: 1100,
+        maxHeight: availableHeight,
+        overflowY: 'auto',
+        zIndex: 2000,
         transform: opensAbove ? 'translateY(-100%)' : undefined
       })
     }
@@ -144,7 +149,7 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
       </button>
 
       {isOpen && menuStyle && typeof document !== 'undefined' && createPortal(
-        <div ref={menuRef} style={menuStyle} className="p-4 bg-[#18181B] rounded-xl shadow-2xl border border-white/10 z-[1100] animate-in fade-in zoom-in-95 duration-200">
+        <div ref={menuRef} style={menuStyle} className="p-4 bg-[#18181B] rounded-xl shadow-2xl border border-white/10 z-[2000] animate-in fade-in zoom-in-95 duration-200">
           <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
             <button 
               type="button"

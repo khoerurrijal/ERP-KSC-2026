@@ -7,6 +7,11 @@ import { createPurchaseOrder, updatePurchaseOrder, deletePurchaseOrder } from '@
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 
+const getLocalDateValue = () => {
+  const today = new Date()
+  return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+}
+
 function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disabled = false, allowCustom = false, numericPrimaryMatch = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -153,6 +158,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   // Tab 3: Pembayaran
   const [paymentStatus, setPaymentStatus] = useState(initialData?.status || 'TEMPO')
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
+  const [paymentDate, setPaymentDate] = useState(initialData?.payment_date || '')
 
   const handleSupplierChange = (e) => {
     setSupplierId(e.target.value)
@@ -252,6 +258,9 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
     if (paymentStatus === 'LUNAS' && !paymentAccount) {
       return setError("Jika dibayar Lunas, Anda harus memilih Akun Kas/Bank.")
     }
+    if (paymentStatus === 'LUNAS' && !paymentDate) {
+      return setError("Tanggal pelunasan wajib diisi jika status pembayaran Lunas.")
+    }
 
     setLoading(true)
     setError(null)
@@ -263,6 +272,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
         notes,
         paymentStatus,
         paymentAccount,
+        paymentDate,
         grandTotal,
         items: items.map(item => ({
           ...item,
@@ -495,7 +505,10 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                         <button
                           key={value}
                           type="button"
-                          onClick={() => setPaymentStatus(value)}
+                          onClick={() => {
+                            setPaymentStatus(value)
+                            if (value === 'LUNAS' && !paymentDate) setPaymentDate(getLocalDateValue())
+                          }}
                           className={`flex-1 rounded-md px-3 py-2 text-xs font-bold transition-colors ${paymentStatus === value ? 'bg-primary text-background' : 'text-foreground/60 hover:bg-white/10 hover:text-foreground'}`}
                         >
                           {label}
@@ -506,17 +519,23 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                 </div>
 
                 {paymentStatus === 'LUNAS' && (
-                  <div className="space-y-1 animate-in fade-in">
-                    <label className="text-xs font-medium text-foreground/70">Kas/Bank</label>
-                    <CustomSelect
-                      value={paymentAccount}
-                      onChange={e => setPaymentAccount(e.target.value)}
-                      options={[
-                        { value: "", label: "- Pilih Akun (Kas/Bank) -" },
-                        ...(dropdownConfig.payment_method || ["BCA", "CASH", "MANDIRI"]).map(v => ({ value: v, label: v }))
-                      ]}
-                    />
-                  </div>
+                  <>
+                    <div className="space-y-1 animate-in fade-in">
+                      <label className="text-xs font-medium text-foreground/70">Tanggal Pelunasan</label>
+                      <CustomDatePicker value={paymentDate} onChange={setPaymentDate} />
+                    </div>
+                    <div className="space-y-1 animate-in fade-in">
+                      <label className="text-xs font-medium text-foreground/70">Kas/Bank</label>
+                      <CustomSelect
+                        value={paymentAccount}
+                        onChange={e => setPaymentAccount(e.target.value)}
+                        options={[
+                          { value: "", label: "- Pilih Akun (Kas/Bank) -" },
+                          ...(dropdownConfig.payment_method || ["BCA", "CASH", "MANDIRI"]).map(v => ({ value: v, label: v }))
+                        ]}
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </section>
