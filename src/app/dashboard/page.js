@@ -48,8 +48,7 @@ export default async function DashboardPage({ searchParams }) {
   const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   // Fetch orders for metrics
-  const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name), sales_items(qty, unit_price, order_type)').limit(100000)
-  const { data: marketplaceOrders } = await supabase.from('sales_orders').select('*, customers!inner(type)').limit(100000).in('customers.type', ['Marketplace', 'Shopee', 'Tokopedia', 'TikTok', 'MARKETPLACE', 'SHOPEE', 'TOKOPEDIA', 'TIKTOK'])
+  const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name, type), sales_items(qty, unit_price, order_type)').limit(100000)
   const auditReport = await runAuditScan(supabase)
 
   const rawOrders = salesOrders || []
@@ -64,7 +63,19 @@ export default async function DashboardPage({ searchParams }) {
   // SO Belum Lunas & Marketplace Tempo: Hutang berjalan (TIDAK DIFILTER BULAN), ABAIKAN BATAL
   const soBelumLunas = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL').length
 
-  const mpTempo = (marketplaceOrders || []).filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL').length
+  const mpTempo = rawOrders.filter(order => {
+    const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+    const marketplaceIdentity = `${String(customer?.name || '')} ${String(customer?.type || '')}`.toUpperCase()
+    const isMarketplace = marketplaceIdentity.includes('MARKETPLACE')
+      || ['SHOPEE', 'TOKOPEDIA', 'TIKTOK'].some(platform => marketplaceIdentity.includes(platform))
+    const paymentStatus = String(order.payment_status || '').toUpperCase()
+    const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').toUpperCase()
+
+    return isMarketplace
+      && paymentStatus !== 'LUNAS'
+      && paymentStatus !== 'BATAL'
+      && settlementStatus !== 'SETTLED_EXTERNAL'
+  }).length
   
   // Calculate Jumlah Produksi Type Sablon (hanya bulan terpilih, ABAIKAN BATAL)
   const totalSablonQty = thisMonthOrders.filter(o => o.payment_status !== 'BATAL').reduce((acc, order) => {
