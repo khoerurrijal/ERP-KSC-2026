@@ -421,7 +421,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                       </div>
 
                       <div className="relative space-y-1 sm:col-span-2">
-                        <label className="block text-[10px] font-medium text-foreground/70">Bahan Baku + Kategori</label>
+                        <label className="block text-[10px] font-medium text-foreground/70">Produk + Kategori</label>
                         <SuggestField
                           value={item.product_search}
                           onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
