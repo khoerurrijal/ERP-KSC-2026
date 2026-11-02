@@ -1,12 +1,59 @@
 <!-- BEGIN:nextjs-agent-rules -->
 # Owner-locked ERP decisions
 
+## Arti LOCKED — WAJIB
+- Rule berlabel LOCKED adalah keputusan Owner dan baseline production. Jangan ditanyakan ulang, didesain ulang, disederhanakan, atau diubah hanya karena implementasi lama berbeda.
+- Jika kode/database berbeda dari rule LOCKED, perlakukan sebagai BUG/REGRESSION IMPLEMENTASI. Audit read-only, buktikan penyimpangannya, lalu buat patch sekecil mungkin.
+- Jangan menyentuh flow sehat saat memperbaiki bug lain. Tidak boleh refactor lintas modul, cleanup massal, rename besar, atau perubahan formula sampingan tanpa scope Owner yang eksplisit.
+- Membuka kembali rule LOCKED hanya boleh jika Owner secara eksplisit mengatakan rule tersebut diubah/dibuka kembali.
+- Sebelum perubahan production: audit kondisi aktual -> pisahkan fakta/asumsi -> siapkan rollback -> validasi/test -> apply minimal -> regression test -> laporkan bukti.
+
+## LOCKED — akses publik & integrasi
 - Guest hanya boleh membuat `customer_order_requests` berstatus pending; guest tidak boleh membuat customer, Sales Order, item, stok, invoice, atau transaksi operasional.
 - `/order`, `/track`, dan `/invoice` adalah public tanpa login. `/pricelist` hanya redirect ke `/order`, bukan public entry point terpisah.
 - DOKU disabled total sampai Owner memberi approval tertulis untuk mengaktifkannya kembali. QRIS dan transfer manual tetap dipakai.
 - Satu event masuk WhatsApp boleh menghasilkan maksimal satu balasan outbound dan satu history model. Retry provider wajib atomic-dedup.
+
+## LOCKED — stok & tipe order
+- `JASA`, kategori `Jasa Layanan`, dan order type `DLL` adalah NON-STOCK. Tidak boleh membuat pengurangan/penambahan stok operasional.
+- Mapping live `DLL -> Jasa Layanan` adalah keputusan final. Jangan ubah DLL menjadi barang stok.
+- `PRINTING` adalah vendor fulfillment dan tidak menggunakan stok KING/GUDANG/GLOBAL. PRINTING wajib zero inventory mutation.
+- Semua perubahan stok wajib memiliki jejak di `stock_mutations` / STOK_MUTASI. Jangan mengubah saldo stok langsung.
+- POLOS tetap mengikuti flow stok POLOS yang sudah berjalan; jangan mengubah timing/jenis mutasinya tanpa approval Owner.
+- SABLON tetap mengikuti flow reserve/produksi yang sudah berjalan; production log SABLON tetap menjadi bagian flow stok fisik sesuai implementasi sehat saat ini.
+- Defect/cacat produksi tetap dicatat melalui mutasi; jangan menghapus jejak defect.
+- Migration `56_fix_service_stock_bypass.sql` dan perilaku production setelah commit `dae9eb9` adalah baseline P0 yang sudah diverifikasi. Jangan meregresikan bypass JASA/DLL/PRINTING.
+- Saldo historis yang terlanjur salah/negatif TIDAK boleh dibersihkan otomatis. Rekonsiliasi historis adalah pekerjaan terpisah dan harus memakai audit + STOK_MUTASI resmi.
+
+## LOCKED — Sales Order & produksi
+- Status operasional berada di level `sales_items` / detail item, bukan hanya header invoice.
+- Satu invoice BOLEH memiliki beberapa item dengan status pengerjaan berbeda.
+- Jangan memaksa semua item satu invoice mempunyai status produksi yang sama.
+- Status granular production/shipping yang sudah live tetap dipertahankan. Jangan disederhanakan kembali hanya untuk mengikuti dokumen lama.
+- Item service/DLL tidak boleh masuk alur produksi SABLON otomatis.
+
+## LOCKED — marketplace & keuangan
+- Settlement Shopee/Tokopedia tetap dicatat secara BATCH seperti flow production saat ini.
+- Fee marketplace tidak perlu dibuat sebagai transaksi biaya terpisah. Selisih omzet kotor dengan settlement bersih menjadi dasar rekonsiliasi.
+- `SETTLED_EXTERNAL` berarti order sudah dibayar di luar ERP dan tidak membuat cash transaction baru.
+- Jangan menyamakan omzet kotor dengan dana settlement bersih.
+- Semua pemasukan/pengeluaran riil tetap dicatat melalui `transactions`; jangan mengubah saldo kas langsung.
+- PO hanya menggunakan status pembayaran `TEMPO` dan `LUNAS`.
+- Untuk flow lama PO LUNAS yang benar-benar dihapus, transaksi terkait PO ikut rollback sesuai implementasi existing. Jangan diam-diam mengganti kebijakan ini menjadi VOID/reversal tanpa keputusan Owner baru.
+
+## LOCKED — migration & production safety
+- Repository KSC menyimpan migration operasional di `database/*.sql`. Migration 54/55/56 terbukti dijalankan dengan `supabase db query --file`.
+- Jangan memakai `supabase db push` sampai migration history standar Supabase sengaja diselaraskan dan disetujui.
+- Untuk migration berisiko: validasi terlebih dahulu dengan transaksi `BEGIN ... ROLLBACK` bila memungkinkan sebelum apply nyata.
 - Migration harus fokus dan idempotent. Tidak boleh menambah atau menjalankan perubahan RLS global tanpa approval Owner.
+- Setelah perubahan kritis wajib regression test minimal terhadap flow yang bersinggungan, lalu jalankan lint/build/diff-check yang relevan.
 - Setiap dirty change wajib dikategorikan sebelum commit/deploy; file eksperimen, temporary, dan migration yang belum disetujui tidak boleh masuk production.
+
+## BELUM LOCKED — JANGAN DIUBAH OTOMATIS
+- Formula HPP histori PO belum final. Ada konflik implementasi antara 3 PO terakhir vs seluruh histori. Jangan mengubah HPP/harga live tanpa shadow audit dan keputusan Owner.
+- Rekomendasi teknis sementara untuk evaluasi HPP adalah weighted average maksimal 3 PO terbaru berdasarkan actual quantity, tetapi ini BUKAN rule production sampai disetujui setelah shadow comparison.
+- Aturan payroll terbaru belum diverifikasi ulang. Jangan mengubah formula payroll/denda berdasarkan catatan historis saja.
+- Mekanisme khusus SO salah input/batal setelah sudah ada pembayaran belum menjadi flow production yang di-lock. Jangan membuat refund/reversal/transfer payment otomatis tanpa kasus nyata dan approval Owner.
 
 # Project Instructions for AI Agent
 
