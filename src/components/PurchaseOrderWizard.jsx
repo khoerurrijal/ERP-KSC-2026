@@ -92,7 +92,7 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
             <div className="px-3 py-3 text-center text-xs text-foreground/40">Tidak ada hasil</div>
           ) : filteredOptions.map(option => (
             <button
-              key={option.value || 'empty'}
+              key={option.key ?? `${option.value || 'empty'}-${option.label}`}
               type="button"
               role="option"
               aria-selected={String(value) === String(option.value)}
@@ -429,7 +429,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                           numericPrimaryMatch
                           options={[
                             { value: "", label: "Pilih Produk..." },
-                            ...products.filter(p => p.workshop_code === workshops.find(w => w.id === item.workshop_id)?.code && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
+                            ...products.filter(p => p.workshop_code === workshops.find(w => w.id === item.workshop_id)?.code && (p.is_active !== false || p.name === item.product_search)).map(p => ({ key: p.id, value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
                           ]}
                           disabled={!item.workshop_id}
                         />
