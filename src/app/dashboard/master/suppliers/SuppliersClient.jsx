@@ -1,14 +1,41 @@
 'use client'
 
-import { useState } from 'react'
+/* Server results intentionally replace the local list after search navigation. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useState, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, Plus, Truck, CheckCircle2, Edit2, Trash2, X, Loader2 } from 'lucide-react'
 import { saveSupplier, deleteSupplier } from './actions'
+import { matchesSearchText } from '@/utils/search'
 
-export default function SuppliersClient({ initialSuppliers = [], error }) {
+export default function SuppliersClient({ initialSuppliers = [], error, initialSearch = '' }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentSearchParams = useSearchParams()
   const [suppliers, setSuppliers] = useState(initialSuppliers)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [showModal, setShowModal] = useState(false)
   const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    setSuppliers(initialSuppliers)
+  }, [initialSuppliers])
+
+  const updateSearchParam = useCallback((value) => {
+    const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
+    if (value) params.set('search', value)
+    else params.delete('search')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [currentSearchParams, pathname, router])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((initialSearch || '') !== searchQuery.trim()) updateSearchParam(searchQuery.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [initialSearch, searchQuery, updateSearchParam])
 
   // Form State
   const [formData, setFormData] = useState({
@@ -70,8 +97,10 @@ export default function SuppliersClient({ initialSuppliers = [], error }) {
     }
   }
 
-  const filteredSuppliers = suppliers.filter(c => 
-    ((c.supplier_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+  const filteredSuppliers = suppliers.filter(supplier =>
+    matchesSearchText(supplier.supplier_name, searchQuery) ||
+    matchesSearchText(supplier.phone, searchQuery, { numericSubstring: true }) ||
+    matchesSearchText(supplier.address, searchQuery)
   )
 
   return (

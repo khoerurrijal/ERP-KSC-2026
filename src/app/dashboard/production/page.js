@@ -24,10 +24,11 @@ function ProductionSkeleton() {
   )
 }
 
-export default function ProductionPage() {
+export default async function ProductionPage({ searchParams }) {
+  const resolvedParams = await Promise.resolve(searchParams || {})
   return (
-    <Suspense fallback={<ProductionSkeleton />}>
-      <ProductionData />
+    <Suspense key={JSON.stringify(resolvedParams)} fallback={<ProductionSkeleton />}>
+      <ProductionData searchParams={resolvedParams} />
     </Suspense>
   )
 }

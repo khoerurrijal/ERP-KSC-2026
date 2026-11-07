@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { matchesSearchText, numericTokenPattern } from '@/utils/search'
 import SalesClient from './SalesClient'
 
 export default async function SalesData({ searchParams = {}, itemsOnly = false }) {
@@ -6,7 +7,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
 
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
-  const search = searchParams.search || ''
+  const search = String(searchParams.search || '').trim()
   const filterStatus = searchParams.status || 'BELUM_LUNAS'
   const filterCustomerType = searchParams.customerType || 'ALL'
   const now = new Date()
@@ -28,26 +29,37 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   let matchedProductCodes = []
   let matchedSoIds = []
 
-  let safeSearch = search ? search.replace(/,/g, ' ').trim() : ''
+  let safeSearch = search ? search.replace(/[(),"]/g, ' ').trim() : ''
 
   if (safeSearch) {
     const [custRes, prodRes, soRes] = await Promise.all([
-      supabase.from('customers').select('customer_code, id').ilike('name', `%${safeSearch}%`).limit(100),
-      supabase.from('products').select('product_code').ilike('name', `%${safeSearch}%`).limit(100),
-      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${safeSearch}%`).limit(100)
+      supabase.from('customers').select('customer_code, name').ilike('name', `%${safeSearch}%`).limit(50000),
+      supabase.from('products').select('product_code, name').ilike('name', `%${safeSearch}%`).limit(50000),
+      supabase.from('sales_orders').select('id, invoice_number').ilike('invoice_number', `%${safeSearch}%`).limit(50000)
     ])
 
-    matchedCustCodes = (custRes.data || []).map(c => c.customer_code || c.id).filter(Boolean)
-    matchedProductCodes = (prodRes.data || []).map(p => p.product_code).filter(Boolean)
+    matchedCustCodes = (custRes.data || [])
+      .filter(customer => matchesSearchText(customer.name, safeSearch))
+      .map(customer => customer.customer_code)
+      .filter(Boolean)
+    matchedProductCodes = (prodRes.data || [])
+      .filter(product => matchesSearchText(product.name, safeSearch))
+      .map(product => product.product_code)
+      .filter(Boolean)
     
     // Also fetch SO IDs that belong to the matched customers to ensure sales_items can be searched by customer name
     let additionalSoIds = []
     if (matchedCustCodes.length > 0) {
-      const { data: custSoRes } = await supabase.from('sales_orders').select('id').in('customer_code', matchedCustCodes).limit(200)
+      const { data: custSoRes } = await supabase.from('sales_orders').select('id').in('customer_code', matchedCustCodes)
       additionalSoIds = (custSoRes || []).map(s => s.id)
     }
     
-    matchedSoIds = [...(soRes.data || []).map(s => s.id), ...additionalSoIds].filter(Boolean)
+    matchedSoIds = [
+      ...(soRes.data || [])
+        .filter(order => matchesSearchText(order.invoice_number, safeSearch))
+        .map(order => order.id),
+      ...additionalSoIds
+    ].filter(Boolean)
   }
 
   // 2. Summary KPI Query untuk bulan terpilih
@@ -75,18 +87,30 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       customers (name, type),
       sales_items (id, order_type, product_code, qty, unit, unit_multiplier, unit_price, mockup_url, notes, status)
     `, { count: 'exact' })
-    .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
 
+  // Marketplace orders are excluded from the default operational list, but
+  // a lookup must be able to find every matching Sales Order.
+  if (!safeSearch) {
+    query = query.or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
+  }
+
+  const isNumericSearch = Boolean(numericTokenPattern(safeSearch))
   const searchFilters = safeSearch
-    ? [
-        `invoice_number.ilike.%${safeSearch}%`,
-        `payment_status.ilike.%${safeSearch}%`,
-        ...(matchedCustCodes.length > 0 ? [`customer_code.in.(${matchedCustCodes.join(',')})`] : [])
-      ]
+    ? isNumericSearch
+      ? (matchedSoIds.length ? [`id.in.(${matchedSoIds.join(',')})`] : [])
+      : [
+          `invoice_number.ilike.%${safeSearch}%`,
+          `payment_status.ilike.%${safeSearch}%`,
+          ...(matchedCustCodes.length > 0 ? [`customer_code.in.(${matchedCustCodes.join(',')})`] : [])
+        ]
     : []
 
+  if (isNumericSearch && !matchedSoIds.length) {
+    query = query.eq('invoice_number', '__NO_NUMERIC_SEARCH_MATCH__')
+  }
+
   // Keep unpaid orders from earlier months visible in the selected month view.
-  const monthConditionGroups = filterMonth
+  const monthConditionGroups = filterMonth && !safeSearch
     ? [
         [`date.gte.${startDate}`, `date.lte.${endDate}`],
         ...(filterStatus === 'LUNAS' ? [] : [[`date.lt.${startDate}`, 'payment_status.in.(BELUM LUNAS,DP)']])
@@ -105,9 +129,9 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     query = query.or(orderFilters.join(','))
   }
 
-  if (filterStatus === 'BELUM_LUNAS') {
+  if (!safeSearch && filterStatus === 'BELUM_LUNAS') {
     query = query.in('payment_status', ['BELUM LUNAS', 'DP'])
-  } else if (filterStatus === 'LUNAS') {
+  } else if (!safeSearch && filterStatus === 'LUNAS') {
     query = query.eq('payment_status', 'LUNAS')
   }
 
@@ -126,18 +150,19 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       products(name)
     `)
 
-  if (filterMonth) {
+  if (filterMonth && !safeSearch) {
     itemsQuery = itemsQuery.gte('sales_orders.date', startDate).lte('sales_orders.date', endDate)
   }
 
   if (safeSearch) {
-    const itemOrConditions = [`product_code.ilike.%${safeSearch}%`]
+    const itemOrConditions = isNumericSearch ? [] : [`product_code.ilike.%${safeSearch}%`]
     if (matchedProductCodes.length > 0) itemOrConditions.push(`product_code.in.(${matchedProductCodes.join(',')})`)
     if (matchedSoIds.length > 0) itemOrConditions.push(`so_id.in.(${matchedSoIds.join(',')})`)
-    itemsQuery = itemsQuery.or(itemOrConditions.join(','))
+    if (itemOrConditions.length) itemsQuery = itemsQuery.or(itemOrConditions.join(','))
+    else itemsQuery = itemsQuery.eq('product_code', '__NO_NUMERIC_SEARCH_MATCH__')
   }
 
-  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(1000)
+  itemsQuery = itemsQuery.order('id', { ascending: false }).limit(safeSearch ? 50000 : 1000)
 
   const [salesOrdersResult, salesItemsResult, settingsResult, summaryResult, piutangResult, customersResult, productsResult, workshopsResult] = await Promise.all([
     query,

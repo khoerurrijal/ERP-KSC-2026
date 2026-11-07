@@ -9,6 +9,7 @@ import { PackageSearch, Plus, Filter, ChevronUp, ChevronDown, Kanban, Package, S
 import Link from 'next/link'
 import { updateStock } from '../master/products/actions'
 import CustomSelect from '@/components/CustomSelect'
+import { matchesSearchText } from '@/utils/search'
 
 export default function InventoryClient({ 
   products: initialProducts = [], 
@@ -121,12 +122,13 @@ export default function InventoryClient({
       const isActive = products.some(p => p.product_code === pipe.product_code)
       if (!isActive) return false
 
-      const matchSearch = ((pipe.product_name || '').toLowerCase().includes(debouncedSearch.toLowerCase())) || 
-                          ((pipe.category || '').toLowerCase().includes(debouncedSearch.toLowerCase()))
+      const normalizedSearch = debouncedSearch.replace(/[(),"]/g, ' ').trim().toLowerCase()
+      const matchSearch = matchesSearchText(pipe.product_name, normalizedSearch) ||
+                          matchesSearchText(pipe.category, normalizedSearch)
       
       const matchCat = filterCategory ? pipe.category === filterCategory : true
       
-      return matchSearch && matchCat
+      return matchSearch && (normalizedSearch ? true : matchCat)
     })
 
     result.sort((a, b) => {
@@ -148,7 +150,7 @@ export default function InventoryClient({
     })
 
     return result
-  }, [pipelineData, debouncedSearch, filterCategory, sortConfig])
+  }, [pipelineData, products, debouncedSearch, filterCategory, sortConfig])
 
   useEffect(() => {
     setPipelinePage(1)
@@ -362,31 +364,31 @@ export default function InventoryClient({
                       <p className="text-xs text-foreground/50">{pipe.category}</p>
                     </td>
                     <td className="p-3 text-center">
-                      <span className="font-bold text-base">{Number(pipe.fisik).toLocaleString('id-ID')}</span>
+                      <span className="font-bold text-base">{Number(pipe.fisik).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_booking > 0 ? 'bg-blue-500/20 text-blue-400' : 'text-foreground/20'}`}>
-                        {Number(pipe.qty_booking).toLocaleString('id-ID')}
+                        {Number(pipe.qty_booking).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_proses > 0 ? 'bg-yellow-500/20 text-yellow-400' : 'text-foreground/20'}`}>
-                        {Number(pipe.qty_proses).toLocaleString('id-ID')}
+                        {Number(pipe.qty_proses).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_siap > 0 ? 'bg-orange-500/20 text-orange-400' : 'text-foreground/20'}`}>
-                        {Number(pipe.qty_siap).toLocaleString('id-ID')}
+                        {Number(pipe.qty_siap).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.qty_selesai > 0 ? 'bg-purple-500/20 text-purple-400' : 'text-foreground/20'}`}>
-                        {Number(pipe.qty_selesai).toLocaleString('id-ID')}
+                        {Number(pipe.qty_selesai).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     </td>
                     <td className="p-3 text-center">
                       <span className={`px-3 py-1 rounded-full font-bold ${pipe.tersedia > 0 ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
-                        {Number(pipe.tersedia).toLocaleString('id-ID')}
+                        {Number(pipe.tersedia).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     </td>
                   </tr>

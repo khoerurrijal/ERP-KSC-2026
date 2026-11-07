@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import InventoryClient from './InventoryClient'
+import { numericTokenPattern } from '@/utils/search'
 
 // Komponen server ini di-render di dalam Suspense boundary di page.js
 // sehingga UI halaman bisa langsung tampil, dan data dimuat secara streaming
@@ -8,7 +9,7 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
 
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
-  const search = searchParams.search || ''
+  const search = String(searchParams.search || '').replace(/[(),"]/g, ' ').trim()
   const category = searchParams.category || ''
   const workshop = searchParams.workshop || ''
   const sortKey = searchParams.sortKey || 'name'
@@ -20,17 +21,23 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
       *,
       workshops (name)
     `, { count: 'exact' })
-    .eq('is_active', true)
 
-  if (search) {
-    query = query.or(`name.ilike.%${search}%,product_code.ilike.%${search}%,category.ilike.%${search}%`)
+  if (!search) {
+    query = query.eq('is_active', true)
   }
 
-  if (category) {
+  if (search) {
+    const numericPattern = numericTokenPattern(search)
+    query = query.or(numericPattern
+      ? `name.imatch."${numericPattern}",category.imatch."${numericPattern}"`
+      : `name.ilike.%${search}%,category.ilike.%${search}%`)
+  }
+
+  if (!search && category) {
     query = query.eq('category', category)
   }
 
-  if (workshop) {
+  if (!search && workshop) {
     query = query.eq('workshop_code', workshop)
   }
 
@@ -41,6 +48,17 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
   const end = start + pageSize - 1
   query = query.range(start, end)
 
+  let pipelineQuery = supabase
+    .from('product_pipeline_view')
+    .select('*')
+  if (search && activeTab === 'pipeline') {
+    const numericPattern = numericTokenPattern(search)
+    pipelineQuery = pipelineQuery.or(numericPattern
+      ? `product_name.imatch."${numericPattern}",category.imatch."${numericPattern}"`
+      : `product_name.ilike.%${search}%,category.ilike.%${search}%`)
+  }
+  pipelineQuery = pipelineQuery.limit(search && activeTab === 'pipeline' ? 1000 : 200)
+
   const [
     productsRes,
     { data: pipelineData },
@@ -48,10 +66,7 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     { data: allCategories }
   ] = await Promise.all([
     query,
-    supabase
-      .from('product_pipeline_view')
-      .select('*')
-      .limit(200),
+    pipelineQuery,
     supabase
       .from('workshops')
       .select('id, name, code')

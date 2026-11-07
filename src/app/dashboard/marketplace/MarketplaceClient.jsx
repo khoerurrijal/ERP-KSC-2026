@@ -174,7 +174,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
 
   const handleQuickSettlement = async () => {
     if (!quickPreview?.count) return
-    if (!window.confirm(`Tandai ${quickPreview.count} pesanan sebagai sudah cair dengan total Rp ${quickPreview.total.toLocaleString('id-ID')}?`)) return
+    if (!window.confirm(`Tandai ${quickPreview.count} pesanan sebagai sudah cair dengan total Rp ${quickPreview.total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}?`)) return
 
     setIsQuickLoading(true)
     try {
@@ -220,7 +220,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
 
     const skippedCount = (bulkPreview?.summary?.inputCount || 0) - matchedCount
     const skipMessage = skippedCount > 0 ? ` ${skippedCount} baris tidak cocok akan dilewati.` : ''
-    if (!window.confirm(`Proses ${matchedCount} pesanan dengan total Rp ${(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID')}?${skipMessage}`)) return
+    if (!window.confirm(`Proses ${matchedCount} pesanan dengan total Rp ${(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}?${skipMessage}`)) return
 
     setIsBulkLoading(true)
     try {
@@ -269,15 +269,15 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
         <div className="glass-card p-4 border-l-4 border-orange-500">
           <p className="text-xs font-bold text-orange-400 uppercase tracking-wider">Shopee</p>
-          <p className="text-2xl font-black text-foreground mt-2">{shopeeCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
+          <p className="metric-value mt-2 text-foreground">{shopeeCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-green-500">
           <p className="text-xs font-bold text-green-400 uppercase tracking-wider">Tokopedia</p>
-          <p className="text-2xl font-black text-foreground mt-2">{topedCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
+          <p className="metric-value mt-2 text-foreground">{topedCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-black/50 dark:border-white/50 bg-white/5">
           <p className="text-xs font-bold text-foreground uppercase tracking-wider">TikTok Shop</p>
-          <p className="text-2xl font-black text-foreground mt-2">{tiktokCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
+          <p className="metric-value mt-2 text-foreground">{tiktokCount} <span className="text-sm font-normal text-foreground/50">Pesanan Aktif</span></p>
         </div>
       </div>
 
@@ -351,11 +351,11 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                     </div>
                   </td>
                   <td className="px-4 py-3 text-orange-400 font-bold">{item.customers?.name || item.customers?.type}</td>
-                  <td className="px-4 py-3 text-right font-bold text-foreground">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
+                  <td className="px-4 py-3 text-right font-bold text-foreground">Rp {Number(item.total_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   <td className="px-4 py-3 text-right">
                     {item.payment_status === 'LUNAS' ? (
                       <span className="font-bold text-green-400">
-                        Rp {Number(item.marketplace_pencairan || 0).toLocaleString('id-ID')}
+                        Rp {Number(item.marketplace_pencairan || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
                     ) : (
                       <CurrencyInput
@@ -389,15 +389,15 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
               </div>
               <div>
                 <p className="text-xs font-bold text-foreground/60 uppercase tracking-wider">Summary Pencairan</p>
-                <p className="text-xl font-bold text-foreground">
+                <p className="metric-value-compact text-foreground">
                   {settlementData.length} <span className="text-sm font-normal text-foreground/60">Pesanan Terpilih</span>
                 </p>
               </div>
             </div>
             <div className="text-right">
               <p className="text-xs font-bold text-foreground/60 uppercase tracking-wider mb-1">Total Bersih Cair</p>
-              <p className="text-2xl font-black text-green-400">
-                Rp {totalBersihCair.toLocaleString('id-ID')}
+              <p className="metric-value text-green-400">
+                Rp {totalBersihCair.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
               </p>
             </div>
             <button 
@@ -428,7 +428,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
             <div className="p-4 sm:p-6 space-y-4 min-h-0 overflow-y-auto">
               <div className="bg-green-500/10 border border-green-500/20 p-4 rounded-xl text-center mb-4">
                 <p className="text-sm text-foreground/80 mb-1">Total Uang Masuk Kas</p>
-                <p className="text-3xl font-black text-green-400">Rp {totalBersihCair.toLocaleString('id-ID')}</p>
+                <p className="metric-value-prominent text-green-400">Rp {totalBersihCair.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                 <p className="text-xs text-foreground/50 mt-2">Dari {settlementData.length} pesanan marketplace</p>
               </div>
 
@@ -513,19 +513,19 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                     <div className="bg-green-500/10 border border-green-500/20 rounded-xl p-3">
                       <p className="text-[10px] text-green-300 uppercase font-bold">Cocok</p>
-                      <p className="text-xl font-black text-green-400">{bulkPreview.summary.matchedCount}</p>
+                <p className="metric-value-compact text-green-400">{bulkPreview.summary.matchedCount}</p>
                     </div>
                     <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3">
                       <p className="text-[10px] text-red-300 uppercase font-bold">Tidak ditemukan</p>
-                      <p className="text-xl font-black text-red-400">{bulkPreview.summary.notFoundCount}</p>
+                <p className="metric-value-compact text-red-400">{bulkPreview.summary.notFoundCount}</p>
                     </div>
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-xl p-3">
                       <p className="text-[10px] text-amber-300 uppercase font-bold">Duplikat/sudah cair</p>
-                      <p className="text-xl font-black text-amber-300">{bulkPreview.summary.duplicateCount + bulkPreview.summary.settledCount}</p>
+                <p className="metric-value-compact text-amber-300">{bulkPreview.summary.duplicateCount + bulkPreview.summary.settledCount}</p>
                     </div>
                     <div className="bg-primary/10 border border-primary/20 rounded-xl p-3">
                       <p className="text-[10px] text-primary uppercase font-bold">Total cocok</p>
-                      <p className="text-lg font-black text-primary">Rp {(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID')}</p>
+                <p className="metric-value-compact text-primary">Rp {(bulkPreview.summary.matchedTotal || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                     </div>
                   </div>
 
@@ -544,7 +544,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                         {bulkPreview.rows.map((row, index) => (
                           <tr key={`${row.receipt}-${row.line}-${index}`}>
                             <td className="px-3 py-2 font-mono">{row.receipt || '-'}</td>
-                            <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID')}</td>
+                            <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                             <td className="px-3 py-2">{row.invoiceNumber || '-'}</td>
                             <td className="px-3 py-2">{row.customerName || '-'}</td>
                             <td className={`px-3 py-2 font-bold ${row.status === 'COCOK' ? 'text-green-400' : row.status === 'SUDAH CAIR' ? 'text-amber-300' : 'text-red-400'}`}>{row.status}</td>
@@ -637,7 +637,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                   <p className="text-sm font-bold text-amber-300">Preview pencairan</p>
                   <p className="text-sm text-foreground/80">{quickPreview.candidateCount} pesanan aktif cocok dengan tanggal/platform.</p>
                   <p className="text-sm text-foreground/80">{quickPreview.count} pesanan bisa dicairkan otomatis.</p>
-                  <p className="text-xl font-black text-amber-300">Rp {quickPreview.total.toLocaleString('id-ID')}</p>
+                <p className="metric-value-compact text-amber-300">Rp {quickPreview.total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                   {quickPreview.candidateCount === 0 && (
                     <p className="text-xs text-red-300">Tidak ada pesanan untuk filter ini. Pilih tanggal order yang lebih akhir atau platform yang sesuai.</p>
                   )}

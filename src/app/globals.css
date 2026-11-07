@@ -1,20 +1,40 @@
 @import "tailwindcss";
 
 :root {
-  /* Luxury Clean Glassium Theme */
+  /* Semantic design tokens shared by every page and component. */
   --background: #09090B;
   --foreground: #FAFAFA;
-  
+
   --primary: #D4AF37;
   --primary-foreground: #09090B;
-  
+
   --accent: #C084FC;
   --accent-foreground: #FAFAFA;
 
+  --surface: #151517;
+  --surface-raised: #1D1D20;
+  --surface-muted: rgba(255, 255, 255, 0.05);
+  --surface-hover: rgba(255, 255, 255, 0.10);
+  --muted: #A1A1AA;
+  --border: rgba(255, 255, 255, 0.10);
+  --success: #22C55E;
+  --warning: #EAB308;
+  --danger: #EF4444;
+  --info: #3B82F6;
+  --type-page-title: 1.375rem;
+  --type-section-title: 1rem;
+  --type-subsection-title: 0.9375rem;
+  --type-body: 0.875rem;
+  --type-meta: 0.75rem;
+  --type-metric-compact: 1rem;
+  --type-metric-prominent: 1.625rem;
+
   --card: rgba(255, 255, 255, 0.03);
   --card-border: rgba(255, 255, 255, 0.08);
-  
-  --radius: 1rem; /* Rounded XL */
+
+  --radius: 0.75rem;
+  --radius-control: 0.5rem;
+  --radius-dialog: 1rem;
 
   --scroll-track: #0A0A0A;
   --scroll-thumb: #333;
@@ -22,25 +42,38 @@
 }
 
 .light {
-  /* Premium Coffee Theme - Refined */
-  --background: #FCF9F2; /* Sangat terang, hint cream */
-  --foreground: #3E2723; /* Espresso Dark Brown */
-  
-  --primary: #1B4332; /* Deep Forest Green */
+  /* Neutral light palette keeps text and surfaces consistent across modules. */
+  --background: #F4F6F8;
+  --foreground: #17212B;
+
+  --primary: #8A6500;
   --primary-foreground: #FFFFFF;
-  
-  --accent: #8D6E63; /* Mocha Brown */
+
+  --accent: #68439B;
   --accent-foreground: #FFFFFF;
 
-  --card: rgba(255, 255, 255, 0.75); /* Frosted white glass, more opaque */
-  --card-border: rgba(139, 69, 19, 0.15); /* Subtle brown border */
-  
-  --scroll-track: #F2E8DC;
-  --scroll-thumb: #CBB5A1;
-  --scroll-thumb-hover: #9E7D63;
+  --surface: #FFFFFF;
+  --surface-raised: #FFFFFF;
+  --surface-muted: #EEF1F4;
+  --surface-hover: #E8EDF2;
+  --muted: #5D6876;
+  --border: #D8DEE7;
+  --success: #157347;
+  --warning: #8A6500;
+  --danger: #B42318;
+  --info: #175CD3;
+
+  --card: #FFFFFF;
+  --card-border: #D8DEE7;
+
+  --scroll-track: #EEF1F4;
+  --scroll-thumb: #B8C1CC;
+  --scroll-thumb-hover: #8793A1;
 }
 
 @theme inline {
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-inter);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-primary: var(--primary);
@@ -50,6 +83,16 @@
   
   --color-card: var(--card);
   --color-card-border: var(--card-border);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-info: var(--info);
   
   --radius-xl: var(--radius);
 }
@@ -57,10 +100,582 @@
 body {
   background-color: var(--background);
   color: var(--foreground);
-  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: var(--type-body);
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
   min-height: 100vh;
   position: relative;
   overflow-x: hidden;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  html.light {
+    color-scheme: light;
+  }
+
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+  select,
+  textarea {
+    border-radius: var(--radius-control);
+    font-family: inherit;
+    font-size: var(--type-body);
+    line-height: 1.25rem;
+  }
+
+  label {
+    line-height: 1rem;
+  }
+}
+
+html body h1 {
+  font-size: var(--type-page-title);
+  line-height: 1.75rem;
+  font-weight: 650;
+}
+
+html body h2 {
+  font-size: var(--type-section-title);
+  line-height: 1.375rem;
+  font-weight: 650;
+}
+
+html body h3 {
+  font-size: var(--type-subsection-title);
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+html body h4 {
+  font-size: var(--type-body);
+  line-height: 1.25rem;
+  font-weight: 600;
+}
+
+html body h2.page-display-title {
+  font-size: var(--type-page-title);
+  line-height: 1.75rem;
+}
+
+html body .metric-value {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: clamp(0.9375rem, calc(0.6vw + 0.9rem), 1.25rem);
+  line-height: 1.25;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.025em;
+}
+
+html body .metric-value-compact {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: var(--type-metric-compact);
+  line-height: 1.35;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+html body .metric-value-prominent {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: clamp(1.25rem, calc(0.6vw + 1.2rem), var(--type-metric-prominent));
+  line-height: 1.2;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.035em;
+}
+
+html body :is(.metric-value, .metric-value-compact, .metric-value-prominent) > :is([class~="text-xs"], [class~="text-sm"]) {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-variant-numeric: normal;
+  letter-spacing: normal;
+}
+
+html body td:is([class~="text-right"], [class~="text-end"]) {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* One restrained type scale across every page, including responsive utilities. */
+html body :is([class~="text-base"], [class*=":text-base"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+html body :is([class~="text-lg"], [class*=":text-lg"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+html body :is([class~="text-xl"], [class*=":text-xl"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 1.125rem;
+  line-height: 1.5rem;
+}
+
+html body :is([class~="text-2xl"], [class*=":text-2xl"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 1.25rem;
+  line-height: 1.75rem;
+}
+
+html body :is([class~="text-3xl"], [class*=":text-3xl"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 1.5rem;
+  line-height: 2rem;
+}
+
+html body :is([class~="text-4xl"], [class*=":text-4xl"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 1.75rem;
+  line-height: 2.25rem;
+}
+
+html body :is([class~="text-5xl"], [class*=":text-5xl"]):not(h1):not(h2):not(h3):not(h4) {
+  font-size: 2rem;
+  line-height: 2.5rem;
+}
+
+html body [class~="text-[7px]"],
+html body [class~="text-[8px]"],
+html body [class~="text-[9px]"],
+html body [class~="text-[10px]"],
+html body [class~="text-[11px]"] {
+  font-size: var(--type-meta) !important;
+  line-height: 1rem !important;
+}
+
+html body label {
+  font-size: var(--type-meta);
+}
+
+/* Legacy class bridge keeps older screens aligned with the shared tokens. */
+html body [class~="bg-white/5"],
+html body [class~="bg-white/[0.04]"] {
+  background-color: var(--surface-muted) !important;
+}
+
+html body [class~="bg-white/10"],
+html body [class~="bg-white/20"],
+html body [class~="hover:bg-white/10"]:hover,
+html body [class~="hover:bg-white/20"]:hover {
+  background-color: var(--surface-hover) !important;
+}
+
+html body [class~="hover:bg-white/5"]:hover {
+  background-color: var(--surface-muted) !important;
+}
+
+html body [class~="border-white/5"] {
+  border-color: color-mix(in srgb, var(--border) 60%, transparent) !important;
+}
+
+html body [class~="border-white/10"],
+html body [class~="border-white/15"],
+html body [class~="border-white/20"] {
+  border-color: var(--border) !important;
+}
+
+html body [class~="border-white/50"] {
+  border-color: var(--border) !important;
+}
+
+html body [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+/* LiquidGlass samples the real dashboard beneath the dark top bar. */
+html.dark body .liquid-glass-scene {
+  isolation: isolate;
+  background: transparent;
+}
+
+html.dark body .liquid-glass-underlay {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background-color: var(--background);
+}
+
+html.dark body .liquid-glass-underlay::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  background-image: url('/logo_bg.png');
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 60% auto;
+  opacity: 0.15;
+  mix-blend-mode: screen;
+  pointer-events: none;
+}
+
+html.dark body .liquid-glass-topbar {
+  background-color: transparent !important;
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+  border-color: transparent !important;
+  border-radius: 65px;
+  box-shadow: none !important;
+  z-index: 40;
+}
+
+html.dark body .liquid-glass-topbar > * {
+  position: relative;
+  z-index: 1;
+}
+
+html.dark body .liquid-glass-topbar.liquid-glass-active > canvas {
+  opacity: 1 !important;
+}
+
+html.light body .liquid-glass-topbar {
+  position: sticky;
+  top: 0;
+  margin: 0 !important;
+  width: 100%;
+  height: 3.5rem;
+  border-radius: 0;
+  background-color: var(--surface);
+  border-bottom: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(23, 33, 43, 0.06);
+}
+
+@media (min-width: 640px) {
+  html.light body .liquid-glass-topbar {
+    height: 4rem;
+  }
+}
+
+html.light body .liquid-glass-topbar {
+  background-image: none !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.light body .liquid-glass-underlay {
+  display: none !important;
+}
+
+html body .glass-card:not([class~="bg-white"])[class~="p-6"],
+html body .glass-card:not([class~="bg-white"])[class~="p-8"] {
+  padding: 1rem !important;
+}
+
+html body .glass-card:not([class~="bg-white"]):is([class*="p-5"], [class*="p-6"], [class*="p-8"]) {
+  padding: 1rem !important;
+}
+
+html body .glass-card:not([class~="bg-white"])[class~="p-12"] {
+  padding: 1.5rem !important;
+}
+
+html body .dashboard-content > :is(div, section)[class~="space-y-8"] > * + * {
+  margin-block-start: 1rem !important;
+}
+
+html body .fixed.inset-0 > [class*="bg-background"] {
+  background-color: var(--surface) !important;
+}
+
+html body .fixed.inset-0.wizard-drawer-layer {
+  top: 3.5rem !important;
+}
+
+@media (min-width: 640px) {
+  html body .fixed.inset-0.wizard-drawer-layer {
+    top: 4rem !important;
+  }
+}
+
+html body .fixed.inset-0 > [class*="max-w-"]:not([class~="bg-white"]) {
+  border-color: var(--border) !important;
+  border-radius: var(--radius-dialog) !important;
+}
+
+html body .fixed.inset-0 :is([role="dialog"], [class*="max-w-"]):not([class~="bg-white"]) {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  border-radius: var(--radius-dialog) !important;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Legacy bordered cards are brought onto the same solid 12px panel pattern. */
+html body [class*="rounded-3xl"][class*="border"]:not([class*="max-w-"]):not([class~="bg-white"]) {
+  border-radius: var(--radius) !important;
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html body [class*="rounded-2xl"][class*="border"]:not([class*="max-w-"]):not([class~="bg-white"]) {
+  border-radius: var(--radius) !important;
+}
+
+html body [class*="rounded-3xl"][class*="border"]:not([class*="max-w-"]):not([class~="bg-white"]):is([class*="p-5"], [class*="p-6"], [class*="p-8"]) {
+  padding: 1rem !important;
+}
+
+html body [class~="blur-3xl"] {
+  display: none !important;
+}
+
+html body [class*="rounded-3xl"][class*="hover:scale-"]:hover {
+  transform: none !important;
+}
+
+html body .fixed.inset-0[class~="bg-black/50"],
+html body .fixed.inset-0[class~="bg-black/60"],
+html body .fixed.inset-0[class~="bg-black/70"],
+html body .fixed.inset-0[class~="bg-black/80"] {
+  background-color: rgba(9, 9, 11, 0.58) !important;
+}
+
+html body button:focus-visible,
+html body a:focus-visible,
+html body input:focus-visible,
+html body select:focus-visible,
+html body textarea:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Light mode avoids full-screen animation, image compositing, and blur work. */
+html.light body::before,
+html.light body::after {
+  display: none;
+  animation: none;
+}
+
+html.light .dashboard-lightweight-decor {
+  display: none !important;
+}
+
+html.light .glass-card,
+html.light .glass-panel,
+html.light [class*="backdrop-blur"] {
+  -webkit-backdrop-filter: none !important;
+  backdrop-filter: none !important;
+}
+
+html.light [class*="bg-black/"]:not(.fixed.inset-0),
+html.light [class*="bg-[#18181B]"],
+html.light [class*="bg-[#1a1f2e]"],
+html.light [class*="bg-[#1b1f27]"] {
+  background-color: var(--surface-muted) !important;
+}
+
+html.light [class~="bg-gray-50"],
+html.light [class~="bg-gray-100"],
+html.light [class~="bg-gray-200"],
+html.light [class~="bg-gray-700"],
+html.light [class~="bg-gray-800"],
+html.light [class~="bg-gray-900"] {
+  background-color: var(--surface-muted) !important;
+}
+
+html.light [class~="border-gray-100"],
+html.light [class~="border-gray-200"],
+html.light [class~="border-gray-300"] {
+  border-color: var(--border) !important;
+}
+
+html.light :is([class~="text-white"], [class~="text-white/90"], [class~="text-white/80"], [class~="text-white/70"]):not([class*="bg-red-"]):not([class*="bg-green-"]):not([class*="bg-emerald-"]):not([class*="bg-blue-"]):not([class*="bg-primary"]) {
+  color: var(--foreground) !important;
+}
+
+html.light [class~="text-white/50"],
+html.light [class~="text-white/40"],
+html.light [class~="text-white/20"] {
+  color: var(--muted) !important;
+}
+
+html.light [class~="text-gray-400"],
+html.light [class~="text-gray-500"],
+html.light [class~="text-gray-600"] {
+  color: var(--muted) !important;
+}
+
+html.light [class~="text-gray-200"] {
+  color: var(--foreground) !important;
+}
+
+html.light [class~="text-green-300"],
+html.light [class~="text-green-400"],
+html.light [class~="text-green-500"],
+html.light [class~="text-green-600"],
+html.light [class~="text-green-700"],
+html.light [class~="text-emerald-300"],
+html.light [class~="text-emerald-400"],
+html.light [class~="text-emerald-500"] {
+  color: var(--success) !important;
+}
+
+html.light [class~="text-red-300"],
+html.light [class~="text-red-400"],
+html.light [class~="text-red-500"],
+html.light [class~="text-red-600"],
+html.light [class~="text-rose-400"],
+html.light [class~="text-rose-500"] {
+  color: var(--danger) !important;
+}
+
+html.light [class~="text-yellow-300"],
+html.light [class~="text-yellow-700"],
+html.light [class~="text-yellow-400"],
+html.light [class~="text-yellow-500"],
+html.light [class~="text-amber-200"],
+html.light [class~="text-amber-300"],
+html.light [class~="text-amber-400"],
+html.light [class~="text-orange-300"],
+html.light [class~="text-orange-400"] {
+  color: var(--warning) !important;
+}
+
+html.light [class~="text-blue-300"],
+html.light [class~="text-blue-200"],
+html.light [class~="text-blue-400"],
+html.light [class~="text-blue-500"],
+html.light [class~="text-blue-600"],
+html.light [class~="text-indigo-300"],
+html.light [class~="text-indigo-500"],
+html.light [class~="text-sky-400"],
+html.light [class~="text-cyan-400"] {
+  color: var(--info) !important;
+}
+
+html.light [class~="text-purple-300"],
+html.light [class~="text-purple-400"],
+html.light [class~="text-purple-500"],
+html.light [class~="text-violet-300"],
+html.light [class~="text-violet-400"],
+html.light [class~="text-pink-400"],
+html.light [class~="text-fuchsia-400"] {
+  color: var(--accent) !important;
+}
+
+html.light [class~="bg-red-400/10"],
+html.light [class~="bg-red-500/5"],
+html.light [class~="bg-red-500/10"],
+html.light [class~="bg-red-500/20"],
+html.light [class~="bg-red-500/30"] {
+  background-color: color-mix(in srgb, var(--danger) 10%, transparent) !important;
+}
+
+html.light [class~="bg-green-400/20"],
+html.light [class~="bg-green-500/5"],
+html.light [class~="bg-green-500/10"],
+html.light [class~="bg-green-500/20"],
+html.light [class~="bg-emerald-500/15"],
+html.light [class~="bg-emerald-500/25"] {
+  background-color: color-mix(in srgb, var(--success) 10%, transparent) !important;
+}
+
+html.light [class~="bg-yellow-400/10"],
+html.light [class~="bg-yellow-500/5"],
+html.light [class~="bg-yellow-500/10"],
+html.light [class~="bg-yellow-500/20"],
+html.light [class~="bg-amber-500/10"],
+html.light [class~="bg-orange-500/5"],
+html.light [class~="bg-orange-500/10"],
+html.light [class~="bg-orange-500/20"] {
+  background-color: color-mix(in srgb, var(--warning) 10%, transparent) !important;
+}
+
+html.light [class~="bg-blue-400/10"],
+html.light [class~="bg-blue-500/5"],
+html.light [class~="bg-blue-500/10"],
+html.light [class~="bg-blue-500/20"],
+html.light [class~="bg-indigo-500/10"],
+html.light [class~="bg-indigo-500/15"],
+html.light [class~="bg-indigo-500/25"] {
+  background-color: color-mix(in srgb, var(--info) 10%, transparent) !important;
+}
+
+html.light [class~="bg-purple-500/5"],
+html.light [class~="bg-purple-500/10"],
+html.light [class~="bg-purple-500/15"],
+html.light [class~="bg-purple-500/20"],
+html.light [class~="bg-pink-500/5"],
+html.light [class~="bg-pink-500/20"] {
+  background-color: color-mix(in srgb, var(--accent) 10%, transparent) !important;
+}
+
+html.light [class~="border-red-400/20"],
+html.light [class~="border-red-500/20"],
+html.light [class~="border-red-500/25"],
+html.light [class~="border-red-500/30"],
+html.light [class~="border-red-500/50"] {
+  border-color: color-mix(in srgb, var(--danger) 30%, transparent) !important;
+}
+
+html.light [class~="border-green-400/40"],
+html.light [class~="border-green-500/20"],
+html.light [class~="border-green-500/25"],
+html.light [class~="border-green-500/30"],
+html.light [class~="border-green-500/40"],
+html.light [class~="border-emerald-500/30"] {
+  border-color: color-mix(in srgb, var(--success) 30%, transparent) !important;
+}
+
+html.light [class~="border-amber-400/20"],
+html.light [class~="border-amber-500/20"],
+html.light [class~="border-amber-500/25"],
+html.light [class~="border-amber-500/40"],
+html.light [class~="border-yellow-400/30"],
+html.light [class~="border-yellow-400/50"],
+html.light [class~="border-yellow-400/80"],
+html.light [class~="border-yellow-500/20"],
+html.light [class~="border-yellow-500/30"],
+html.light [class~="border-yellow-500/40"],
+html.light [class~="border-yellow-500/50"],
+html.light [class~="border-orange-500/20"],
+html.light [class~="border-orange-500/30"] {
+  border-color: color-mix(in srgb, var(--warning) 30%, transparent) !important;
+}
+
+html.light [class~="border-blue-400/20"],
+html.light [class~="border-blue-400/50"],
+html.light [class~="border-blue-500/20"],
+html.light [class~="border-blue-500/25"],
+html.light [class~="border-blue-500/30"],
+html.light [class~="border-blue-500/40"],
+html.light [class~="border-indigo-500/20"],
+html.light [class~="border-indigo-500/30"] {
+  border-color: color-mix(in srgb, var(--info) 30%, transparent) !important;
+}
+
+html.light [class~="border-purple-500/20"],
+html.light [class~="border-purple-500/30"],
+html.light [class~="border-purple-500/50"],
+html.light [class~="border-pink-500/20"] {
+  border-color: color-mix(in srgb, var(--accent) 30%, transparent) !important;
+}
+
+html.light .glass-card,
+html.light .glass-panel {
+  background-color: var(--surface);
+  box-shadow: 0 1px 3px rgba(23, 33, 43, 0.08) !important;
+}
+
+html.light .glass-input {
+  background-color: var(--surface);
+  border-color: var(--border);
+  box-shadow: none !important;
+}
+
+html.light :is(.shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: 0 1px 3px rgba(23, 33, 43, 0.08) !important;
+}
+
+html.light [class*="shadow-["] {
+  box-shadow: 0 1px 3px rgba(23, 33, 43, 0.08) !important;
 }
 
 /* Halaman dashboard tidak perlu menunggu animasi besar saat berpindah route. */
@@ -121,6 +736,34 @@ body::after {
   mix-blend-mode: screen; /* Changed to screen to hide black background of the logo */
 }
 
+html body::before {
+  display: none !important;
+  animation: none !important;
+  background-image: none !important;
+  filter: none !important;
+}
+
+html.dark body::after {
+  display: block !important;
+  background-image: url('/logo_bg.png') !important;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: 60% auto;
+  opacity: 0.15;
+  mix-blend-mode: screen;
+}
+
+html.light body::after {
+  display: none !important;
+  background-image: none !important;
+}
+
+html body .dashboard-lightweight-decor {
+  display: none !important;
+  animation: none !important;
+  filter: none !important;
+}
+
 @keyframes aurora-shift {
   0% { background-position: 0% 0%; }
   33% { background-position: 100% 50%; }
@@ -128,39 +771,88 @@ body::after {
   100% { background-position: 0% 100%; }
 }
 
-/* Glassmorphism utility classes */
+/* Shared surface, input, and action primitives used throughout the app. */
 @layer utilities {
   .glass-card {
-    @apply bg-card border border-card-border backdrop-blur-[24px] rounded-[1.25rem] shadow-2xl;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    @apply bg-surface border border-border rounded-xl shadow-sm;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16);
   }
   .glass-panel {
-    @apply bg-card border-r border-card-border backdrop-blur-[24px] shadow-2xl;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    @apply bg-surface border-r border-border;
+    box-shadow: 1px 0 3px rgba(0, 0, 0, 0.14);
   }
   .glass-input {
-    @apply bg-black/20 border border-white/10 rounded-xl px-4 py-2 text-foreground shadow-inner focus:outline-none focus:border-primary/70 focus:ring-1 focus:ring-primary/70 transition-all;
-    box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.2);
+    @apply bg-surface border border-border rounded-lg px-3 py-2 text-foreground focus:outline-none focus:border-primary/70 focus:ring-2 focus:ring-primary/30 transition-colors;
+    min-height: 2.5rem;
+    box-shadow: none;
   }
   .btn-primary {
-    @apply font-semibold px-4 py-2 rounded-xl transition-all border border-transparent;
-    background: linear-gradient(135deg, var(--primary) 0%, color-mix(in srgb, var(--primary) 70%, black) 100%);
-    color: var(--primary-foreground);
-    box-shadow: 0 4px 15px color-mix(in srgb, var(--primary) 30%, transparent), inset 0 1px 0 0 rgba(255, 255, 255, 0.2);
+    @apply font-semibold px-4 py-2 rounded-lg transition-colors border border-transparent;
+    min-height: 2.5rem;
+    box-shadow: none;
   }
-  .btn-primary:hover {
-    background: linear-gradient(135deg, color-mix(in srgb, var(--primary) 85%, white) 0%, color-mix(in srgb, var(--primary) 80%, black) 100%);
-    box-shadow: 0 6px 20px color-mix(in srgb, var(--primary) 40%, transparent), inset 0 1px 0 0 rgba(255, 255, 255, 0.3);
-    transform: translateY(-1px);
+  .btn-primary:not([class*=" bg-"]):not([class^="bg-"]) {
+    background: var(--primary);
+  }
+  .btn-primary:not([class~="text-white"]):not([class~="text-black"]):not([class~="text-primary-foreground"]):not([class*="text-foreground"]) {
+    color: var(--primary-foreground);
+  }
+  .btn-primary:hover:not([class*=" hover:bg-"]):not([class^="hover:bg-"]) {
+    background: color-mix(in srgb, var(--primary) 88%, black);
   }
   .btn-secondary {
-    @apply bg-white/5 text-foreground border border-white/10 font-semibold px-4 py-2 rounded-xl hover:bg-white/10 transition-all backdrop-blur-md;
-    box-shadow: 0 4px 15px rgba(0,0,0,0.1), inset 0 1px 0 0 rgba(255, 255, 255, 0.05);
+    @apply text-foreground border border-border font-semibold px-4 py-2 rounded-lg transition-colors;
+    min-height: 2.5rem;
+    box-shadow: none;
   }
-  .btn-secondary:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 6px 20px rgba(0,0,0,0.15), inset 0 1px 0 0 rgba(255, 255, 255, 0.08);
+  .btn-secondary:not([class*=" bg-"]):not([class^="bg-"]) {
+    background: var(--surface-muted);
   }
+  .btn-secondary:hover:not([class*=" hover:bg-"]):not([class^="hover:bg-"]) {
+    background: var(--surface-hover);
+  }
+}
+
+html body .glass-card:not([class~="bg-white"]) {
+  border-radius: 0.75rem;
+  background-color: var(--surface) !important;
+  background-image: none !important;
+  border-color: var(--border) !important;
+  backdrop-filter: none;
+}
+
+html body .glass-card[class*="bg-gradient-to-"] {
+  background-color: var(--surface) !important;
+  background-image: none !important;
+}
+
+html body .glass-panel {
+  backdrop-filter: none;
+}
+
+html body :is(input, select, textarea):not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]) {
+  min-height: 2.5rem;
+  border-radius: var(--radius-control);
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif;
+  font-size: var(--type-body);
+  line-height: 1.25rem;
+}
+
+html body :is(.btn-primary, .btn-secondary) {
+  border-radius: var(--radius-control);
+  transition-duration: 140ms;
+}
+
+html body .shadow-2xl {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.16) !important;
+}
+
+html body .fixed.inset-0 > [class~="rounded-2xl"]:not([class~="bg-white"]) {
+  border-radius: var(--radius-dialog) !important;
+}
+
+html body .fixed.inset-0 > [class*="max-w-"]:not([class~="bg-white"]) {
+  border-radius: var(--radius-dialog) !important;
 }
 
 select option {
@@ -170,17 +862,17 @@ select option {
 
 /* Tabel operasional dibuat padat agar lebih banyak data terlihat dalam satu layar. */
 table th {
-  padding-top: 0.6rem !important;
+  padding-top: 0.5rem !important;
   padding-right: 0.75rem !important;
-  padding-bottom: 0.6rem !important;
+  padding-bottom: 0.5rem !important;
   padding-left: 0.75rem !important;
   line-height: 1.25;
 }
 
 table td {
-  padding-top: 0.55rem !important;
+  padding-top: 0.5rem !important;
   padding-right: 0.75rem !important;
-  padding-bottom: 0.55rem !important;
+  padding-bottom: 0.5rem !important;
   padding-left: 0.75rem !important;
   line-height: 1.3;
 }

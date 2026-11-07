@@ -219,7 +219,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
           <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
             <div>
               <h3 className="font-bold text-primary">Hasil Kalkulasi: {new Date(payrollData.startDate).toLocaleDateString('id-ID')} - {new Date(payrollData.endDate).toLocaleDateString('id-ID')}</h3>
-              <p className="text-sm text-foreground/60">Total Beban Gaji: <strong className="text-foreground">Rp {payrollData.grandTotal.toLocaleString('id-ID')}</strong></p>
+              <p className="text-sm text-foreground/60">Total Beban Gaji: <strong className="text-foreground">Rp {payrollData.grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></p>
             </div>
             <button disabled={saving} onClick={handleSave} className="btn-primary h-10 px-4 text-sm flex items-center gap-2 shadow-[0_0_15px_rgba(212,175,55,0.3)] disabled:opacity-50">
               {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
@@ -257,39 +257,39 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
                       {item.bawahanQtyTotal > 0 && <div className="text-xs mt-1">Bawahan: {item.bawahanQtyTotal} pcs</div>}
                     </td>
                     <td className="px-6 py-4 text-foreground/80">
-                      <div>Gaji: Rp {item.base_salary.toLocaleString('id-ID')}</div>
-                      <div>Makan: Rp {item.meal_allowance.toLocaleString('id-ID')}</div>
+                      <div>Gaji: Rp {item.base_salary.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
+                      <div>Makan: Rp {item.meal_allowance.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
                       <div className="text-[10px] text-foreground/40 mt-1">({item.daysWorked} hari absensi)</div>
                     </td>
-                    <td className="px-6 py-4 font-medium text-blue-400">Rp {item.borongan_amount.toLocaleString('id-ID')}</td>
+                    <td className="px-6 py-4 font-medium text-blue-400">Rp {item.borongan_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                     <td className="px-6 py-4 text-foreground/80">
-                      <div>Bawahan: Rp {item.bawahan_bonus.toLocaleString('id-ID')}</div>
-                      <div>Mingguan: Rp {item.weekly_bonus.toLocaleString('id-ID')}</div>
-                      {item.other_bonuses > 0 && <div>Lainnya: Rp {item.other_bonuses.toLocaleString('id-ID')}</div>}
+                      <div>Bawahan: Rp {item.bawahan_bonus.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
+                      <div>Mingguan: Rp {item.weekly_bonus.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
+                      {item.other_bonuses > 0 && <div>Lainnya: Rp {item.other_bonuses.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
                     </td>
                     <td className="px-6 py-4">
                       <input 
                         type="text" 
-                        value={item.kasbon_amount === 0 ? '' : item.kasbon_amount.toLocaleString('id-ID')}
+                        value={item.kasbon_amount === 0 ? '' : item.kasbon_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                         onChange={(e) => handleKasbonChange(item.employee_id, e.target.value)}
                         placeholder="Rp 0"
                         className="glass-input w-24 text-sm text-red-400 font-bold text-right"
                       />
                     </td>
                     <td className="px-6 py-4 font-bold text-purple-400">
-                      Rp {(item.pinjaman_amount || 0).toLocaleString('id-ID')}
+                      Rp {(item.pinjaman_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </td>
                     <td className="px-6 py-4">
                       <input 
                         type="text" 
-                        value={item.late_deduction === 0 ? '' : item.late_deduction?.toLocaleString('id-ID')}
+                        value={item.late_deduction === 0 ? '' : item.late_deduction?.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                         onChange={(e) => handleLateDeductionChange(item.employee_id, e.target.value)}
                         placeholder="Rp 0"
                         className="glass-input w-24 text-sm text-orange-400 font-bold text-right border-orange-500/30 focus:border-orange-400"
                       />
                     </td>
                     <td className="px-6 py-4 text-right font-bold text-green-400 text-lg">
-                      Rp {item.total.toLocaleString('id-ID')}
+                      Rp {item.total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </td>
                   </tr>
                 ))}
@@ -310,7 +310,7 @@ export default function PayrollClient({ employees = [], dropdownConfig = {} }) {
             
             <div className="p-4 rounded-xl bg-primary/10 border border-primary/20 flex justify-between items-center">
               <span className="text-sm font-medium text-primary">Total Tagihan Gaji</span>
-              <span className="text-lg font-bold text-primary">Rp {(payrollData?.grandTotal || 0).toLocaleString('id-ID')}</span>
+              <span className="text-lg font-bold text-primary">Rp {(payrollData?.grandTotal || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
             </div>
 
             <div className="space-y-4">

@@ -38,9 +38,9 @@ const nextConfig = {
       { source: '/report', destination: '/dashboard/report' },
       { source: '/master/:path*', destination: '/dashboard/master/:path*' },
       { source: '/audit', destination: '/dashboard/audit' },
-      { source: '/settings', destination: '/dashboard/settings/access' },
+      { source: '/settings', destination: '/dashboard/settings' },
       { source: '/settings/:path*', destination: '/dashboard/settings/:path*' },
-      { source: '/system-config', destination: '/dashboard/settings' },
+      { source: '/system-config', destination: '/dashboard/settings?tab=dropdowns' },
     ];
   },
 };

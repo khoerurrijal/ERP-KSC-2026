@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { Coffee, Box } from 'lucide-react'
 import { calculateItemPrice as calculateItemPriceUtil } from '@/utils/pricing'
 
@@ -81,7 +82,7 @@ export default function PriceListClient({ products, matrix, pricelistConfig = {}
   // Format ke Rupiah
   const formatRp = (num) => {
     if (!num) return '-'
-    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0 }).format(num)
+    return new Intl.NumberFormat('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num)
   }
 
   // Get image for category (placeholder logic for user to upload later)
@@ -182,9 +183,12 @@ export default function PriceListClient({ products, matrix, pricelistConfig = {}
               <div className="lg:w-1/4 flex flex-col justify-center items-center lg:items-start text-center lg:text-left relative z-10 shrink-0">
                 <div className="w-full max-w-[200px] aspect-square relative mb-4">
                   <div className="absolute inset-0 bg-primary/20 blur-[40px] rounded-full" />
-                  <img 
+                  <Image
                     src={imgUrl} 
                     alt={cat} 
+                    width={800}
+                    height={800}
+                    unoptimized
                     className="w-full h-full object-contain relative z-10 drop-shadow-xl"
                     onError={(e) => {
                       e.target.onerror = null; 

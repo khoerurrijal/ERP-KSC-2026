@@ -2,7 +2,7 @@
 
 function formatGrouped(value) {
   const digits = String(value ?? '').replace(/[^0-9]/g, '')
-  return digits ? Number(digits).toLocaleString('id-ID') : ''
+  return digits ? Number(digits).toLocaleString('id-ID', { maximumFractionDigits: 0 }) : ''
 }
 
 export default function CurrencyInput({ value, onChange, className = '', placeholder = '0', ...props }) {

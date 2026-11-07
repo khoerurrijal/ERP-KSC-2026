@@ -1,3 +1,4 @@
+import Image from 'next/image'
 import { createAdminClient } from '@/utils/supabase/admin'
 import OrderClient from './OrderClient'
 
@@ -42,7 +43,7 @@ export default async function OrderPage() {
   return (
     <div className="min-h-screen bg-background text-foreground pb-20">
       <div className="relative pt-5 sm:pt-7 pb-2 px-4 text-center">
-        <img src="/logo-dark.png" alt="King Sablon Logo" className="h-16 sm:h-20 mx-auto drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] object-contain" />
+        <Image src="/logo-dark.png" alt="King Sablon Logo" width={400} height={160} className="h-16 sm:h-20 w-auto mx-auto drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] object-contain" />
       </div>
 
       <div className="max-w-3xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 relative z-10">

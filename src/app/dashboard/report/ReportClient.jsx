@@ -140,8 +140,8 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           {/* 1. BREAKDOWN MUTASI KHUSUS KING */}
           <section className="space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-yellow-500/20 flex items-center justify-center border border-yellow-500/30">
-            <FileText className="w-5 h-5 text-yellow-500" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+            <FileText className="w-5 h-5 text-primary" />
           </div>
           <h2 className="text-xl font-bold text-foreground">Ringkasan Mutasi KING</h2>
         </div>
@@ -151,55 +151,34 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             title="Pendapatan Masuk"
             value={summary.king?.pendapatan}
             subtitle="Total Uang Masuk KING"
-            color="text-green-400"
-            bg="bg-green-500/5"
-            border="border-green-500/20"
-            glow="bg-green-500/20"
           />
           <MetricCard 
             title="Pengeluaran Harian"
             value={summary.king?.pengeluaran_harian}
             subtitle="Total Uang Keluar (Non-HPP)"
-            color="text-red-400"
-            bg="bg-red-500/5"
-            border="border-red-500/20"
-            glow="bg-red-500/20"
           />
           <MetricCard 
             title="Pengeluaran Tetap"
             value={summary.king?.pengeluaran_tetap}
             subtitle="Settlement Wajib Bulanan"
-            color="text-pink-400"
-            bg="bg-pink-500/5"
-            border="border-pink-500/20"
-            glow="bg-pink-500/20"
           />
           <MetricCard 
             title="Pemakaian Cup (Gudang)"
             value={summary.king?.pemakaian_gudang}
             subtitle="Alokasi HPP Gudang"
-            color="text-blue-400"
-            bg="bg-blue-500/5"
-            border="border-blue-500/20"
-            glow="bg-blue-500/20"
           />
           <MetricCard 
             title="Pemakaian Global & Mesin"
             value={summary.king?.pemakaian_global}
             subtitle="Alokasi HPP Bahan & Mesin Sablon"
-            color="text-orange-400"
-            bg="bg-orange-500/5"
-            border="border-orange-500/20"
-            glow="bg-orange-500/20"
           />
           
-          <div className="rounded-3xl p-6 flex flex-col justify-center border border-yellow-500/40 bg-gradient-to-br from-yellow-500/20 to-transparent relative overflow-hidden group hover:scale-[1.02] transition-transform shadow-2xl shadow-yellow-500/10">
-            <div className="absolute -right-10 -top-10 w-40 h-40 bg-yellow-500/20 blur-3xl rounded-full" />
-            <span className="text-sm font-black text-yellow-400 uppercase tracking-widest relative z-10">Saldo Real (Kas KING)</span>
-            <span className={`text-4xl font-black mt-3 relative z-10 ${summary.king?.saldo_bersih < 0 ? 'text-red-400' : 'text-green-400'}`}>
-              Rp {Number(summary.king?.saldo_bersih || 0).toLocaleString('id-ID')}
+          <div className="glass-card p-4 flex flex-col justify-center border-primary/30">
+            <span className="text-xs font-semibold text-primary uppercase tracking-wide">Saldo Real (Kas KING)</span>
+            <span className={`metric-value-compact mt-3 ${summary.king?.saldo_bersih < 0 ? 'text-red-400' : 'text-green-400'}`}>
+              Rp {Number(summary.king?.saldo_bersih || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
             </span>
-            <span className="text-xs font-medium text-yellow-500/70 mt-2 relative z-10">Bersih setelah seluruh pemotongan alokasi</span>
+            <span className="text-xs font-medium text-foreground/60 mt-2">Bersih setelah seluruh pemotongan alokasi</span>
           </div>
         </div>
       </section>
@@ -219,7 +198,6 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
              masuk={summary.gudang?.masuk}
              keluar={summary.gudang?.keluar}
              akhir={summary.gudang?.akhir}
-             colorTheme="purple"
              details={gudangDetails}
           />
           <WorkshopCard 
@@ -227,7 +205,6 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
              masuk={summary.global?.masuk}
              keluar={summary.global?.keluar}
              akhir={summary.global?.akhir}
-             colorTheme="blue"
              details={globalDetails}
           />
           <WorkshopCard 
@@ -235,7 +212,6 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
              masuk={summary.tabungan?.masuk}
              keluar={summary.tabungan?.keluar}
              akhir={summary.tabungan?.akhir}
-             colorTheme="green"
              details={tabunganDetails}
           />
         </div>
@@ -268,27 +244,27 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
           {/* GRAND TOTAL KESELURUHAN */}
           <div className="col-span-full mb-2">
-            <div className="glass-card p-5 border-yellow-500/30 bg-gradient-to-r from-yellow-500/10 to-transparent">
-              <span className="text-xs font-black text-yellow-500 uppercase tracking-widest">GRAND TOTAL SEMUA REFERENSI (KING)</span>
+            <div className="glass-card p-4 border-primary/30">
+              <span className="text-xs font-semibold text-primary uppercase tracking-wide">Grand Total Semua Referensi (KING)</span>
               <div className="mt-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div className="flex gap-8">
                   <div className="flex flex-col">
                     <span className="text-foreground/50 text-sm font-medium">Total Masuk</span>
                     <span className="font-bold text-green-400 text-lg">
-                      Rp {summaryRefs.reduce((a, c) => a + c.masuk, 0).toLocaleString('id-ID')}
+                      Rp {summaryRefs.reduce((a, c) => a + c.masuk, 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                   <div className="flex flex-col">
                     <span className="text-foreground/50 text-sm font-medium">Total Keluar</span>
                     <span className="font-bold text-red-400 text-lg">
-                      Rp {summaryRefs.reduce((a, c) => a + c.keluar, 0).toLocaleString('id-ID')}
+                      Rp {summaryRefs.reduce((a, c) => a + c.keluar, 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 </div>
                 <div className="flex flex-col sm:items-end">
                   <span className="text-foreground/80 font-bold text-sm">Selisih Bersih Keseluruhan</span>
-                  <span className={`font-black text-2xl ${summaryRefs.reduce((a, c) => a + c.masuk, 0) - summaryRefs.reduce((a, c) => a + c.keluar, 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    Rp {(summaryRefs.reduce((a, c) => a + c.masuk, 0) - summaryRefs.reduce((a, c) => a + c.keluar, 0)).toLocaleString('id-ID')}
+                  <span className={`metric-value-compact ${summaryRefs.reduce((a, c) => a + c.masuk, 0) - summaryRefs.reduce((a, c) => a + c.keluar, 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    Rp {(summaryRefs.reduce((a, c) => a + c.masuk, 0) - summaryRefs.reduce((a, c) => a + c.keluar, 0)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </span>
                 </div>
               </div>
@@ -301,14 +277,14 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             </div>
           )}
           {summaryRefs.map((item) => (
-            <div key={item.reference} className="glass-card p-6 border-white/5 hover:border-primary/30 transition-colors">
+            <div key={item.reference} className="glass-card p-4 border-white/5 hover:border-primary/30 transition-colors">
               <span className="text-xs font-black text-primary uppercase tracking-widest">{item.reference}</span>
               <div className="mt-4 space-y-3">
                 {item.masuk > 0 && (
                   <div className="flex justify-between items-end text-sm">
                     <span className="text-foreground/50 font-medium">Masuk</span>
                     <span className="font-bold text-green-400 text-base">
-                      Rp {item.masuk.toLocaleString('id-ID')}
+                      Rp {item.masuk.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 )}
@@ -316,7 +292,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
                   <div className="flex justify-between items-end text-sm">
                     <span className="text-foreground/50 font-medium">Keluar</span>
                     <span className="font-bold text-red-400 text-base">
-                      Rp {item.keluar.toLocaleString('id-ID')}
+                      Rp {item.keluar.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 )}
@@ -324,7 +300,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
                   <div className="flex justify-between items-end text-sm pt-3 border-t border-white/5 mt-2">
                     <span className="text-foreground/80 font-bold">Selisih Bersih</span>
                     <span className={`font-black text-lg ${item.masuk - item.keluar >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                      Rp {(item.masuk - item.keluar).toLocaleString('id-ID')}
+                      Rp {(item.masuk - item.keluar).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                     </span>
                   </div>
                 )}
@@ -337,78 +313,78 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       {/* 4. SALDO & BALANCE */}
       <section className="space-y-4 pt-6 border-t border-white/10">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center border border-blue-500/30">
-            <Wallet className="w-5 h-5 text-blue-400" />
+          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+            <Wallet className="w-5 h-5 text-primary" />
           </div>
           <h2 className="text-xl font-bold text-foreground">Buku Besar & Kas Realtime</h2>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* BUKU BESAR */}
-          <div className="glass-card flex flex-col p-6 border-white/5">
-            <h3 className="font-bold text-foreground/80 flex items-center gap-2 mb-6">
+          <div className="glass-card flex flex-col p-4 border-white/5">
+            <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
               Total Pembukuan Digital
             </h3>
             <div className="flex flex-col gap-4">
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60">Saldo Gudang</span>
-                <span className="font-bold text-foreground">Rp {Number(summary.gudang?.akhir || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.gudang?.akhir || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60">Saldo Global</span>
-                <span className="font-bold text-foreground">Rp {Number(summary.global?.akhir || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.global?.akhir || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60">Saldo Tabungan</span>
-                <span className="font-bold text-foreground">Rp {Number(summary.tabungan?.akhir || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.tabungan?.akhir || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60">Saldo Kas King</span>
                 <span className={`font-bold ${summary.king?.saldo_bersih < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                  Rp {Number(summary.king?.saldo_bersih || 0).toLocaleString('id-ID')}
+                  Rp {Number(summary.king?.saldo_bersih || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                 </span>
               </div>
-              <div className="flex justify-between items-center mt-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                <span className="text-sm font-black text-blue-400 uppercase tracking-wider">Total Buku Besar</span>
-                <span className="text-xl font-black text-blue-400">Rp {Number(summary.total_buku_besar || 0).toLocaleString('id-ID')}</span>
+              <div className="flex justify-between items-center mt-4 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                <span className="text-sm font-semibold text-primary uppercase tracking-wide">Total Buku Besar</span>
+                <span className="metric-value-compact text-primary">Rp {Number(summary.total_buku_besar || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
           </div>
 
           {/* SALDO FISIK BANK */}
-          <div className="glass-card flex flex-col p-6 border-white/5">
-            <h3 className="font-bold text-foreground/80 flex items-center gap-2 mb-6">
+          <div className="glass-card flex flex-col p-4 border-white/5">
+            <h3 className="font-semibold text-foreground flex items-center gap-2 mb-4">
               Uang Tersedia di Bank
             </h3>
             <div className="flex flex-col gap-4">
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-blue-400" /> Bank BCA
+          <CreditCard className="w-4 h-4 text-primary" /> Bank BCA
                 </span>
-                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.BCA || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.BCA || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60 flex items-center gap-2">
-                  <CreditCard className="w-4 h-4 text-yellow-400" /> Bank MANDIRI
+          <CreditCard className="w-4 h-4 text-accent" /> Bank MANDIRI
                 </span>
-                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.Mandiri || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.Mandiri || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               <div className="flex justify-between items-center pb-3 border-b border-white/5">
                 <span className="text-sm font-medium text-foreground/60 flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-green-400" /> Kas Tunai
+          <Wallet className="w-4 h-4 text-primary" /> Kas Tunai
                 </span>
-                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.Cash || 0).toLocaleString('id-ID')}</span>
+                <span className="font-bold text-foreground">Rp {Number(summary.physicalBalances?.Cash || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
-              <div className="flex justify-between items-center mt-auto p-4 rounded-xl bg-green-500/10 border border-green-500/20">
-                <span className="text-sm font-black text-green-400 uppercase tracking-wider">Total Fisik Bank</span>
-                <span className="text-xl font-black text-green-400">Rp {Number(totalPembukuanFisik).toLocaleString('id-ID')}</span>
+              <div className="flex justify-between items-center mt-auto p-3 rounded-lg bg-accent/5 border border-accent/20">
+                <span className="text-sm font-semibold text-accent uppercase tracking-wide">Total Fisik Bank</span>
+                <span className="metric-value-compact text-accent">Rp {Number(totalPembukuanFisik).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
             </div>
           </div>
 
           {/* MISS KEUANGAN */}
-          <div className={`glass-card flex flex-col p-6 border-l-4 overflow-hidden relative ${missValue === 0 ? 'border-green-500 bg-gradient-to-br from-green-500/5 to-transparent' : missValue > 0 ? 'border-blue-500 bg-gradient-to-br from-blue-500/5 to-transparent' : 'border-red-500 bg-gradient-to-br from-red-500/5 to-transparent'}`}>
-            <div className="flex justify-between items-start mb-6">
+          <div className={`glass-card flex flex-col p-4 border-l-4 overflow-hidden relative ${missValue === 0 ? 'border-green-500 bg-gradient-to-br from-green-500/5 to-transparent' : missValue > 0 ? 'border-blue-500 bg-gradient-to-br from-blue-500/5 to-transparent' : 'border-red-500 bg-gradient-to-br from-red-500/5 to-transparent'}`}>
+            <div className="flex justify-between items-start mb-4">
               <h3 className={`font-bold flex items-center gap-2 ${missValue === 0 ? 'text-green-500' : missValue > 0 ? 'text-blue-500' : 'text-red-500'}`}>
                 <AlertOctagon className="w-5 h-5" /> Status Pencatatan
               </h3>
@@ -422,8 +398,8 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
             
             <div className="flex flex-col justify-center items-center text-center flex-1">
               <span className="text-xs font-medium text-foreground/50 uppercase tracking-widest mb-3">Selisih Realita vs Sistem</span>
-              <span className={`text-4xl lg:text-5xl font-black tracking-tight ${missValue === 0 ? 'text-green-500' : missValue > 0 ? 'text-blue-500' : 'text-red-500'}`}>
-                {missValue > 0 ? '+' : ''}Rp {missValue.toLocaleString('id-ID')}
+              <span className={`metric-value-prominent ${missValue === 0 ? 'text-green-500' : missValue > 0 ? 'text-blue-500' : 'text-red-500'}`}>
+                {missValue > 0 ? '+' : ''}Rp {missValue.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
               </span>
               
               <div className="mt-6 w-full">
@@ -449,7 +425,7 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
       {/* BALANCE MODAL */}
       {isBalanceModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setIsBalanceModalOpen(false)}>
-          <div className="glass-card w-full max-w-sm p-8 flex flex-col gap-6 animate-in zoom-in-95 duration-200 shadow-2xl border border-white/10 rounded-3xl">
+          <div className="glass-card w-full max-w-sm p-4 flex flex-col gap-4 animate-in zoom-in-95 duration-200 border border-white/10 rounded-2xl">
             <div>
               <h3 className="text-2xl font-black text-primary">Cek Uang Fisik</h3>
               <p className="text-sm text-foreground/50 mt-2 leading-relaxed">Masukkan nominal uang fisik yang ada di rekening saat ini untuk mengetahui selisihnya.</p>
@@ -498,8 +474,8 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
           
           <section className="space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center border border-purple-500/30">
-                <BarChart3 className="w-5 h-5 text-purple-400" />
+              <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20">
+                <BarChart3 className="w-5 h-5 text-accent" />
               </div>
               <h2 className="text-xl font-bold text-foreground">Pemecahan Omset Penjualan</h2>
             </div>
@@ -509,47 +485,30 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
                 title="Gelas Sablon & Printing"
                 value={analytics.omset_sablon}
                 subtitle="Penjualan khusus sablon cup"
-                color="text-purple-400"
-                bg="bg-purple-500/5"
-                border="border-purple-500/20"
-                glow="bg-purple-500/20"
               />
               <MetricCard 
                 title="Gelas Polos"
                 value={analytics.omset_polos}
                 subtitle="Penjualan cup tanpa sablon"
-                color="text-blue-400"
-                bg="bg-blue-500/5"
-                border="border-blue-500/20"
-                glow="bg-blue-500/20"
               />
               <MetricCard 
                 title="Sablon Plastik"
                 value={analytics.omset_plastik}
                 subtitle="Sablon kantong plastik"
-                color="text-orange-400"
-                bg="bg-orange-500/5"
-                border="border-orange-500/20"
-                glow="bg-orange-500/20"
               />
               <MetricCard 
                 title="Sablon Lid Sealer"
                 value={analytics.omset_sealer}
                 subtitle="Sablon penutup gelas"
-                color="text-pink-400"
-                bg="bg-pink-500/5"
-                border="border-pink-500/20"
-                glow="bg-pink-500/20"
               />
               <div className="col-span-full">
-                <div className="rounded-3xl p-6 flex flex-col justify-center border border-green-500/40 bg-gradient-to-br from-green-500/10 to-transparent relative overflow-hidden group hover:scale-[1.01] transition-transform shadow-2xl shadow-green-500/10">
-                  <div className="absolute -right-10 -top-10 w-40 h-40 bg-green-500/20 blur-3xl rounded-full" />
-                  <span className="text-sm font-black text-green-400 uppercase tracking-widest relative z-10">Total Omset Bulan Terpilih</span>
-                  <span className="text-5xl font-black mt-3 text-green-400 relative z-10">
-                    Rp {Number(analytics.total_omset || 0).toLocaleString('id-ID')}
+                <div className="glass-card p-4 flex flex-col justify-center border-primary/30">
+                  <span className="text-xs font-semibold text-primary uppercase tracking-wide">Total Omset Bulan Terpilih</span>
+                  <span className="metric-value-prominent mt-3 text-primary">
+                    Rp {Number(analytics.total_omset || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </span>
-                  <span className="text-sm font-medium text-green-500/70 mt-2 relative z-10 flex gap-2">
-                    {analytics.piutang_omset > 0 && <span className="text-yellow-400">(Terdapat Piutang: Rp {analytics.piutang_omset.toLocaleString('id-ID')})</span>}
+                  <span className="text-xs font-medium text-foreground/60 mt-2 flex gap-2">
+                    {analytics.piutang_omset > 0 && <span className="text-yellow-400">(Terdapat Piutang: Rp {analytics.piutang_omset.toLocaleString('id-ID', { maximumFractionDigits: 0 })})</span>}
                   </span>
                 </div>
               </div>
@@ -558,74 +517,72 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
 
           <section className="space-y-4 pt-4 border-t border-white/5">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-green-500/20 flex items-center justify-center border border-green-500/30">
-                <PieChart className="w-5 h-5 text-green-400" />
+              <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center border border-primary/20">
+                <PieChart className="w-5 h-5 text-primary" />
               </div>
               <h2 className="text-xl font-bold text-foreground">Bagi Hasil & Royalty (HPP Lunas)</h2>
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* KOTAK GLOBAL */}
-              <div className="rounded-3xl p-6 border border-blue-500/20 bg-gradient-to-br from-blue-500/10 to-transparent relative overflow-hidden group">
-                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-blue-500/20 blur-3xl rounded-full" />
-                <h3 className="font-black text-blue-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GLOBAL</h3>
+              <div className="glass-card p-4 flex flex-col">
+                <h3 className="font-semibold text-primary mb-4">Analisa Workshop Global</h3>
                 
                 <div className="space-y-4 relative z-10">
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium">Nilai HPP Pokok (Modal Asli)</span>
-                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_global || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_global || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium">Profit Kotor Global (Margin)</span>
-                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_global || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_global || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium flex items-center gap-2">
-                      Royalty Sewa Mesin <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-2 py-0.5 rounded-full">Owner Only</span>
+                      Royalty Sewa Mesin <span className="text-[10px] bg-primary/10 text-primary px-2 py-0.5 rounded-md">Owner Only</span>
                     </span>
-                    <span className="font-bold text-yellow-400">Rp {Number(analytics.royalty_mesin || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-foreground">Rp {Number(analytics.royalty_mesin || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   
-                  <div className="pt-4 mt-6 border-t border-blue-500/30">
-                    <div className="flex flex-col gap-1 mb-4 p-4 rounded-xl bg-blue-500/10 border border-blue-500/20">
-                      <span className="text-xs font-black text-blue-400 uppercase tracking-widest">Hak Bersih Owner Global (Akhir Bulan)</span>
-                      <span className="text-2xl font-black text-blue-400">
-                        Rp {((Number(analytics.margin_global || 0) * 0.5) + Number(analytics.royalty_mesin || 0)).toLocaleString('id-ID')}
+                  <div className="pt-4 mt-4 border-t border-border">
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-primary/5 border border-primary/20">
+                      <span className="text-xs font-semibold text-primary uppercase tracking-wide">Hak Bersih Owner Global (Akhir Bulan)</span>
+                      <span className="metric-value text-primary">
+                        Rp {((Number(analytics.margin_global || 0) * 0.5) + Number(analytics.royalty_mesin || 0)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
-                      <span className="text-xs text-blue-400/60 font-medium mt-1">Rumus: (50% x Profit Kotor Global) + Royalty Sewa Mesin</span>
+                      <span className="text-xs text-foreground/60 font-medium mt-1">Rumus: (50% x Profit Kotor Global) + Royalty Sewa Mesin</span>
                     </div>
                   </div>
                 </div>
               </div>
 
               {/* KOTAK GUDANG */}
-              <div className="rounded-3xl p-6 border border-purple-500/20 bg-gradient-to-br from-purple-500/10 to-transparent relative overflow-hidden group">
-                <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-purple-500/20 blur-3xl rounded-full" />
-                <h3 className="font-black text-purple-400 text-xl tracking-widest mb-6 relative z-10">ANALISA WORKSHOP GUDANG</h3>
+              <div className="glass-card p-4 flex flex-col">
+                <h3 className="font-semibold text-accent mb-4">Analisa Workshop Gudang</h3>
                 
                 <div className="space-y-4 relative z-10">
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium">Nilai HPP Pokok (Modal Asli)</span>
-                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_gudang || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-foreground">Rp {Number(analytics.hpp_gudang || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium">Profit Gudang (Margin)</span>
-                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_gudang || 0).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-green-400">Rp {Number(analytics.margin_gudang || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm border-b border-white/5 pb-2">
                     <span className="text-foreground/60 font-medium flex items-center gap-2">
-                      Suntikan Profit dari Global <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded-full">50% Margin</span>
+                      Suntikan Profit dari Global <span className="text-[10px] bg-accent/10 text-accent px-2 py-0.5 rounded-md">50% Margin</span>
                     </span>
-                    <span className="font-bold text-blue-400">Rp {(Number(analytics.margin_global || 0) * 0.5).toLocaleString('id-ID')}</span>
+                    <span className="font-bold text-accent">Rp {(Number(analytics.margin_global || 0) * 0.5).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                   </div>
                   
-                  <div className="pt-4 mt-6 border-t border-purple-500/30">
-                    <div className="flex flex-col gap-1 p-4 rounded-xl bg-purple-500/10 border border-purple-500/20">
-                      <span className="text-xs font-black text-purple-400 uppercase tracking-widest">Hak Bersih Gudang (Akhir Bulan)</span>
-                      <span className="text-2xl font-black text-purple-400">
-                        Rp {(Number(analytics.margin_gudang || 0) + (Number(analytics.margin_global || 0) * 0.5)).toLocaleString('id-ID')}
+                  <div className="pt-4 mt-4 border-t border-border">
+                    <div className="flex flex-col gap-1 p-3 rounded-lg bg-accent/5 border border-accent/20">
+                      <span className="text-xs font-semibold text-accent uppercase tracking-wide">Hak Bersih Gudang (Akhir Bulan)</span>
+                      <span className="metric-value text-accent">
+                        Rp {(Number(analytics.margin_gudang || 0) + (Number(analytics.margin_global || 0) * 0.5)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                       </span>
-                      <span className="text-xs text-purple-400/60 font-medium mt-1">Rumus: Profit Gudang + (50% x Profit Kotor Global)</span>
+                      <span className="text-xs text-foreground/60 font-medium mt-1">Rumus: Profit Gudang + (50% x Profit Kotor Global)</span>
                     </div>
                   </div>
                 </div>
@@ -640,40 +597,31 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
   )
 }
 
-function MetricCard({ title, value, subtitle, color, bg, border, glow }) {
+function MetricCard({ title, value, subtitle }) {
   return (
-    <div className={`rounded-3xl p-6 flex flex-col justify-center border ${border} ${bg} relative overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-xl`}>
-      <div className={`absolute -right-6 -top-6 w-24 h-24 rounded-full ${glow} blur-2xl opacity-50`} />
-      <span className={`text-xs font-black ${color} uppercase tracking-widest relative z-10`}>{title}</span>
-      <span className="text-3xl font-black text-foreground mt-3 relative z-10">
-        Rp {Number(value || 0).toLocaleString('id-ID')}
+    <div className="glass-card p-4 flex flex-col justify-center">
+      <span className="text-xs font-semibold text-primary uppercase tracking-wide">{title}</span>
+      <span className="metric-value-compact text-foreground mt-2">
+        Rp {Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
       </span>
-      <span className="text-xs font-medium text-foreground/50 mt-2 relative z-10">{subtitle}</span>
+      <span className="text-xs font-medium text-foreground/60 mt-2">{subtitle}</span>
     </div>
   )
 }
 
-function WorkshopCard({ title, masuk, keluar, akhir, colorTheme, details = [] }) {
-  const themes = {
-    purple: { border: 'border-purple-500/20', bg: 'bg-gradient-to-br from-purple-500/10 to-transparent', text: 'text-purple-400', glow: 'bg-purple-500/20' },
-    blue: { border: 'border-blue-500/20', bg: 'bg-gradient-to-br from-blue-500/10 to-transparent', text: 'text-blue-400', glow: 'bg-blue-500/20' },
-    green: { border: 'border-green-500/20', bg: 'bg-gradient-to-br from-green-500/10 to-transparent', text: 'text-green-400', glow: 'bg-green-500/20' }
-  }
-  const t = themes[colorTheme]
-
+function WorkshopCard({ title, masuk, keluar, akhir, details = [] }) {
   return (
-    <div className={`rounded-3xl p-6 md:p-8 border ${t.border} ${t.bg} hover:shadow-2xl transition-all duration-500 relative overflow-hidden group flex flex-col`}>
-      <div className={`absolute -right-10 -bottom-10 w-40 h-40 rounded-full ${t.glow} blur-3xl opacity-50 group-hover:opacity-100 transition-opacity`} />
-      <h3 className={`font-black ${t.text} text-xl tracking-widest mb-8 relative z-10`}>{title}</h3>
+    <div className="glass-card p-4 flex flex-col">
+      <h3 className="font-semibold text-primary mb-4">{title}</h3>
       
-      <div className="space-y-5 relative z-10 flex-1">
+      <div className="space-y-4 flex-1">
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-bold text-foreground/40 uppercase tracking-widest">Total Pemasukan</span>
-          <span className="text-xl font-bold text-foreground">Rp {Number(masuk || 0).toLocaleString('id-ID')}</span>
+          <span className="metric-value-compact text-foreground">Rp {Number(masuk || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
         </div>
         <div className="flex flex-col gap-1.5">
           <span className="text-xs font-bold text-foreground/40 uppercase tracking-widest">Total Belanja (PO)</span>
-          <span className="text-xl font-bold text-foreground">Rp {Number(keluar || 0).toLocaleString('id-ID')}</span>
+          <span className="metric-value-compact text-foreground">Rp {Number(keluar || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
         </div>
 
         {details.length > 0 && (
@@ -683,8 +631,8 @@ function WorkshopCard({ title, masuk, keluar, akhir, colorTheme, details = [] })
               return (
                 <div key={i} className="flex justify-between items-center text-[10px] font-medium text-foreground/60 border-b border-white/5 pb-1 last:border-0">
                   <span className="uppercase tracking-wider">{d.label}</span>
-                  <span className={d.isPositive ? 'text-green-400/90 font-bold' : 'text-red-400/90 font-bold'}>
-                    {d.isPositive ? '+' : '-'} Rp {Number(d.value).toLocaleString('id-ID')}
+                  <span className={d.isPositive ? 'text-green-400 font-semibold' : 'text-red-400 font-semibold'}>
+                    {d.isPositive ? '+' : '-'} Rp {Number(d.value).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </span>
                 </div>
               );
@@ -692,9 +640,9 @@ function WorkshopCard({ title, masuk, keluar, akhir, colorTheme, details = [] })
           </div>
         )}
         
-        <div className="pt-6 mt-auto border-t border-white/10 flex flex-col gap-2">
-          <span className={`text-xs font-black ${t.text} uppercase tracking-widest`}>Saldo Tersedia</span>
-          <span className={`text-3xl font-black ${t.text}`}>Rp {Number(akhir || 0).toLocaleString('id-ID')}</span>
+        <div className="pt-4 mt-auto border-t border-border flex flex-col gap-2">
+          <span className="text-xs font-semibold text-accent uppercase tracking-wide">Saldo Tersedia</span>
+          <span className="metric-value-compact text-accent">Rp {Number(akhir || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
         </div>
       </div>
     </div>

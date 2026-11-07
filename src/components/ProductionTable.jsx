@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
 
 import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
@@ -9,6 +10,7 @@ import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
+import { matchesSearchText } from '@/utils/search'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
@@ -27,7 +29,10 @@ const getStatusColor = (st) => {
   return 'bg-white/10 text-foreground border-white/20'
 }
 
-export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, hideHeader = false, title = 'Produksi' }) {
+export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentSearchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState(initialTab || (userRole === 'Operator' ? 'PRODUKSI' : 'SO')) // 'SO' | 'PRODUKSI'
   
   const [selectedJob, setSelectedJob] = useState(null)
@@ -42,7 +47,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [qtyProcessed, setQtyProcessed] = useState('')
   const [qtyDefect, setQtyDefect] = useState('')
   const [notes, setNotes] = useState('')
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [loading, setLoading] = useState(false)
 
   // Mockup popup state
@@ -54,6 +59,21 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [soPage, setSoPage] = useState(1)
   const [prodPage, setProdPage] = useState(1)
   const pageSize = 50
+
+  const updateSearchParam = useCallback((value) => {
+    const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
+    if (value) params.set('search', value)
+    else params.delete('search')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [currentSearchParams, pathname, router])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((initialSearch || '') !== searchQuery) updateSearchParam(searchQuery.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [initialSearch, searchQuery, updateSearchParam])
 
   const handleSort = (key) => {
     let direction = 'asc'
@@ -68,12 +88,19 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   // TAB 2: Tracking Produksi (Input Qty by Operator)
   const filteredAndSortedJobs = useMemo(() => {
+    const normalizedSearch = searchQuery.replace(/[(),\"]/g, ' ').trim().toLowerCase()
+    const isSearching = Boolean(normalizedSearch)
     let result = (productionJobs || []).filter(j => 
-      j.order_type?.toUpperCase() === 'SABLON' &&
-      (j.item_status?.toUpperCase() === 'PROSES' || j.item_status?.toUpperCase() === 'SIAP PROSES' || j.item_status?.toUpperCase() === 'BARU MASUK') &&
-      ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-       (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-       (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      (isSearching || (
+        j.order_type?.toUpperCase() === 'SABLON' &&
+        ['PROSES', 'SIAP PROSES', 'BARU MASUK'].includes(j.item_status?.toUpperCase())
+      )) &&
+      (!isSearching ||
+       matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
+       matchesSearchText(j.sales_order_items?.sales_orders?.invoice_number, normalizedSearch) ||
+       matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||
+       matchesSearchText(j.notes, normalizedSearch) ||
+       matchesSearchText(j.item_status, normalizedSearch))
     )
 
     result.sort((a, b) => {
@@ -107,11 +134,16 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   }, [productionJobs, searchQuery, sortConfig])
 
   // TAB 1: Tracking Sales Order (Visual Timeline)
-  const trackingSoItems = (productionJobs || []).filter(j => 
-    j.item_status?.toUpperCase() !== 'SELESAI' && j.item_status?.toUpperCase() !== 'BATAL' &&
-    ((j.sales_order_items?.sales_orders?.customers?.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-     (j.sales_order_items?.sales_orders?.invoice_number || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-     (j.sales_order_items?.products?.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+  const normalizedSearch = searchQuery.replace(/[(),\"]/g, ' ').trim().toLowerCase()
+  const isSearching = Boolean(normalizedSearch)
+  const trackingSoItems = (productionJobs || []).filter(j =>
+    (isSearching || !['SELESAI', 'BATAL'].includes(j.item_status?.toUpperCase())) &&
+    (!isSearching ||
+      matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
+      matchesSearchText(j.sales_order_items?.sales_orders?.invoice_number, normalizedSearch) ||
+      matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||
+      matchesSearchText(j.notes, normalizedSearch) ||
+      matchesSearchText(j.item_status, normalizedSearch))
   )
 
   const paginatedProdJobs = useMemo(() => {
@@ -224,7 +256,11 @@ export default function ProductionTable({ productionJobs, operators = [], curren
               type="text" 
               placeholder="Cari nomor Invoice/Job..." 
               value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
+              onChange={e => {
+                setSearchQuery(e.target.value)
+                setSoPage(1)
+                setProdPage(1)
+              }}
               className="glass-input !pl-10 h-10 w-full sm:w-64 text-sm"
             />
           </div>
@@ -382,9 +418,11 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right">
-                      <button onClick={() => handleOpenModal(item)} className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 font-medium text-xs rounded-lg transition-all">
-                        Input Qty
-                      </button>
+                      {item.order_type?.toUpperCase() === 'SABLON' && ['BARU MASUK', 'SIAP PROSES', 'PROSES'].includes(item.item_status?.toUpperCase()) ? (
+                        <button onClick={() => handleOpenModal(item)} className="px-3 py-1.5 bg-primary/20 hover:bg-primary/30 text-primary border border-primary/20 font-medium text-xs rounded-lg transition-all">
+                          Input Qty
+                        </button>
+                      ) : <span className="text-xs text-foreground/40">-</span>}
                     </td>
                   </tr>
                 ))}

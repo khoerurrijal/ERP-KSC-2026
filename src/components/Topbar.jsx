@@ -10,7 +10,7 @@ import { useTheme } from 'next-themes'
 import { getWaBotStatus, toggleWaBotStatus } from '@/app/dashboard/settings/actions'
 import { getAdminNotifications, markAdminNotificationRead } from '@/app/actions/notifications'
 
-export default function Topbar({ userRole = '', onToggleSidebar }) {
+export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRootRef }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -21,7 +21,8 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
   const [unreadCount, setUnreadCount] = useState(0)
   const notificationRef = useRef(null)
   const profileRef = useRef(null)
-  const { theme, setTheme } = useTheme()
+  const liquidGlassElementRef = useRef(null)
+  const { theme, setTheme, resolvedTheme } = useTheme()
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -29,6 +30,112 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
     // Fetch initial WA bot status
     getWaBotStatus().then(status => setIsWaBotActive(status))
   }, [])
+
+  useEffect(() => {
+    const root = liquidGlassRootRef?.current
+    const glassElement = liquidGlassElementRef.current
+    if (!mounted || !root || !glassElement) return undefined
+
+    const isDarkTheme = resolvedTheme
+      ? resolvedTheme === 'dark'
+      : document.documentElement.classList.contains('dark')
+    if (!isDarkTheme) return undefined
+
+    const content = root.querySelector('main')
+    let sceneObserver = null
+    let sceneRefreshTimer = null
+    let sceneRefreshInFlight = false
+    let cancelled = false
+    let liquidGlassInstance = null
+
+    const markSceneForScroll = () => {
+      if (content) liquidGlassInstance?.markChanged(content)
+    }
+
+    document.addEventListener('scroll', markSceneForScroll, true)
+
+    const scheduleSceneRefresh = (instance) => {
+      if (!content || sceneRefreshTimer) return
+      sceneRefreshTimer = window.setTimeout(async () => {
+        sceneRefreshTimer = null
+        if (cancelled) return
+        if (sceneRefreshInFlight) {
+          scheduleSceneRefresh(instance)
+          return
+        }
+
+        sceneRefreshInFlight = true
+        try {
+          await instance.capture.captureElement(content, true)
+          instance.markChanged(content)
+        } catch (error) {
+          console.warn('Liquid Glass gagal memperbarui konten halaman.', error)
+        } finally {
+          sceneRefreshInFlight = false
+        }
+      }, 120)
+    }
+
+    const initializeGlass = async () => {
+      try {
+        const { LiquidGlass } = await import('@ybouane/liquidglass')
+        if (cancelled) return
+
+        const instance = await LiquidGlass.init({
+          root,
+          glassElements: [glassElement],
+          defaults: {
+            blurAmount: 0.2,
+            refraction: 0.69,
+            chromAberration: 0.05,
+            edgeHighlight: 0.05,
+            specular: 0,
+            fresnel: 1,
+            cornerRadius: 65,
+            zRadius: 40,
+            saturation: 0,
+            brightness: 0,
+            shadowOpacity: 0.3,
+            floating: false,
+            button: false,
+            bevelMode: 0,
+          },
+        })
+
+        if (cancelled) {
+          instance.destroy()
+          return
+        }
+
+        liquidGlassInstance = instance
+        if (content) {
+          await instance.capture.captureElement(content, true)
+          instance.markChanged(content)
+          sceneObserver = new MutationObserver(() => scheduleSceneRefresh(instance))
+          sceneObserver.observe(content, { childList: true, subtree: true, characterData: true, attributes: true })
+        }
+        glassElement.classList.add('liquid-glass-active')
+      } catch (error) {
+        if (!cancelled) {
+          console.warn('Liquid Glass tidak tersedia; memakai tampilan fallback.', error)
+          glassElement.querySelectorAll(':scope > canvas').forEach(canvas => canvas.remove())
+          glassElement.style.removeProperty('position')
+          glassElement.style.removeProperty('overflow')
+        }
+      }
+    }
+
+    void initializeGlass()
+
+    return () => {
+      cancelled = true
+      liquidGlassInstance?.destroy()
+      glassElement.classList.remove('liquid-glass-active')
+      document.removeEventListener('scroll', markSceneForScroll, true)
+      sceneObserver?.disconnect()
+      if (sceneRefreshTimer) window.clearTimeout(sceneRefreshTimer)
+    }
+  }, [mounted, resolvedTheme, liquidGlassRootRef])
 
   useEffect(() => {
     if (!['Owner', 'Admin'].includes(userRole)) return undefined
@@ -120,12 +227,12 @@ export default function Topbar({ userRole = '', onToggleSidebar }) {
     ['/master/employees', 'Karyawan', 'Kelola data karyawan'],
     ['/report', 'Laporan', 'Ringkasan keuangan dan performa usaha'],
     ['/audit', 'AI Audit', 'Pemeriksaan data dan kesehatan alur aplikasi'],
-    ['/settings', 'Pengaturan', 'Kelola akses pengguna dan hak akses'],
-    ['/system-config', 'Sistem Konfigurasi', 'Konfigurasi parameter operasional aplikasi'],
+    ['/settings', 'Pengaturan Sistem', 'Kelola konfigurasi, akses, dan skema gaji'],
+    ['/system-config', 'Pengaturan Sistem', 'Kelola konfigurasi, akses, dan skema gaji'],
   ].find(([path]) => displayPathname === path || displayPathname.startsWith(`${path}/`)) || ['/', 'King Sablon ERP', '']
 
   return (
-    <div className="w-full h-14 sm:h-16 bg-white/[0.04] backdrop-blur-xl border-b border-white/10 sticky top-0 z-40 flex items-center justify-between px-3 sm:px-4 lg:px-6">
+    <div ref={liquidGlassElementRef} className="liquid-glass-topbar sticky top-1 z-40 mx-2 my-1 h-12 sm:h-14 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 print:hidden">
       
       {/* Left: Mobile Hamburger & Logo */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">

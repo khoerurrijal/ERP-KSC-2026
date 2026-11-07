@@ -2,12 +2,14 @@
 
 import { useState } from 'react'
 import { PackageSearch } from 'lucide-react'
+import { matchesSearchText } from '@/utils/search'
 
 export default function StockSearchWidget({ products = [] }) {
   const [query, setQuery] = useState('')
 
-  const filtered = query 
-    ? products.filter(s => ((s.name || '').toLowerCase().includes(query.toLowerCase())))
+  const normalizedQuery = query.trim().toLowerCase()
+  const filtered = normalizedQuery
+    ? products.filter(s => matchesSearchText(s.name, normalizedQuery))
     : products.slice(0, 3)
 
   return (
@@ -31,7 +33,7 @@ export default function StockSearchWidget({ products = [] }) {
               <div key={item.id} className="flex justify-between items-center border-b border-white/5 pb-2 last:border-0 last:pb-0">
                 <span className="text-sm text-foreground/80 font-medium">{item.name}</span>
                 <span className={`text-sm font-bold ${item.stock_qty < 100 ? 'text-red-400' : 'text-green-400'}`}>
-                  {Number(item.stock_qty || 0).toLocaleString('id-ID')} <span className="text-[10px] font-normal">{item.unit}</span>
+                  {Number(item.stock_qty || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-[10px] font-normal">{item.unit}</span>
                 </span>
               </div>
             ))}

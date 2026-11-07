@@ -185,7 +185,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   const formatRp = (val) => {
     if (val === undefined || val === null || val === '') return ''
     const num = val.toString().replace(/[^0-9]/g, '')
-    return Number(num).toLocaleString('id-ID')
+    return Number(num).toLocaleString('id-ID', { maximumFractionDigits: 0 })
   }
 
   const parseRp = (val) => {
@@ -321,7 +321,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
   }
 
   return (
-    <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-[2px]">
+    <div className="fixed inset-0 wizard-drawer-layer z-[1100] bg-black/50 backdrop-blur-[2px]">
       <button
         type="button"
         aria-label="Tutup form Purchase Order"
@@ -476,7 +476,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
 
                     <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2 text-xs">
                       <span className="text-foreground/50">Subtotal Modal</span>
-                      <span className="font-bold text-red-400">Rp {(Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)).toLocaleString('id-ID')}</span>
+                      <span className="font-bold text-red-400">Rp {(Number(item.qty) * Number(item.unit_multiplier) * Number(item.unit_cost)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                     </div>
                   </div>
                 ))}
@@ -491,7 +491,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                 </div>
                 <div className="rounded-lg border border-red-500/20 bg-red-500/10 px-2.5 py-1.5 sm:text-right">
                   <p className="text-[10px] font-medium text-red-400">Total</p>
-                  <p className="text-base font-bold text-red-500">Rp {grandTotal.toLocaleString('id-ID')}</p>
+                  <p className="text-base font-bold text-red-500">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
 

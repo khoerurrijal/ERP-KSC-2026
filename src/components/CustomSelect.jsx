@@ -6,6 +6,7 @@
 import { useState, useRef, useEffect, useMemo, useLayoutEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'
+import { matchesSearchText } from '@/utils/search'
 
 export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false, menuPosition = "absolute" }) {
   const [isOpen, setIsOpen] = useState(false)
@@ -76,9 +77,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
 
   const filteredOptions = useMemo(() => {
     if (!searchable || !searchQuery) return options
-    return options.filter(opt => 
-      String(opt.label).toLowerCase().includes(searchQuery.toLowerCase())
-    )
+    return options.filter(opt => matchesSearchText(opt.label, searchQuery))
   }, [options, searchable, searchQuery])
 
   return (

@@ -2,8 +2,9 @@ import { createClient } from '@/utils/supabase/server'
 import ProductionTable from '@/components/ProductionTable'
 import { handleAutoStatusUpdate } from './actions'
 
-export default async function ProductionData({ mode = 'production', embedded = false } = {}) {
+export default async function ProductionData({ mode = 'production', embedded = false, searchParams = {} } = {}) {
   const supabase = await createClient()
+  const search = String(searchParams.search || '').replace(/[(),\"]/g, ' ').trim()
 
   if (mode === 'status') {
     const { data: paidDeliveryItems, error: paidItemsError } = await supabase
@@ -24,6 +25,58 @@ export default async function ProductionData({ mode = 'production', embedded = f
   const { data: { user } } = await supabase.auth.getUser()
   const userEmail = user?.email?.toLowerCase() || ''
 
+  let matchedOrderIds = []
+  let matchedProductCodes = []
+  if (search && mode === 'production') {
+    const [customersResult, productsResult, ordersResult] = await Promise.all([
+      supabase.from('customers').select('customer_code').ilike('name', `%${search}%`),
+      supabase.from('products').select('product_code').ilike('name', `%${search}%`),
+      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${search}%`)
+    ])
+    matchedProductCodes = (productsResult.data || []).map(product => product.product_code).filter(Boolean)
+    matchedOrderIds = (ordersResult.data || []).map(order => order.id).filter(Boolean)
+
+    const customerCodes = (customersResult.data || []).map(customer => customer.customer_code).filter(Boolean)
+    if (customerCodes.length) {
+      const { data: customerOrders } = await supabase.from('sales_orders').select('id').in('customer_code', customerCodes)
+      matchedOrderIds.push(...(customerOrders || []).map(order => order.id).filter(Boolean))
+    }
+    matchedOrderIds = [...new Set(matchedOrderIds)]
+  }
+
+  let productionItemsQuery = supabase
+    .from('sales_items')
+    .select(`
+      id,
+      product_code,
+      qty,
+      unit_multiplier,
+      status,
+      mockup_url,
+      order_type,
+      notes,
+      sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name)),
+      products (name, workshop_code),
+      production_logs (qty_processed)
+    `)
+    .order('id', { ascending: false })
+
+  if (search && mode === 'production') {
+    const searchFilters = [
+      `product_code.ilike.%${search}%`,
+      `notes.ilike.%${search}%`,
+      `status.ilike.%${search}%`,
+      ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : []),
+      ...(matchedOrderIds.length ? [`so_id.in.(${matchedOrderIds.join(',')})`] : [])
+    ]
+    productionItemsQuery = productionItemsQuery.or(searchFilters.join(','))
+  } else if (mode === 'production') {
+    productionItemsQuery = productionItemsQuery.in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
+  } else {
+    productionItemsQuery = productionItemsQuery.in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
+  }
+  productionItemsQuery = productionItemsQuery.limit(search && mode === 'production' ? 50000 : 500)
+
   const [
     { data: settingsData },
     { data: operatorsData },
@@ -31,23 +84,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   ] = await Promise.all([
     supabase.from('system_settings').select('value').eq('key', 'user_roles').single(),
     supabase.from('employees').select('id, full_name, salary_schemas(role_name)').eq('is_active', true),
-    supabase
-      .from('sales_items')
-      .select(`
-        id,
-        qty,
-        unit_multiplier,
-        status,
-        mockup_url,
-        order_type,
-        notes,
-        sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name)),
-        products (name, workshop_code),
-        production_logs (qty_processed)
-      `)
-      .in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
-      .order('id', { ascending: false })
-      .limit(500)
+    productionItemsQuery
   ])
 
   const userRoles = settingsData?.value || []
@@ -123,6 +160,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
       currentUser={userEmail} 
       userRole={userRole} 
       currentUserName={currentUserName} 
+      initialSearch={search}
       initialTab={mode === 'status' ? 'SO' : 'PRODUKSI'}
       hideTabs={mode === 'production' || embedded}
       hideHeader={embedded}

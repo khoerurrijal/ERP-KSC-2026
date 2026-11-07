@@ -231,14 +231,14 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
         <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
           <div className="flex justify-between text-xs text-foreground/60">
             <span>Harga Satuan (Rp)</span>
-            <span>Rp {finalPricePerPcs.toLocaleString('id-ID')}</span>
+            <span>Rp {finalPricePerPcs.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
           </div>
         </div>
       </div>
       
       <div className="p-4 bg-primary/10 border-t border-primary/20 flex justify-between items-center rounded-b-xl">
         <span className="text-xs text-primary font-bold uppercase tracking-wider">Total Est</span>
-        <span className="text-xl font-black text-primary">Rp {totalPrice.toLocaleString('id-ID')}</span>
+        <span className="metric-value-compact text-primary">Rp {totalPrice.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
       </div>
     </div>
   )

@@ -288,7 +288,7 @@ export async function addSalesPayment(soId, paymentData) {
 
     // Guard 2: Overpayment — pembayaran melebihi sisa tagihan
     if (normalizedPaymentAmount > remaining) {
-      throw new Error(`Pembayaran (Rp ${normalizedPaymentAmount.toLocaleString('id-ID')}) melebihi sisa tagihan (Rp ${remaining.toLocaleString('id-ID')}). Kurangi nominal pembayaran.`)
+      throw new Error(`Pembayaran (Rp ${normalizedPaymentAmount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}) melebihi sisa tagihan (Rp ${remaining.toLocaleString('id-ID', { maximumFractionDigits: 0 })}). Kurangi nominal pembayaran.`)
     }
 
     const newDpAmount = currentPaid + normalizedPaymentAmount

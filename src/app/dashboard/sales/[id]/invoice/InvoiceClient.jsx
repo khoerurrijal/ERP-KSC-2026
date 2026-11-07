@@ -1,6 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { getInvoiceAdditionalCharges, getInvoiceBaseItems } from '@/utils/invoiceTotals'
@@ -47,15 +48,15 @@ export default function InvoiceClient({ order, storeConfig }) {
   const waText = waTemplate
     .replace(/{invoice_number}/g, invoiceId)
     .replace(/{customer_name}/g, order.customers?.name || 'Customer')
-    .replace(/{total_amount}/g, Number(order.total_amount).toLocaleString('id-ID'))
-    .replace(/{sisa_bayar}/g, sisaBayar.toLocaleString('id-ID'))
+    .replace(/{total_amount}/g, Number(order.total_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 }))
+    .replace(/{sisa_bayar}/g, sisaBayar.toLocaleString('id-ID', { maximumFractionDigits: 0 }))
   const waUrl = `https://wa.me/?text=${encodeURIComponent(waText)}`
 
   return (
     <>
       {isQrisOpen && (
         <div className="fixed inset-0 z-[1200] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={event => event.target === event.currentTarget && setIsQrisOpen(false)}>
-          <img src="/qris.png" alt="QRIS Full" className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
+          <Image src="/qris.png" alt="QRIS Full" width={900} height={900} className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a href="/qris.png" download="QRIS-KingSablon.png" className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-primary/20" onClick={e => e.stopPropagation()}>
               <Download className="w-5 h-5" /> Simpan QRIS
@@ -109,7 +110,7 @@ export default function InvoiceClient({ order, storeConfig }) {
         <div className="flex flex-col md:flex-row justify-between items-start gap-6 md:gap-8 border-b border-gray-200 pb-6 md:pb-8 print:flex-row">
           <div>
             <div className="mb-2">
-              <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-12 sm:h-16 md:h-20 w-auto object-contain bg-transparent" />
+              <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-12 sm:h-16 md:h-20 w-auto object-contain bg-transparent" />
             </div>
             <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
 
@@ -121,7 +122,7 @@ export default function InvoiceClient({ order, storeConfig }) {
           </div>
 
           <div className="text-left md:text-right w-full md:w-auto mt-4 md:mt-0">
-            <h2 className="text-3xl md:text-4xl font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
+            <h2 className="page-display-title font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
             <div className="mt-2 md:mt-4 space-y-1 text-sm">
               <p className="text-gray-500">Nomor Faktur</p>
               <p className="font-bold text-gray-900">{invoiceId}</p>
@@ -159,10 +160,10 @@ export default function InvoiceClient({ order, storeConfig }) {
                 <div className="pr-4">
                   <p className="font-bold text-gray-900 text-sm leading-tight">{item.products?.name || item.product_code}</p>
                   <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
-                  <p className="text-xs text-gray-400 mt-1">{Number(item.qty).toLocaleString('id-ID')} Pcs x Rp {Number(item.unit_price).toLocaleString('id-ID')}</p>
+                  <p className="text-xs text-gray-400 mt-1">{Number(item.qty).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs x Rp {Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                 </div>
                 <div className="text-right shrink-0">
-                  <p className="font-bold text-gray-900 text-sm">Rp {Number(item.total_price).toLocaleString('id-ID')}</p>
+                  <p className="font-bold text-gray-900 text-sm">Rp {Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                 </div>
               </div>
             ))}
@@ -172,7 +173,7 @@ export default function InvoiceClient({ order, storeConfig }) {
                   <p className="font-bold text-gray-900 text-sm">{charge.label}</p>
                   <p className="text-xs text-gray-500 mt-1">Biaya tambahan pesanan</p>
                 </div>
-                <p className="font-bold text-gray-900 text-sm">Rp {charge.amount.toLocaleString('id-ID')}</p>
+                <p className="font-bold text-gray-900 text-sm">Rp {charge.amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
               </div>
             ))}
           </div>
@@ -196,16 +197,16 @@ export default function InvoiceClient({ order, storeConfig }) {
                       <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
                       <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
                     </td>
-                    <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID')}</td>
+                    <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                     <td className="py-4 text-center text-gray-600">Pcs</td>
-                    <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
-                    <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+                    <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                    <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
                 {additionalCharges.map((charge) => (
                   <tr key={charge.key}>
                     <td colSpan={4} className="py-3 text-right font-bold text-gray-900">{charge.label}</td>
-                    <td className="py-3 text-right font-bold text-gray-900">{charge.amount.toLocaleString('id-ID')}</td>
+                    <td className="py-3 text-right font-bold text-gray-900">{charge.amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>
@@ -228,7 +229,7 @@ export default function InvoiceClient({ order, storeConfig }) {
                   <p className="text-sm font-bold text-gray-900 mb-3 group-hover:text-primary transition-colors">Scan QRIS untuk Membayar</p>
                   
                   <div className="w-48 h-48 mx-auto relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-inner">
-                    <img src="/qris.png" alt="QRIS BCA" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-none mix-blend-multiply" />
+                    <Image src="/qris.png" alt="QRIS BCA" width={900} height={900} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-none mix-blend-multiply" />
                   </div>
 
                   <p className="text-xs text-gray-500 mt-3 font-semibold flex flex-col items-center gap-2">
@@ -266,18 +267,18 @@ export default function InvoiceClient({ order, storeConfig }) {
           <div className="w-full md:w-1/3 space-y-3 print:w-1/2">
             <div className="flex justify-between items-center pt-2 border-b border-gray-200 pb-3">
               <span className="font-bold text-gray-900 text-lg">Total Tagihan</span>
-              <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID')}</span>
+              <span className="metric-value-compact font-black text-gray-900">Rp {Number(order.total_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
             </div>
 
             <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-300 space-y-2">
               <div className="flex justify-between items-center text-sm text-green-700 font-medium">
                 <span>Telah Dibayar (DP)</span>
-                <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID')}</span>
+                <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
               </div>
               {sisaBayar > 0 ? (
                 <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg text-red-700 font-bold">
                   <span>Sisa Pembayaran</span>
-                  <span className="text-lg">Rp {sisaBayar.toLocaleString('id-ID')}</span>
+                  <span className="text-lg">Rp {sisaBayar.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                 </div>
               ) : (
                 <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg text-green-700 font-bold">

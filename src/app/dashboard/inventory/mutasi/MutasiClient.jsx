@@ -1,21 +1,50 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+/* Search input follows the URL so database results and browser history stay in sync. */
+/* eslint-disable react-hooks/set-state-in-effect */
+import { useState, useMemo, useEffect } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, ArrowDownToLine, ArrowUpFromLine, Filter } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
+import { matchesSearchText } from '@/utils/search'
 
-export default function MutasiClient({ mutations = [], products = [], selectedMonth = '', error = null }) {
-  const [searchQuery, setSearchQuery] = useState('')
+export default function MutasiClient({ mutations = [], products = [], selectedMonth = '', initialSearch = '', error = null }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const searchParamsString = searchParams.toString()
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [filterProduct, setFilterProduct] = useState('')
 
+  useEffect(() => {
+    setSearchQuery(searchParams.get('mutationSearch') || '')
+  }, [searchParams])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const normalizedSearch = searchQuery.trim()
+      const params = new URLSearchParams(searchParamsString)
+      if ((params.get('mutationSearch') || '') === normalizedSearch) return
+
+      if (normalizedSearch) params.set('mutationSearch', normalizedSearch)
+      else params.delete('mutationSearch')
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, searchParamsString, pathname, router])
+
   const filteredMutations = useMemo(() => {
+    const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
+    const isSearching = Boolean(normalizedSearch)
     return mutations.filter(m => {
-      const matchSearch = ((m.reference || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          ((m.actor || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          ((m.product_name || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchSearch = matchesSearchText(m.reference, normalizedSearch) ||
+                          matchesSearchText(m.actor, normalizedSearch) ||
+                          matchesSearchText(m.product_name, normalizedSearch)
       
-      const matchProduct = filterProduct ? m.product_code === filterProduct : true
+      const matchProduct = !isSearching && filterProduct ? m.product_code === filterProduct : true
 
       return matchSearch && matchProduct
     })
@@ -43,14 +72,14 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
         <div className="glass-card p-4 border-l-4 border-green-500 flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Barang Masuk</p>
-            <p className="text-2xl font-bold text-green-400 mt-2">{totalMasuk.toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">PCS</span></p>
+            <p className="metric-value mt-2 text-green-400">{totalMasuk.toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">PCS</span></p>
           </div>
           <ArrowDownToLine className="w-8 h-8 text-green-500/20" />
         </div>
         <div className="glass-card p-4 border-l-4 border-yellow-500 flex items-center justify-between">
           <div>
             <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Barang Keluar</p>
-            <p className="text-2xl font-bold text-yellow-400 mt-2">{totalKeluar.toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">PCS</span></p>
+            <p className="metric-value mt-2 text-yellow-400">{totalKeluar.toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">PCS</span></p>
           </div>
           <ArrowUpFromLine className="w-8 h-8 text-yellow-500/20" />
         </div>

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import Image from 'next/image'
 import CustomSelect from '@/components/CustomSelect'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 import { ShoppingCart, X, Plus, ChevronRight, Image as ImageIcon } from 'lucide-react'
@@ -39,7 +40,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [invoiceData, setInvoiceData] = useState(null)
 
-  const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(num)
+  const formatRp = (num) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num)
 
   // --- DERIVED DATA ---
   const allCategories = useMemo(() => {
@@ -93,7 +94,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
   // Removed the useEffect that forces the qty back to minQty
 
   // --- PRICING LOGIC ---
-  const calculateItemPrice = (item) => {
+  const calculateItemPrice = useCallback((item) => {
     const product = products.find(p => p.id === item.productId)
     if (!product) return 0
     
@@ -105,7 +106,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
       printingColors: item.printingColors,
       pricelistConfig
     })
-  }
+  }, [products, pricelistConfig])
 
   const modalPricePreview = useMemo(() => {
     if (!modalSelectedProductObj) return { unitPrice: 0, total: 0 }
@@ -152,7 +153,7 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
     if (isDesignService && cart.length > 0) grandTotal += 50000
 
     return { subtotal, grandTotal }
-  }, [cart, isDesignService, products, pricelistConfig])
+  }, [cart, isDesignService, calculateItemPrice])
 
   // --- HANDLERS ---
   const handleOpenCategory = (cat) => {
@@ -309,9 +310,12 @@ export default function OrderClient({ products, matrix, dropdownConfig, pricelis
                 >
                   {/* Aspect Square for thumbnail */}
                   <div className="w-full aspect-square relative bg-white/5 overflow-hidden">
-                    <img 
+                    <Image
                       src={imgUrl} 
                       alt={cat} 
+                      width={800}
+                      height={800}
+                      unoptimized
                       className="w-full h-full object-contain p-3 sm:p-4 opacity-50 transition-transform duration-500 group-hover:scale-110"
                       onError={(e) => { 
                         e.currentTarget.onerror = null; 

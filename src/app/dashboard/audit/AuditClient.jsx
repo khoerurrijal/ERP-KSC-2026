@@ -98,15 +98,15 @@ export default function AuditClient({ initialReport }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div className="glass-card p-4 border-l-4 border-red-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Kritis</p>
-          <p className="text-3xl font-black text-red-400 mt-2">{report.summary.critical}</p>
+          <p className="metric-value mt-2 text-red-400">{report.summary.critical}</p>
         </div>
         <div className="glass-card p-4 border-l-4 border-amber-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Perlu Ditinjau</p>
-          <p className="text-3xl font-black text-amber-400 mt-2">{report.summary.warning}</p>
+          <p className="metric-value mt-2 text-amber-400">{report.summary.warning}</p>
         </div>
         <div className="glass-card p-4 border-l-4 border-primary">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-bold">Total Temuan</p>
-          <p className="text-3xl font-black text-primary mt-2">{report.summary.total}</p>
+          <p className="metric-value mt-2 text-primary">{report.summary.total}</p>
         </div>
       </div>
 

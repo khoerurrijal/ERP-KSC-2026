@@ -6,8 +6,8 @@ import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRo
 import CurrencyInput from '@/components/CurrencyInput'
 import { DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 
-export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false }) {
-  const [activeTab, setActiveTab] = useState(onlyAccess ? 'access' : 'dropdowns')
+export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false, hideTabs = false, initialTab }) {
+  const [activeTab, setActiveTab] = useState(initialTab || (onlyAccess ? 'access' : 'dropdowns'))
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
   
@@ -280,7 +280,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-white/10 pb-px overflow-x-auto">
+      {!hideTabs && <div className="flex gap-1 border-b border-white/10 pb-px overflow-x-auto">
         <button
           onClick={() => setActiveTab('dropdowns')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
@@ -358,7 +358,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <ShieldCheck className="w-4 h-4" />
           Akses & Pengguna
         </button>
-      </div>
+      </div>}
 
       {/* Tab Content: Dropdowns */}
       {activeTab === 'dropdowns' && (

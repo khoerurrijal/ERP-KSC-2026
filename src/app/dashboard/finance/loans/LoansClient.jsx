@@ -62,7 +62,7 @@ export default function LoansClient({ employees = [], initialLoans = [], error =
   const formatRp = (val) => {
     if (!val) return ''
     const num = val.toString().replace(/[^0-9]/g, '')
-    return Number(num).toLocaleString('id-ID')
+    return Number(num).toLocaleString('id-ID', { maximumFractionDigits: 0 })
   }
 
   return (
@@ -101,8 +101,8 @@ export default function LoansClient({ employees = [], initialLoans = [], error =
                       {item.type}
                     </span>
                   </td>
-                  <td className="px-6 py-4 text-foreground/80 font-medium">Rp {item.amount.toLocaleString('id-ID')}</td>
-                  <td className="px-6 py-4 text-red-400 font-bold">Rp {item.remaining_amount.toLocaleString('id-ID')}</td>
+                  <td className="px-6 py-4 text-foreground/80 font-medium">Rp {item.amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                  <td className="px-6 py-4 text-red-400 font-bold">Rp {item.remaining_amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded-full text-[10px] font-bold ${item.status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : 'bg-yellow-500/20 text-yellow-400'}`}>
                       {item.status}
@@ -174,7 +174,7 @@ export default function LoansClient({ employees = [], initialLoans = [], error =
                 <div className="space-y-2 animate-in fade-in">
                   <label className="text-xs font-medium text-foreground/80">Tenor (Berapa Minggu Cicilan)</label>
                   <input type="number" min="1" value={formData.tenor_weeks} onChange={e => setFormData({...formData, tenor_weeks: parseInt(e.target.value) || 1})} className="glass-input w-full" />
-                  <p className="text-[10px] text-yellow-400">Cicilan per minggu: Rp {Math.ceil(Number(formData.amount.replace(/[^0-9]/g, '')) / formData.tenor_weeks || 0).toLocaleString('id-ID')}</p>
+                  <p className="text-[10px] text-yellow-400">Cicilan per minggu: Rp {Math.ceil(Number(formData.amount.replace(/[^0-9]/g, '')) / formData.tenor_weeks || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                 </div>
               )}
 

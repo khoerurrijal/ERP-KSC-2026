@@ -5,6 +5,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTheme } from 'next-themes'
@@ -64,13 +65,12 @@ const MENU_GROUPS = [
     subItems: [
       { name: 'Laporan', path: '/report', icon: FileText, key: 'laporan' },
       { name: 'AI Audit', path: '/audit', icon: ShieldCheck, key: 'audit' },
-      { name: 'Pengaturan', path: '/settings', icon: Settings, key: 'pengaturan' },
-      { name: 'Sistem Konfigurasi', path: '/system-config', icon: Settings, key: 'pengaturan' },
+      { name: 'Pengaturan Sistem', path: '/settings', icon: Settings, key: 'pengaturan' },
     ]
   }
 ]
 
-export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {} }) {
+export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {} }) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const sidebarRef = useRef(null)
@@ -145,8 +145,8 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
       <div ref={sidebarRef} className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center justify-between p-4">
           <div className="flex shrink-0">
-            <img src="/logo.png" alt="Logo Light" className="h-8 object-contain drop-shadow-md block dark:hidden" />
-            <img src="/logo-dark.png" alt="Logo Dark" className="h-8 object-contain drop-shadow-md hidden dark:block" />
+            <Image src="/logo.png" alt="Logo Light" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md block dark:hidden" />
+            <Image src="/logo-dark.png" alt="Logo Dark" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md hidden dark:block" />
           </div>
           <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
             <div className="w-5 h-0.5 bg-current mb-1" />
@@ -158,7 +158,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
           <div className="absolute top-full left-0 w-full h-[calc(100vh-64px)] bg-background/95 backdrop-blur-2xl flex flex-col overflow-y-auto border-t border-white/10 animate-in slide-in-from-top-4 p-4">
             <div className="flex-1 space-y-2">
               {filteredMenus.map((group, idx) => (
-                <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => setIsMobileOpen(false)} isOpen={openGroupKey === group.name} onToggle={() => toggleGroup(group.name)} />
+                <MenuGroup key={idx} group={group} pathname={pathname} onClick={() => { setIsMobileOpen(false); onCloseMobile() }} isOpen={openGroupKey === group.name} onToggle={() => toggleGroup(group.name)} />
               ))}
             </div>
              <div className="mt-8 pt-4 border-t border-white/10 pb-10 flex justify-center text-xs text-foreground/40">
@@ -174,14 +174,18 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     <aside ref={sidebarRef} className={`h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className={`relative flex ${isCollapsed ? 'flex-col items-center gap-2 p-3' : 'items-center justify-center p-6 pb-2'}`}>
         <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} transition-all duration-300 cursor-pointer hover:scale-105`}>
-          <img 
+          <Image
             src="/logo.png" 
             alt="King Sablon Logo Light" 
+            width={400}
+            height={160}
             className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden"
           />
-          <img 
+          <Image
             src="/logo-dark.png" 
             alt="King Sablon Logo Dark" 
+            width={400}
+            height={160}
             className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block"
           />
         </div>
@@ -195,7 +199,10 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
             pathname={pathname}
             isCollapsed={isCollapsed}
             isOpen={openGroupKey === group.name}
-            onClick={isCollapsed ? () => setOpenGroupKey(null) : undefined}
+            onClick={() => {
+              if (isCollapsed) setOpenGroupKey(null)
+              onCloseMobile()
+            }}
             onToggle={() => toggleGroup(group.name)}
           />
         ))}

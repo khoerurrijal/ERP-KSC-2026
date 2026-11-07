@@ -11,6 +11,8 @@ export default async function MutasiPage({ searchParams }) {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`
   })()
+  const searchTerm = String(resolvedParams?.mutationSearch || '').trim()
+  const search = searchTerm.replace(/[(),"]/g, ' ').trim()
 
   // Ambil semua data mutasi (Pastikan VIEW sudah ada di DB)
   // Karena bisa besar, kita limit 100k, filter di client atau jika terlalu besar harus filter DB
@@ -24,23 +26,50 @@ export default async function MutasiPage({ searchParams }) {
   const lastDay = new Date(year, month, 0).getDate()
   const endDateStr = `${selectedMonth}-${String(lastDay).padStart(2, '0')}`
 
-  const { data: rawMutations, error } = await supabase
+  let mutationsQuery = supabase
     .from('inventory_mutations')
     .select('*')
-    .gte('mutation_date', `${selectedMonth}-01`)
-    .lte('mutation_date', endDateStr)
     .order('created_at', { ascending: false })
     .limit(50000)
+
+  if (search) {
+    mutationsQuery = mutationsQuery.or(`reference.ilike.%${search}%,actor.ilike.%${search}%,product_name.ilike.%${search}%`)
+  } else {
+    mutationsQuery = mutationsQuery
+      .gte('mutation_date', `${selectedMonth}-01`)
+      .lte('mutation_date', endDateStr)
+  }
+
+  const { data: rawMutations, error } = await mutationsQuery
 
   let mutations = rawMutations || [];
 
   // Ambil mutasi tambahan dari stock_mutations yang tidak tercover oleh view
-  const { data: stockMutations } = await supabase
+  let stockMutationsQuery = supabase
     .from('stock_mutations')
     .select('*, products(name)')
-    .gte('created_at', `${selectedMonth}-01T00:00:00`)
-    .lte('created_at', `${endDateStr}T23:59:59`)
     .not('mutation_type', 'in', '("IN","OUT_POLOS","OUT_SABLON")')
+
+  if (search) {
+    const { data: matchedProducts } = await supabase
+      .from('products')
+      .select('product_code')
+      .ilike('name', `%${searchTerm}%`)
+    const matchedProductCodes = (matchedProducts || []).map(product => product.product_code).filter(Boolean)
+    const searchFilters = [
+      `reference_number.ilike.%${search}%`,
+      `mutation_type.ilike.%${search}%`,
+      ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : [])
+    ]
+    stockMutationsQuery = stockMutationsQuery.or(searchFilters.join(','))
+  } else {
+    stockMutationsQuery = stockMutationsQuery
+      .gte('created_at', `${selectedMonth}-01T00:00:00`)
+      .lte('created_at', `${endDateStr}T23:59:59`)
+  }
+
+  stockMutationsQuery = stockMutationsQuery.order('created_at', { ascending: false }).limit(50000)
+  const { data: stockMutations } = await stockMutationsQuery
 
   if (stockMutations && stockMutations.length > 0) {
     const extraMutations = stockMutations.map(m => {
@@ -70,6 +99,7 @@ export default async function MutasiPage({ searchParams }) {
       mutations={mutations} 
       products={products || []} 
       selectedMonth={selectedMonth} 
+      initialSearch={searchTerm}
       error={error ? error.message : null}
     />
   )

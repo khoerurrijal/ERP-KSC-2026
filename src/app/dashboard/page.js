@@ -93,8 +93,9 @@ export default async function DashboardPage({ searchParams }) {
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       
-      <div className="flex justify-end">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h2 className="text-lg font-bold text-foreground">Statistik Pesanan (Sales Order)</h2>
+        <div className="flex items-center justify-end gap-3">
           <MonthFilter />
           <form action="/auth/signout" method="post">
             <button type="submit" className="btn-secondary h-10 px-4 text-sm">Sign Out</button>
@@ -103,23 +104,22 @@ export default async function DashboardPage({ searchParams }) {
       </div>
 
       {/* STATISTIK PENJUALAN */}
-      <h2 className="text-lg font-bold text-foreground mt-8">Statistik Pesanan (Sales Order)</h2>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="glass-card p-4 border-l-4 border-green-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">SO Lunas</p>
-          <p className="text-2xl font-bold text-green-400 mt-2">{soLunas} <span className="text-xs font-normal text-foreground/50">Total</span></p>
+          <p className="metric-value mt-2 text-green-400">{soLunas} <span className="text-xs font-normal text-foreground/50">Total</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-yellow-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">SO Belum Lunas (DP)</p>
-          <p className="text-2xl font-bold text-yellow-400 mt-2">{soBelumLunas} <span className="text-xs font-normal text-foreground/50">Tagihan Aktif</span></p>
+          <p className="metric-value mt-2 text-yellow-400">{soBelumLunas} <span className="text-xs font-normal text-foreground/50">Tagihan Aktif</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-blue-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Marketplace (Tempo)</p>
-          <p className="text-2xl font-bold text-blue-400 mt-2">{mpTempo} <span className="text-xs font-normal text-foreground/50">Pencairan</span></p>
+          <p className="metric-value mt-2 text-blue-400">{mpTempo} <span className="text-xs font-normal text-foreground/50">Pencairan</span></p>
         </div>
         <div className="glass-card p-4 border-l-4 border-primary bg-primary/5">
           <p className="text-xs text-primary uppercase tracking-wider font-bold">Total Produksi Sablon</p>
-          <p className="text-2xl font-bold text-foreground mt-2">{totalSablonQty.toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Pcs</span></p>
+          <p className="metric-value mt-2 text-foreground">{totalSablonQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Pcs</span></p>
         </div>
       </div>
 
@@ -138,7 +138,7 @@ export default async function DashboardPage({ searchParams }) {
         </Link>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mt-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 items-start gap-4 mt-4">
         
         {/* KALKULATOR HARGA */}
         <div className="lg:col-span-1">
@@ -184,14 +184,14 @@ export default async function DashboardPage({ searchParams }) {
         </div>
 
         {/* PIUTANG SO (Belum Lunas) */}
-        <div className="glass-card flex flex-col lg:col-span-1 border-t-4 border-yellow-500 h-fit">
+        <div className="glass-card flex min-h-0 flex-col lg:col-span-1 border-t-4 border-yellow-500 h-fit">
           <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
             <h2 className="font-bold text-foreground flex items-center gap-2">
               <FileText className="w-5 h-5 text-yellow-400" /> Pesanan Belum Lunas
             </h2>
             <Link href="/sales" className="text-xs text-primary hover:underline">Lihat SO</Link>
           </div>
-             <div className="p-4 flex-1 overflow-y-auto max-h-[450px] space-y-3">
+             <div className="p-4 min-h-0 flex-1 overflow-y-auto max-h-[450px] space-y-3">
              {(() => {
                const unpaidOrders = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL')
                if (unpaidOrders.length === 0) {
@@ -222,7 +222,7 @@ export default async function DashboardPage({ searchParams }) {
                   <details key={month} className="group bg-white/5 border border-white/10 rounded-lg overflow-hidden" open>
                      <summary className="p-3 cursor-pointer flex justify-between items-center hover:bg-white/5 transition-colors">
                         <div className="font-bold text-foreground uppercase text-xs tracking-wider">{formatMonth(month)}</div>
-                        <div className="font-bold text-yellow-400">Rp {groupedUnpaid[month].totalRp.toLocaleString('id-ID')}</div>
+                        <div className="font-bold text-yellow-400">Rp {groupedUnpaid[month].totalRp.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>
                      </summary>
                      <div className="p-3 border-t border-white/10 bg-black/20 space-y-2">
                         {groupedUnpaid[month].orders.map(so => (
@@ -231,7 +231,7 @@ export default async function DashboardPage({ searchParams }) {
                                <p className="font-bold text-foreground/90">{so.customers?.name || 'Unknown'}</p>
                                <p className="text-[10px] text-foreground/50">{so.invoice_number}</p>
                              </div>
-                             <p className="font-semibold text-yellow-400">Rp {so.sisaTagihan.toLocaleString('id-ID')}</p>
+                             <p className="font-semibold text-yellow-400">Rp {so.sisaTagihan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                           </div>
                         ))}
                      </div>
@@ -239,13 +239,13 @@ export default async function DashboardPage({ searchParams }) {
                ))
              })()}
           </div>
-          <div className="p-4 border-t border-white/10 bg-yellow-500/10 flex justify-between items-center sticky bottom-0">
+          <div className="p-4 border-t border-white/10 bg-yellow-500/10 flex shrink-0 justify-between items-center">
             <span className="text-sm font-medium text-yellow-400">Total Keseluruhan:</span>
             <span className="text-lg font-bold text-yellow-500">
               Rp {rawOrders.filter(o => o.payment_status !== 'LUNAS').reduce((acc, so) => {
                 const total = Number(so.total_amount) || 0
                 return acc + (total - (Number(so.dp_amount) || 0))
-              }, 0).toLocaleString('id-ID')}
+              }, 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>

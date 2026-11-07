@@ -299,7 +299,7 @@ export async function runAuditScan(supabase) {
         'Marketplace',
         `Pencairan marketplace invoice ${order.invoice_number || order.id} kosong`,
         'Invoice marketplace sudah lunas, tetapi nominal pencairannya masih kosong.',
-        [{ label: order.invoice_number || order.id, value: `Rp ${total.toLocaleString('id-ID')}`, href: '/marketplace' }],
+        [{ label: order.invoice_number || order.id, value: `Rp ${total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`, href: '/marketplace' }],
         '/marketplace'
       ))
     }
@@ -311,7 +311,7 @@ export async function runAuditScan(supabase) {
         'Marketplace',
         `Pencairan ada tetapi invoice ${order.invoice_number || order.id} belum lunas`,
         'Nominal marketplace_pencairan sudah terisi, tetapi payment_status belum LUNAS.',
-        [{ label: order.invoice_number || order.id, value: `Rp ${payout.toLocaleString('id-ID')}`, href: '/marketplace' }],
+        [{ label: order.invoice_number || order.id, value: `Rp ${payout.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`, href: '/marketplace' }],
         '/marketplace'
       ))
     }
@@ -323,7 +323,7 @@ export async function runAuditScan(supabase) {
         'Keuangan',
         `DP invoice ${order.invoice_number || order.id} melebihi total`,
         'Nilai pembayaran tercatat lebih besar daripada total invoice.',
-        [{ label: order.invoice_number || order.id, value: `DP Rp ${Number(order.dp_amount).toLocaleString('id-ID')} / Total Rp ${total.toLocaleString('id-ID')}`, href: `/sales?search=${encodeURIComponent(order.invoice_number || '')}` }],
+        [{ label: order.invoice_number || order.id, value: `DP Rp ${Number(order.dp_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })} / Total Rp ${total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`, href: `/sales?search=${encodeURIComponent(order.invoice_number || '')}` }],
         `/sales?search=${encodeURIComponent(order.invoice_number || '')}`
       ))
     }
@@ -358,8 +358,8 @@ export async function runAuditScan(supabase) {
         'Kesehatan Sistem',
         `Konfigurasi ${key} belum tersedia`,
         'Aplikasi mungkin menggunakan nilai default untuk sebagian fitur.',
-        [{ label: key, value: 'Tidak ditemukan', href: '/system-config' }],
-        '/system-config'
+        [{ label: key, value: 'Tidak ditemukan', href: '/settings?tab=dropdowns' }],
+        '/settings?tab=dropdowns'
       ))
     }
   }

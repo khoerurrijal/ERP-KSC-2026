@@ -111,17 +111,17 @@ export default function SalarySchemaClient({ initialSchemas }) {
               <tr key={schema.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-3 font-bold text-primary">{schema.role_name}</td>
                 <td className="px-4 py-3 text-xs">
-                  {schema.bonus_mingguan > 0 ? `Rp ${schema.bonus_mingguan.toLocaleString('id-ID')}` : '-'}
+                  {schema.bonus_mingguan > 0 ? `Rp ${schema.bonus_mingguan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                 </td>
                 <td className="px-4 py-3 text-xs text-foreground/80">
-                  {schema.rate_borongan_sendiri > 0 && <div>Sendiri: Rp {schema.rate_borongan_sendiri.toLocaleString('id-ID')}</div>}
-                  {schema.rate_produksi_bawahan > 0 && <div>Bawahan: Rp {schema.rate_produksi_bawahan.toLocaleString('id-ID')}</div>}
+                  {schema.rate_borongan_sendiri > 0 && <div>Sendiri: Rp {schema.rate_borongan_sendiri.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
+                  {schema.rate_produksi_bawahan > 0 && <div>Bawahan: Rp {schema.rate_produksi_bawahan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
                   {schema.rate_borongan_sendiri === 0 && schema.rate_produksi_bawahan === 0 && <span className="text-foreground/40 italic">-</span>}
                 </td>
                 <td className="px-4 py-3 text-xs text-foreground/60">
-                  {schema.bonus_harian_dibawah_target > 0 && <div>Bns Qty {'<'}{schema.batas_qty_bonus_harian}: Rp {schema.bonus_harian_dibawah_target.toLocaleString('id-ID')}</div>}
-                  {schema.bonus_target_harian > 0 && <div>Bns Qty {'>'}={schema.batas_qty_target_harian}: Rp {schema.bonus_target_harian.toLocaleString('id-ID')}</div>}
-                  {schema.fee_2_warna > 0 && <div>Fee 2 Warna: Rp {schema.fee_2_warna.toLocaleString('id-ID')}</div>}
+                  {schema.bonus_harian_dibawah_target > 0 && <div>Bns Qty {'<'}{schema.batas_qty_bonus_harian}: Rp {schema.bonus_harian_dibawah_target.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
+                  {schema.bonus_target_harian > 0 && <div>Bns Qty {'>'}={schema.batas_qty_target_harian}: Rp {schema.bonus_target_harian.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
+                  {schema.fee_2_warna > 0 && <div>Fee 2 Warna: Rp {schema.fee_2_warna.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-2">

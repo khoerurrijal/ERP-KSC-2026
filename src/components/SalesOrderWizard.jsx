@@ -244,7 +244,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const formatRp = (val) => {
     if (val === undefined || val === null || val === '') return ''
     const num = val.toString().replace(/[^0-9]/g, '')
-    return Number(num).toLocaleString('id-ID')
+    return Number(num).toLocaleString('id-ID', { maximumFractionDigits: 0 })
   }
 
   const parseRp = (val) => {
@@ -437,7 +437,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   if (compact) {
     return (
-      <div className="fixed inset-0 z-[1100] bg-black/50 backdrop-blur-[2px]">
+      <div className="fixed inset-0 wizard-drawer-layer z-[1100] bg-black/50 backdrop-blur-[2px]">
         <button
           type="button"
           aria-label="Tutup form Sales Order"
@@ -643,7 +643,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
                         <div className="mt-2 flex items-center justify-between border-t border-white/5 pt-2 text-xs">
                           <span className="text-foreground/50">Subtotal Item</span>
-                          <span className="font-bold text-primary">Rp {itemTotal.toLocaleString('id-ID')}</span>
+                          <span className="font-bold text-primary">Rp {itemTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                         </div>
                       </div>
                     )
@@ -666,14 +666,14 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   </div>
                   <div className="rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1.5 text-right">
                     <p className="text-[10px] font-medium text-primary/80">Total</p>
-                    <p className="text-base font-bold text-primary">Rp {grandTotal.toLocaleString('id-ID')}</p>
+                    <p className="text-base font-bold text-primary">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                   </div>
                 </div>
 
                 {isExistingOrder ? (
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">DP tercatat</span><strong className="mt-0.5 block text-green-400">Rp {Number(dpAmount).toLocaleString('id-ID')}</strong></div>
-                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">Sisa tagihan</span><strong className={`mt-0.5 block ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID')}</strong></div>
+                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">DP tercatat</span><strong className="mt-0.5 block text-green-400">Rp {Number(dpAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
+                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">Sisa tagihan</span><strong className={`mt-0.5 block ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -689,7 +689,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                       </div>
                     )}
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2 text-xs sm:col-span-2">
-                      <div className="flex items-center justify-between"><span className="text-foreground/60">Sisa Tagihan</span><strong className={remaining > 0 ? 'text-yellow-400' : 'text-green-400'}>Rp {Math.max(0, remaining).toLocaleString('id-ID')}</strong></div>
+                      <div className="flex items-center justify-between"><span className="text-foreground/60">Sisa Tagihan</span><strong className={remaining > 0 ? 'text-yellow-400' : 'text-green-400'}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
                     </div>
                   </div>
                 )}
@@ -951,7 +951,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     return (
                       <div className="mt-4 pt-4 border-t border-white/5 flex justify-between items-center text-sm">
                         <span className="text-foreground/60">Subtotal Item:</span>
-                        <span className="font-bold text-primary text-base">Rp {itemTotal.toLocaleString('id-ID')}</span>
+                        <span className="font-bold text-primary text-base">Rp {itemTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                       </div>
                     )
                   })()}
@@ -1071,11 +1071,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
             <div className="p-6 rounded-xl bg-primary/10 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-4">
               <div>
                 <p className="text-sm text-primary/80 font-medium">Grand Total Tagihan</p>
-                <p className="text-3xl font-bold text-primary mt-1">Rp {grandTotal.toLocaleString('id-ID')}</p>
+                <p className="metric-value-prominent mt-1 text-primary">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
               </div>
               <div className="text-right">
                 <p className="text-sm text-foreground/60">Total Item</p>
-                <p className="text-xl font-semibold text-foreground">{items.length} Macam</p>
+                <p className="metric-value-compact text-foreground">{items.length} Macam</p>
               </div>
             </div>
 
@@ -1105,7 +1105,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               <div className="flex justify-between items-center text-sm">
                 <span className="text-foreground/80">Sisa Tagihan (Kekurangan):</span>
                 <span className={`font-bold text-lg ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>
-                  Rp {remaining.toLocaleString('id-ID')}
+                  Rp {remaining.toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                 </span>
               </div>
             </div>

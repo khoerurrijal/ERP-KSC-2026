@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import Image from 'next/image'
 import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Printer, Settings, PackageOpen, CreditCard, XCircle, Download, MapPin, Phone, Mail, Navigation } from 'lucide-react'
 
 const STATUS_STEPS = [
@@ -129,7 +130,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
     <>
       {isQrisOpen && (
         <div className="fixed inset-0 z-[1200] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={event => event.target === event.currentTarget && setIsQrisOpen(false)}>
-          <img src="/qris.png" alt="QRIS Full" className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
+          <Image src="/qris.png" alt="QRIS Full" width={900} height={900} className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <a href="/qris.png" download="QRIS-KingSablon.png" className="bg-primary text-primary-foreground hover:bg-primary/90 px-6 py-3 rounded-full font-bold flex items-center gap-2 shadow-lg shadow-primary/20" onClick={e => e.stopPropagation()}>
               <Download className="w-5 h-5" /> Simpan QRIS
@@ -186,9 +187,11 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
           {/* Header */}
           <div className="p-5 sm:p-8 bg-gradient-to-b from-primary/10 to-transparent flex flex-col items-center justify-center text-center no-print">
             <div className="w-24 h-24 sm:w-32 sm:h-32 mb-2 flex items-center justify-center">
-              <img 
+              <Image
                 src="/logo.png" 
                 alt="Logo" 
+                width={400}
+                height={160}
                 className="max-w-full max-h-full object-contain filter drop-shadow-[0_0_15px_rgba(212,175,55,0.4)]" 
               />
             </div>
@@ -275,7 +278,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       >
                         <div className="flex-1 pr-4">
                           <p className="font-semibold text-sm text-foreground/90">{item.products?.name || `Item ${idx+1}`}</p>
-                          <p className="text-xs text-foreground/50 mt-1">{targetQty.toLocaleString('id-ID')} Pcs {isPolos ? '(Polos)' : ''}</p>
+                          <p className="text-xs text-foreground/50 mt-1">{targetQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs {isPolos ? '(Polos)' : ''}</p>
                           
                           {/* Mini Status */}
                           {!isExpanded && (
@@ -346,7 +349,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                           <AlertCircle className="w-4 h-4 shrink-0 translate-y-0.5" />
                                           <div>
                                             <span className="text-xs font-semibold block">Menunggu Pelunasan</span>
-                                            <span className="text-[10px] opacity-80 block mt-0.5">Sisa tagihan: Rp {sisa.toLocaleString('id-ID')}</span>
+                                            <span className="text-[10px] opacity-80 block mt-0.5">Sisa tagihan: Rp {sisa.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                                           </div>
                                         </div>
                                       )}
@@ -361,7 +364,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                                 <span className="text-[10px] text-foreground/50">{new Date(log.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
                                               </div>
                                               <p className="text-xs pl-5">
-                                                <span className="font-semibold text-white">Disablon {Number(log.qty_processed).toLocaleString('id-ID')} Pcs</span>
+                                                <span className="font-semibold text-white">Disablon {Number(log.qty_processed).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs</span>
                                                 <span className="text-foreground/60"> oleh {getEmployeeName(log.employee_id)}</span>
                                               </p>
                                             </div>
@@ -370,7 +373,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                             <div className="mt-2">
                                               <div className="flex justify-between text-[10px] text-foreground/50 mb-1">
                                                 <span>Progres Sablon</span>
-                                                <span>{completedQty.toLocaleString('id-ID')} / {targetQty.toLocaleString('id-ID')} Pcs</span>
+                                                <span>{completedQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} / {targetQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs</span>
                                               </div>
                                               <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">
                                                 <div className="bg-primary h-1 rounded-full" style={{ width: `${Math.min(100, Math.max(0, (completedQty/targetQty)*100))}%` }}></div>
@@ -428,7 +431,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                     <div className="flex flex-col md:flex-row justify-between items-start gap-6 md:gap-8 border-b border-gray-200 pb-6 md:pb-8">
                       <div>
                         <div className="mb-2">
-                          <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-16 w-auto object-contain bg-transparent" />
+                          <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-16 w-auto object-contain bg-transparent" />
                         </div>
                         <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
 
@@ -440,7 +443,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       </div>
 
                       <div className="text-left md:text-right w-full md:w-auto mt-4 md:mt-0">
-                        <h2 className="text-3xl md:text-4xl font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
+                        <h2 className="page-display-title font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
                         <div className="mt-2 md:mt-4 space-y-1 text-sm">
                           <p className="text-gray-500">Nomor Faktur</p>
                           <p className="font-bold text-gray-900">{order.invoice_number}</p>
@@ -477,10 +480,10 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                           <div key={idx} className="flex justify-between items-start gap-3 pb-3 border-b border-gray-100 last:border-0">
                             <div className="min-w-0">
                               <p className="font-bold text-gray-900 text-sm leading-tight break-words">{item.products?.name || item.product_code}</p>
-                              <p className="text-xs text-gray-500 mt-1">{item.order_type} · {(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')} Pcs</p>
-                              <p className="text-xs text-gray-400 mt-1">Rp {Number(item.unit_price).toLocaleString('id-ID')} / Pcs</p>
+                              <p className="text-xs text-gray-500 mt-1">{item.order_type} · {(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs</p>
+                              <p className="text-xs text-gray-400 mt-1">Rp {Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })} / Pcs</p>
                             </div>
-                            <p className="font-bold text-gray-900 text-sm text-right shrink-0">Rp {Number(item.total_price).toLocaleString('id-ID')}</p>
+                            <p className="font-bold text-gray-900 text-sm text-right shrink-0">Rp {Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                           </div>
                         ))}
                       </div>
@@ -504,10 +507,10 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                   <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
                                   <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
                                 </td>
-                                <td className="py-4 text-center font-medium text-gray-900">{(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')}</td>
+                                <td className="py-4 text-center font-medium text-gray-900">{(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                                 <td className="py-4 text-center text-gray-600">Pcs</td>
-                                <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
-                                <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+                                <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                                <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                               </tr>
                             ))}
                           </tbody>
@@ -530,7 +533,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                               <p className="text-xs font-bold text-gray-900 mb-2 group-hover:text-primary transition-colors">Scan QRIS untuk Membayar</p>
                               
                               <div className="w-32 h-32 mx-auto relative overflow-hidden rounded-xl border border-gray-100 bg-gray-50 shadow-inner">
-                                <img src="/qris.png" alt="QRIS BCA" className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-none mix-blend-multiply" />
+                                <Image src="/qris.png" alt="QRIS BCA" width={900} height={900} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[140%] max-w-none mix-blend-multiply" />
                               </div>
 
                               <p className="text-[10px] text-gray-500 mt-2 font-semibold flex flex-col items-center gap-1.5">
@@ -564,18 +567,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       <div className="w-full md:w-1/3 space-y-3">
                         <div className="flex justify-between items-center pt-2 border-b border-gray-200 pb-3">
                           <span className="font-bold text-gray-900 text-lg">Total Tagihan</span>
-                          <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID')}</span>
+                          <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                         </div>
 
                         <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-300 space-y-2">
                           <div className="flex justify-between items-center text-sm text-green-700 font-medium">
                             <span>Telah Dibayar (DP)</span>
-                            <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID')}</span>
+                            <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                           </div>
                           {sisa > 0 ? (
                             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg text-red-700 font-bold">
                               <span>Sisa Pembayaran</span>
-                              <span className="text-lg">Rp {sisa.toLocaleString('id-ID')}</span>
+                              <span className="text-lg">Rp {sisa.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                             </div>
                           ) : (
                             <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg text-green-700 font-bold">
@@ -604,7 +607,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                   <div className="flex flex-row justify-between items-start gap-8 border-b border-gray-200 pb-8">
                     <div>
                       <div className="mb-2">
-                        <img src={store.logo_url || '/logo.png'} alt="Logo" className="h-20 w-auto object-contain bg-transparent" />
+                        <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-20 w-auto object-contain bg-transparent" />
                       </div>
                       <p className="text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
 
@@ -616,7 +619,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                     </div>
 
                     <div className="text-right">
-                      <h2 className="text-4xl font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
+                      <h2 className="page-display-title font-black text-gray-200 uppercase tracking-widest">INVOICE</h2>
                       <div className="mt-4 space-y-1 text-sm">
                         <p className="text-gray-500">Nomor Faktur</p>
                         <p className="font-bold text-gray-900">{order.invoice_number}</p>
@@ -664,10 +667,10 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                 <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
                                 <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
                               </td>
-                              <td className="py-4 text-center font-medium text-gray-900">{(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')}</td>
+                              <td className="py-4 text-center font-medium text-gray-900">{(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                               <td className="py-4 text-center text-gray-600">Pcs</td>
-                              <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID')}</td>
-                              <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID')}</td>
+                              <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                              <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                             </tr>
                           ))}
                         </tbody>
@@ -695,18 +698,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                     <div className="w-1/2 space-y-3">
                       <div className="flex justify-between items-center pt-2 border-b border-gray-200 pb-3">
                         <span className="font-bold text-gray-900 text-lg">Total Tagihan</span>
-                        <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID')}</span>
+                        <span className="font-black text-gray-900 text-xl">Rp {Number(order.total_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                       </div>
 
                       <div className="mt-4 pt-4 border-t-2 border-dashed border-gray-300 space-y-2">
                         <div className="flex justify-between items-center text-sm text-green-700 font-medium">
                           <span>Telah Dibayar (DP)</span>
-                          <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID')}</span>
+                          <span>- Rp {Number(order.dp_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                         </div>
                         {sisa > 0 ? (
                           <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg text-red-700 font-bold">
                             <span>Sisa Pembayaran</span>
-                            <span className="text-lg">Rp {sisa.toLocaleString('id-ID')}</span>
+                            <span className="text-lg">Rp {sisa.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
                           </div>
                         ) : (
                           <div className="flex justify-between items-center p-3 bg-green-50 rounded-lg text-green-700 font-bold">

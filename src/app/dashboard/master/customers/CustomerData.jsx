@@ -1,19 +1,29 @@
 import { createClient } from '@/utils/supabase/server'
 import CustomersClient from './CustomersClient'
+import { numericTokenPattern } from '@/utils/search'
 
 export default async function CustomerData({ searchParams = {} }) {
   const supabase = await createClient()
 
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
-  const search = searchParams.search || ''
+  const search = String(searchParams.search || '').replace(/[(),"]/g, ' ').trim()
 
   let query = supabase
     .from('customers')
     .select('*', { count: 'exact' })
 
   if (search) {
-    query = query.or(`name.ilike.%${search}%,phone.ilike.%${search}%,customer_code.ilike.%${search}%`)
+    const numericPattern = numericTokenPattern(search)
+    const phoneFilter = numericPattern && search.length < 4
+      ? `phone.imatch."${numericPattern}"`
+      : `phone.ilike.%${search}%`
+    const customerCodeFilter = numericPattern
+      ? `customer_code.imatch."${numericPattern}"`
+      : `customer_code.ilike.%${search}%`
+    query = query.or(numericPattern
+      ? `name.imatch."${numericPattern}",${phoneFilter},${customerCodeFilter}`
+      : `name.ilike.%${search}%,${phoneFilter},${customerCodeFilter}`)
   }
 
   query = query.order('created_at', { ascending: false })

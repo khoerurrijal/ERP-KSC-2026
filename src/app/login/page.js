@@ -1,27 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useActionState, useState } from 'react'
 import { login } from './actions'
 import { KeyRound, Lock, User, Loader2 } from 'lucide-react'
 
 export default function LoginPage() {
-  const [error, setError] = useState(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const router = useRouter()
-
-  async function handleSubmit(formData) {
-    setIsLoading(true)
-    setError(null)
-    const result = await login(formData)
-    if (result?.error) {
-      setError(result.error)
-      setIsLoading(false)
-    } else if (result?.success) {
-      router.push('/dashboard')
-      router.refresh()
-    }
-  }
+  const [state, formAction, isLoading] = useActionState(login, { error: null })
+  const [username, setUsername] = useState('')
+  const [password, setPassword] = useState('')
 
   return (
     <div className="min-h-screen flex items-center justify-center p-4">
@@ -36,7 +22,7 @@ export default function LoginPage() {
             <p className="text-sm text-foreground/60">ERP Management System</p>
           </div>
 
-          <form action={handleSubmit} className="flex flex-col gap-5">
+          <form action={formAction} noValidate className="flex flex-col gap-5">
             <div className="space-y-1">
               <label className="text-sm font-medium text-foreground/80 pl-1">Username</label>
               <div className="relative">
@@ -48,7 +34,8 @@ export default function LoginPage() {
                   name="username"
                   type="text"
                   placeholder="admin"
-                  required
+                  value={username}
+                  onChange={event => setUsername(event.target.value)}
                   className="glass-input w-full !pl-10"
                 />
               </div>
@@ -65,15 +52,16 @@ export default function LoginPage() {
                   name="password"
                   type="password"
                   placeholder="••••••••"
-                  required
+                  value={password}
+                  onChange={event => setPassword(event.target.value)}
                   className="glass-input w-full !pl-10"
                 />
               </div>
             </div>
 
-            {error && (
+            {state?.error && (
               <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm text-center">
-                {error}
+                {state.error}
               </div>
             )}
 

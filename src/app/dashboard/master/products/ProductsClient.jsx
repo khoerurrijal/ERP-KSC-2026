@@ -1,14 +1,22 @@
 'use client'
 
-import { useState, useRef } from 'react'
+/* Server results intentionally replace the local list after search navigation. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X, Upload } from 'lucide-react'
 import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CurrencyInput from '@/components/CurrencyInput'
+import { matchesSearchText } from '@/utils/search'
 
-export default function ProductsClient({ products: initialProducts = [], error = null, workshops = [] }) {
+export default function ProductsClient({ products: initialProducts = [], error = null, workshops = [], initialSearch = '' }) {
+  const router = useRouter()
+  const pathname = usePathname()
+  const currentSearchParams = useSearchParams()
   const [products, setProducts] = useState(initialProducts)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [showModal, setShowModal] = useState(false)
   const [editingId, setEditingId] = useState(null)
   
@@ -23,6 +31,25 @@ export default function ProductsClient({ products: initialProducts = [], error =
   const [units, setUnits] = useState([]) // Array of { unit_name, multiplier }
   const [isPending, setIsPending] = useState(false)
   const fileInputRef = useRef(null)
+
+  useEffect(() => {
+    setProducts(initialProducts)
+  }, [initialProducts])
+
+  const updateSearchParam = useCallback((value) => {
+    const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
+    if (value) params.set('search', value)
+    else params.delete('search')
+    const query = params.toString()
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+  }, [currentSearchParams, pathname, router])
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if ((initialSearch || '') !== searchQuery.trim()) updateSearchParam(searchQuery.trim())
+    }, 350)
+    return () => clearTimeout(timer)
+  }, [initialSearch, searchQuery, updateSearchParam])
 
   const handleFileUpload = async (e) => {
     const file = e.target.files[0]
@@ -125,8 +152,10 @@ export default function ProductsClient({ products: initialProducts = [], error =
   }
 
   const filteredProducts = products.filter(p => 
-    (p.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (p.product_code || '').toLowerCase().includes(searchQuery.toLowerCase())
+    matchesSearchText(p.name, searchQuery) ||
+    matchesSearchText(p.product_code, searchQuery, { numericSubstring: true }) ||
+    matchesSearchText(p.category, searchQuery) ||
+    matchesSearchText(p.workshops?.name, searchQuery)
   )
 
   return (
@@ -189,7 +218,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
                   <td className="px-6 py-4 text-foreground/60">{item.category || '-'}</td>
                   <td className="px-6 py-4 text-foreground/80">{item.workshops?.name || '-'}</td>
                   <td className="px-6 py-4 text-foreground/90 font-semibold">
-                    Rp {Number(item.price_polos || 0).toLocaleString('id-ID')}
+                    Rp {Number(item.price_polos || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
                   </td>
                   <td className="px-6 py-4 text-center">
                     {item.is_active !== false ? (

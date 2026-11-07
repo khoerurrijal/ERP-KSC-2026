@@ -1,16 +1,11 @@
-import { Inter, Roboto_Mono } from "next/font/google";
+import { Inter } from "next/font/google";
 import NextTopLoader from 'nextjs-toploader';
 import "./globals.css";
 
-const geistSans = Inter({
+const inter = Inter({
   subsets: ["latin"],
-  variable: "--font-geist-sans",
+  variable: "--font-inter",
 });
-const geistMono = Roboto_Mono({
-  subsets: ["latin"],
-  variable: "--font-geist-mono",
-});
-
 export const metadata = {
   title: "KING SABLON ERP",
   description: "Internal ERP System for King Sablon Nusantara",
@@ -22,7 +17,7 @@ import { CustomAlertProvider } from "@/components/CustomAlertProvider";
 export default function RootLayout({ children }) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-screen bg-background`}>
+      <body className={`${inter.variable} antialiased min-h-screen bg-background`}>
         <ThemeProvider
           attribute="class"
           defaultTheme="dark"

@@ -42,7 +42,7 @@ export async function saveSalarySchema(payload) {
       if (error) throw error
     }
 
-    revalidatePath('/dashboard/system/salary-schemas')
+    revalidatePath('/settings')
     return { success: true }
   } catch (err) {
     console.error('Error saving salary schema:', err)
@@ -57,7 +57,7 @@ export async function deleteSalarySchema(id) {
     const { error } = await supabase.from('salary_schemas').delete().eq('id', id)
     if (error) throw error
     
-    revalidatePath('/dashboard/system/salary-schemas')
+    revalidatePath('/settings')
     return { success: true }
   } catch (err) {
     return { success: false, error: err.message }

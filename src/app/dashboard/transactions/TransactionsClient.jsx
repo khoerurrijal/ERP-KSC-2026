@@ -4,19 +4,33 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { createManualTransaction, updateTransaction, deleteTransaction } from './actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
+import { matchesSearchText } from '@/utils/search'
 
-export default function TransactionsClient({ transactions = [], dropdownConfig = {} }) {
+function removeInvoiceNumber(value) {
+  return String(value || '')
+    .replace(/\bINV[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, '')
+    .replace(/\bINVOICE\s*(?:NO\.?)?[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, '')
+    .replace(/\bINVOICE\b/gi, '')
+    .replace(/\s{2,}/g, ' ')
+    .replace(/\s+([,.:;])/g, '$1')
+    .replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, '')
+}
+
+export default function TransactionsClient({ transactions = [], dropdownConfig = {}, initialSearch = '' }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const searchParamsString = searchParams.toString()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editId, setEditId] = useState(null)
-  const [searchQuery, setSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [showFilters, setShowFilters] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   
@@ -44,6 +58,25 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const [formAmount, setFormAmount] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [formDate, setFormDate] = useState('')
+
+  useEffect(() => {
+    setSearchQuery(searchParams.get('transactionSearch') || '')
+  }, [searchParams])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const normalizedSearch = searchQuery.trim()
+      const params = new URLSearchParams(searchParamsString)
+      if ((params.get('transactionSearch') || '') === normalizedSearch) return
+
+      if (normalizedSearch) params.set('transactionSearch', normalizedSearch)
+      else params.delete('transactionSearch')
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [searchQuery, searchParamsString, pathname, router])
 
   const handleAddTransaction = () => {
     setEditId(null)
@@ -135,25 +168,30 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const refs = [...new Set(transactions.map(t => (t.reference || '').toUpperCase()).filter(Boolean))]
 
   const filteredAndSorted = useMemo(() => {
+    const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
+    const isSearching = Boolean(normalizedSearch)
     let result = transactions.filter(trx => {
       // Tab Filtering
       const methodUpper = (trx.payment_method || '').toUpperCase()
-      if (currentTab === 'UTAMA') {
+      if (!isSearching && currentTab === 'UTAMA') {
         if (methodUpper === 'VIRTUAL') return false
-      } else if (currentTab === 'VIRTUAL') {
+      } else if (!isSearching && currentTab === 'VIRTUAL') {
         if (methodUpper !== 'VIRTUAL') return false
       }
 
-      const matchSearch = ((trx.description || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-                          ((trx.reference || '').toLowerCase().includes(searchQuery.toLowerCase())) ||
-                          ((trx.workshop_code || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchSearch = matchesSearchText(trx.description, normalizedSearch) ||
+                          matchesSearchText(trx.reference, normalizedSearch) ||
+                          matchesSearchText(trx.workshop_code, normalizedSearch) ||
+                          matchesSearchText(trx.sales_orders?.invoice_number, normalizedSearch) ||
+                          matchesSearchText(trx.sales_orders?.customers?.name, normalizedSearch)
       
-      const matchMonth = filterMonth ? new Date(trx.date).toISOString().slice(0, 7) === filterMonth : true
+      const transactionDate = trx.date ? new Date(trx.date) : null
+      const matchMonth = isSearching || !filterMonth || Boolean(transactionDate && !Number.isNaN(transactionDate.getTime()) && transactionDate.toISOString().slice(0, 7) === filterMonth)
       const matchMethod = filterMethod ? methodUpper === filterMethod.toUpperCase() : true
       const matchWorkshop = filterWorkshop ? (trx.workshop_code || '').toUpperCase() === filterWorkshop.toUpperCase() : true
       const matchRef = filterRef ? (trx.reference || '').toUpperCase() === filterRef.toUpperCase() : true
 
-      return matchSearch && matchMonth && matchMethod && matchWorkshop && matchRef
+      return matchSearch && (isSearching || (matchMonth && matchMethod && matchWorkshop && matchRef))
     })
 
     result.sort((a, b) => {
@@ -277,7 +315,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
           </div>
           <div>
             <p className="text-sm text-foreground/60">Total Pemasukan</p>
-            <p className="text-2xl font-bold text-foreground">Rp {totalIn.toLocaleString('id-ID')}</p>
+            <p className="metric-value-compact text-foreground">Rp {totalIn.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
         <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-red-500">
@@ -286,7 +324,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
           </div>
           <div>
             <p className="text-sm text-foreground/60">Total Pengeluaran</p>
-            <p className="text-2xl font-bold text-foreground">Rp {totalOut.toLocaleString('id-ID')}</p>
+            <p className="metric-value-compact text-foreground">Rp {totalOut.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
         <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-primary">
@@ -295,7 +333,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
           </div>
           <div>
             <p className="text-sm text-foreground/60">Saldo Bersih</p>
-            <p className="text-2xl font-bold text-primary">Rp {saldo.toLocaleString('id-ID')}</p>
+            <p className="metric-value-compact text-primary">Rp {saldo.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
       </div>
@@ -323,17 +361,18 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                 <tr key={trx.id} onClick={() => handleEditTransaction(trx)} className="cursor-pointer transition-colors hover:bg-white/5">
                   <td className="px-4 py-3 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
                   <td className="px-4 py-3 font-medium text-foreground/90">
-                    {trx.description && trx.description !== '-' 
-                      ? trx.description 
-                      : (trx.sales_orders ? trx.sales_orders.customers?.name || 'Unknown Pelanggan' : 'Sistem ERP')}
+                    {trx.sales_orders?.customers?.name || removeInvoiceNumber(trx.description) || (trx.sales_orders ? 'Unknown Pelanggan' : 'Sistem ERP')}
+                    {trx.sales_orders?.customers?.name && removeInvoiceNumber(trx.description) && (
+                      <div className="mt-0.5 text-xs font-normal text-foreground/50">{removeInvoiceNumber(trx.description)}</div>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
                   <td className="px-4 py-3 text-foreground/80">{trx.payment_method || '-'}</td>
                   <td className="px-4 py-3 text-right font-medium text-green-400">
-                    {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID')}` : '-'}
+                    {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                   </td>
                   <td className="px-4 py-3 text-right font-medium text-red-400">
-                    {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID')}` : '-'}
+                    {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                   </td>
                   <td className="px-4 py-3 text-right">
                     <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>

@@ -1,17 +1,5 @@
-import { createClient } from '@/utils/supabase/server'
-import SalarySchemaClient from './SalarySchemaClient'
-
-export const metadata = {
-  title: 'Skema Gaji | King Sablon',
-}
+import { redirect } from 'next/navigation'
 
 export default async function SalarySchemasPage() {
-  const supabase = await createClient()
-
-  const { data: schemas } = await supabase
-    .from('salary_schemas')
-    .select('*')
-    .order('created_at', { ascending: true })
-
-  return <SalarySchemaClient initialSchemas={schemas || []} />
+  redirect('/settings?tab=salary')
 }

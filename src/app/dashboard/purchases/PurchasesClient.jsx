@@ -4,7 +4,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useMemo, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Search, Plus, Filter, ChevronUp, ChevronDown } from 'lucide-react'
 import { getPurchaseOrderPaymentDate, payPurchaseOrder } from './new/actions'
 
@@ -12,17 +12,21 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import PurchaseOrderWizard from '@/components/PurchaseOrderWizard'
+import { matchesSearchText } from '@/utils/search'
 
 const getLocalDateValue = () => {
   const today = new Date()
   return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
 }
 
-export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', dropdownConfig = {}, suppliers = [], products = [], workshops = [] }) {
+export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [], summary = {}, selectedMonth = '', initialSearch = '', dropdownConfig = {}, suppliers = [], products = [], workshops = [] }) {
   const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
+  const searchParamsString = searchParams.toString()
   const [activeTab, setActiveTab] = useState('PO') // 'PO' | 'ITEMS'
-  const [searchQuery, setSearchQuery] = useState('')
-  const [itemSearchQuery, setItemSearchQuery] = useState('')
+  const [searchQuery, setSearchQuery] = useState(initialSearch)
+  const [itemSearchQuery, setItemSearchQuery] = useState(initialSearch)
   const [showFilters, setShowFilters] = useState(false)
   const [filterStatus, setFilterStatus] = useState('BELUM LUNAS')
   const [sortConfig, setSortConfig] = useState({ key: 'date', direction: 'desc' })
@@ -40,6 +44,27 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const [itemPage, setItemPage] = useState(1)
   const pageSize = 50
   const [purchaseOrderDrawer, setPurchaseOrderDrawer] = useState(null)
+
+  useEffect(() => {
+    const currentSearch = searchParams.get('purchaseSearch') || ''
+    setSearchQuery(currentSearch)
+    setItemSearchQuery(currentSearch)
+  }, [searchParams])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const normalizedSearch = (activeTab === 'PO' ? searchQuery : itemSearchQuery).trim()
+      const params = new URLSearchParams(searchParamsString)
+      if ((params.get('purchaseSearch') || '') === normalizedSearch) return
+
+      if (normalizedSearch) params.set('purchaseSearch', normalizedSearch)
+      else params.delete('purchaseSearch')
+      const query = params.toString()
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+    }, 350)
+
+    return () => window.clearTimeout(timer)
+  }, [activeTab, searchQuery, itemSearchQuery, searchParamsString, pathname, router])
 
   const handleSort = (key) => {
     let direction = 'asc'
@@ -156,16 +181,18 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   }
 
   const filteredAndSorted = useMemo(() => {
+    const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
+    const isSearching = Boolean(normalizedSearch)
     let result = purchaseOrders.filter(po => {
-      const matchSearch = ((po.po_number || '').toLowerCase().includes(searchQuery.toLowerCase())) || 
-                          ((po.supplier || '').toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchSearch = matchesSearchText(po.po_number, normalizedSearch) ||
+                          matchesSearchText(po.supplier, normalizedSearch)
       
       const isLunas = po.status === 'LUNAS' || po.payment_status === 'LUNAS'
       
       let matchStatus = true
-      if (filterStatus === 'LUNAS') {
+      if (!isSearching && filterStatus === 'LUNAS') {
         matchStatus = isLunas
-      } else if (filterStatus === 'BELUM LUNAS') {
+      } else if (!isSearching && filterStatus === 'BELUM LUNAS') {
         matchStatus = !isLunas
       }
 
@@ -173,11 +200,11 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
       // Jika statusnya LUNAS, atau filternya LUNAS, kita potong berdasarkan bulan.
       // Jika statusnya BELUM LUNAS (Tempo), tampilkan semua tanpa mempedulikan bulan.
       let matchMonth = true
-      if (!searchQuery && (filterStatus === 'LUNAS' || (isLunas && filterStatus === ''))) {
+      if (!isSearching && (filterStatus === 'LUNAS' || (isLunas && filterStatus === ''))) {
         matchMonth = po.date && po.date.startsWith(selectedMonth)
       }
 
-      return matchSearch && matchStatus && matchMonth
+      return matchSearch && (isSearching || (matchStatus && matchMonth))
     })
 
     result.sort((a, b) => {
@@ -207,18 +234,20 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   }, [filteredAndSorted, poPage, pageSize])
 
   const filteredAndSortedItems = useMemo(() => {
+    const normalizedItemSearch = itemSearchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
+    const isSearching = Boolean(normalizedItemSearch)
     let result = purchaseItems.filter(item => {
-      const matchSearch = ((item.products?.name || item.item_name || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
-                          ((item.purchase_orders?.po_number || '').toLowerCase().includes(itemSearchQuery.toLowerCase())) ||
-                          ((item.purchase_orders?.supplier || '').toLowerCase().includes(itemSearchQuery.toLowerCase()))
+      const matchSearch = matchesSearchText(item.products?.name || item.item_name, normalizedItemSearch) ||
+                          matchesSearchText(item.purchase_orders?.po_number, normalizedItemSearch) ||
+                          matchesSearchText(item.purchase_orders?.supplier, normalizedItemSearch)
       
       // Filter Bulan
       let matchMonth = true
-      if (!itemSearchQuery) {
+      if (!isSearching) {
         matchMonth = item.purchase_orders?.date && item.purchase_orders?.date.startsWith(selectedMonth)
       }
 
-      return matchSearch && matchMonth
+      return matchSearch && (isSearching || matchMonth)
     })
 
     result.sort((a, b) => {
@@ -268,19 +297,19 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
       <div className="grid grid-cols-2 xl:grid-cols-4 gap-3">
         <div className="glass-card p-3 border-l-4 border-green-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Gudang</p>
-          <p className="text-xl font-bold text-foreground mt-2">Rp {(summary.beliGudang || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="metric-value-compact mt-2 text-foreground">Rp {(summary.beliGudang || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-3 border-l-4 border-blue-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Pembelian Global</p>
-          <p className="text-xl font-bold text-foreground mt-2">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="metric-value-compact mt-2 text-foreground">Rp {(summary.beliGlobal || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-3 border-l-4 border-green-400">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Lunas</p>
-          <p className="text-xl font-bold text-green-400 mt-2">Rp {(summary.lunas || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
+          <p className="metric-value-compact mt-2 text-green-400">Rp {(summary.lunas || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Bulan Terpilih</span></p>
         </div>
         <div className="glass-card p-3 border-l-4 border-yellow-500">
           <p className="text-xs text-foreground/60 uppercase tracking-wider font-semibold">Total Tempo Aktif</p>
-          <p className="text-xl font-bold text-yellow-400 mt-2">Rp {(summary.tempo || 0).toLocaleString('id-ID')} <span className="text-xs font-normal text-foreground/50">Seluruh Waktu</span></p>
+          <p className="metric-value-compact mt-2 text-yellow-400">Rp {(summary.tempo || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Seluruh Waktu</span></p>
         </div>
       </div>
 
@@ -358,7 +387,7 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                   >
                     <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                     <td className="px-4 py-3 text-foreground/90 font-medium">{item.supplier || '-'}</td>
-                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(totalAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                     <td className="px-4 py-3">
                       <span className={`px-2.5 py-1 rounded-full text-xs font-bold border ${item.status === 'LUNAS' ? 'bg-green-500/10 text-green-400 border-green-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
                         {item.status || 'BELUM LUNAS'}
@@ -402,8 +431,8 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
                     <td className="px-4 py-3 text-foreground/90">{item.purchase_orders?.supplier || '-'}</td>
                     <td className="px-4 py-3 font-medium">{item.products?.name || item.item_name || '-'}</td>
                     <td className="px-4 py-3">{item.qty} {item.unit}</td>
-                    <td className="px-4 py-3">Rp {Number(item.unit_price || 0).toLocaleString('id-ID')}</td>
-                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID')}</td>
+                    <td className="px-4 py-3">Rp {Number(item.unit_price || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                    <td className="px-4 py-3 font-semibold text-blue-400">Rp {Number(item.total_price || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>

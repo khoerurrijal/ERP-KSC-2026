@@ -13,6 +13,7 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
+import { matchesSearchText } from '@/utils/search'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import SalesOrderWizard from '@/components/SalesOrderWizard'
@@ -234,27 +235,25 @@ export default function SalesClient({
 
   // Memoized Item Data
   const filteredAndSortedItems = useMemo(() => {
-    const searchLower = (debouncedSearch || '').toLowerCase().trim()
+    const searchLower = (debouncedSearch || '').replace(/[(),"]/g, ' ').toLowerCase().trim()
 
     let filtered = salesItems.filter(item => {
       const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
       const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
       const prod = Array.isArray(item.products) ? item.products[0] : item.products
 
-      const invoiceNum = (so?.invoice_number || '').toLowerCase()
-      const customerName = (cust?.name || '').toLowerCase()
-      const productName = (prod?.name || item.product_name || item.item_name || '').toLowerCase()
-      const productCode = (item.product_code || '').toLowerCase()
-      const notesStr = (item.notes || '').toLowerCase()
+      const invoiceNum = so?.invoice_number || ''
+      const customerName = cust?.name || ''
+      const productName = prod?.name || item.product_name || item.item_name || ''
+      const notesStr = item.notes || ''
       const itemProdStatus = (item.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim()
 
       const matchSearch = !searchLower || 
-        invoiceNum.includes(searchLower) ||
-        customerName.includes(searchLower) ||
-        productName.includes(searchLower) ||
-        productCode.includes(searchLower) ||
-        notesStr.includes(searchLower) ||
-        itemProdStatus.toLowerCase().includes(searchLower)
+        matchesSearchText(invoiceNum, searchLower) ||
+        matchesSearchText(customerName, searchLower) ||
+        matchesSearchText(productName, searchLower) ||
+        matchesSearchText(notesStr, searchLower) ||
+        matchesSearchText(itemProdStatus, searchLower)
       
       const rawDate = so?.date || ''
       let itemMonth = ''
@@ -265,16 +264,16 @@ export default function SalesClient({
         if (parts.length === 3) itemMonth = `${parts[2]}-${parts[1].padStart(2, '0')}`
       }
 
-      const matchMonth = filterMonth ? itemMonth === filterMonth : true
+      const matchMonth = searchLower || !filterMonth ? true : itemMonth === filterMonth
 
       let matchStatus = true
-      if (itemFilterStatus !== 'ALL') {
+      if (!searchLower && itemFilterStatus !== 'ALL') {
         const normFilterStatus = itemFilterStatus.toString().replace(/_/g, ' ').toUpperCase().trim()
         matchStatus = itemProdStatus === normFilterStatus
       }
 
       const paymentStatus = (so?.payment_status || '').toLowerCase()
-      const searchIncludesPayment = searchLower && paymentStatus.includes(searchLower)
+      const searchIncludesPayment = searchLower && matchesSearchText(paymentStatus, searchLower)
       const finalSearchMatch = matchSearch || searchIncludesPayment
 
       return finalSearchMatch && matchMonth && matchStatus
@@ -352,7 +351,7 @@ export default function SalesClient({
           </div>
           <div>
             <p className="text-xs text-foreground/60 font-medium">Total Omset (Bulan Terpilih)</p>
-            <p className="text-lg font-bold text-white">Rp {totalOmset.toLocaleString('id-ID')}</p>
+            <p className="text-lg font-bold text-white">Rp {totalOmset.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
         <div className="glass-card p-3 rounded-xl flex items-center gap-3">
@@ -361,7 +360,7 @@ export default function SalesClient({
           </div>
           <div>
             <p className="text-xs text-foreground/60 font-medium">Total Piutang Berjalan</p>
-            <p className="text-lg font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID')}</p>
+            <p className="text-lg font-bold text-white">Rp {totalPiutang.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
           </div>
         </div>
       </div>}
@@ -497,7 +496,7 @@ export default function SalesClient({
                         {item.customers?.name}
                         <br/><span className="text-[10px] text-foreground/50">{item.invoice_number}</span>
                       </td>
-                      <td className="px-4 py-3 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID')}</td>
+                      <td className="px-4 py-3 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold border border-white/10 ${item.payment_status === 'LUNAS' ? 'bg-green-500/20 text-green-400' : item.payment_status === 'BATAL' ? 'bg-red-500/20 text-red-500' : item.payment_status === 'DP' ? 'bg-yellow-500/20 text-yellow-400' : 'bg-red-500/20 text-red-400'}`}>
                           {item.payment_status}
@@ -604,7 +603,7 @@ export default function SalesClient({
                       </td>
                       <td className="px-4 py-2 align-middle text-center">
                         <span className="font-semibold text-xs text-white/90">
-                          {Number(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID')} Pcs
+                          {Number(item.qty * (item.unit_multiplier || 1)).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs
                         </span>
                       </td>
                       <td className="px-4 py-2 align-middle text-right">
@@ -719,9 +718,9 @@ export default function SalesClient({
               <div className="bg-primary/10 border border-primary/20 p-3 rounded-xl text-sm mb-4">
                 <p className="text-foreground/80">Ref: <span className="font-bold text-primary">{editingOrder.invoice_number}</span></p>
                 <p className="text-foreground/80">Pelanggan: <span className="font-bold text-foreground">{editingOrder.customers?.name}</span></p>
-                <p className="text-foreground/80 mt-2">Total Invoice: <span className="font-bold">Rp {Number(editingOrder.total_amount || 0).toLocaleString('id-ID')}</span></p>
-                <p className="text-foreground/80">Telah Dibayar: <span className="font-bold text-green-400">Rp {Number(editingOrder.dp_amount || 0).toLocaleString('id-ID')}</span></p>
-                <p className="text-foreground/80">Sisa Tagihan: <span className="font-bold text-orange-400">Rp {Math.max(0, Number(editingOrder.total_amount || 0) - Number(editingOrder.dp_amount || 0)).toLocaleString('id-ID')}</span></p>
+                <p className="text-foreground/80 mt-2">Total Invoice: <span className="font-bold">Rp {Number(editingOrder.total_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span></p>
+                <p className="text-foreground/80">Telah Dibayar: <span className="font-bold text-green-400">Rp {Number(editingOrder.dp_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span></p>
+                <p className="text-foreground/80">Sisa Tagihan: <span className="font-bold text-orange-400">Rp {Math.max(0, Number(editingOrder.total_amount || 0) - Number(editingOrder.dp_amount || 0)).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span></p>
               </div>
 
               {/* History Pembayaran */}
@@ -739,7 +738,7 @@ export default function SalesClient({
                           <p className="font-semibold text-foreground/90">{new Date(trx.date).toLocaleDateString('id-ID')}</p>
                           <p className="text-foreground/60">{trx.payment_method}</p>
                         </div>
-                        <p className="font-bold text-green-400">+ Rp {Number(trx.amount_in).toLocaleString('id-ID')}</p>
+                        <p className="font-bold text-green-400">+ Rp {Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                       </div>
                     ))}
                   </div>
