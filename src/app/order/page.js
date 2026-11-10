@@ -35,7 +35,7 @@ export default async function OrderPage() {
     <main style={{ colorScheme: 'light' }} className="min-h-screen bg-[#f8f7f4] pb-32 text-stone-900">
       <header className="border-b border-stone-200 bg-white">
         <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-4 sm:px-6">
-          <div className="flex h-14 w-28 items-center justify-center overflow-hidden rounded-lg bg-[#211c13] p-2">
+          <div className="flex h-14 w-28 items-center justify-center overflow-hidden rounded-lg bg-white p-2">
             <Image src="/logo.png" alt="King Sablon Cup" width={160} height={78} priority className="h-full w-full object-contain" />
           </div>
           <div><p className="text-sm font-bold text-stone-900">King Sablon Cup</p><p className="mt-0.5 text-xs text-stone-500">Katalog & pesanan</p></div>
