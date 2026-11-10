@@ -1,13 +1,19 @@
 'use client'
 
-import { useState } from 'react'
+import { Fragment, useState } from 'react'
 import { Save, Plus, Trash2, Settings, ListPlus, Banknote, Percent, Store, ShieldCheck, Users, Image as ImageIcon, Bot, RefreshCw } from 'lucide-react'
 import { updateDropdownConfig, updateCashflowConfig, updateStoreConfig, updateRolePermissions, updateUserRoles, updatePricelistConfig, updateCategoryImagesConfig, refreshAiAgentModel } from './actions'
 import CurrencyInput from '@/components/CurrencyInput'
 import { DEFAULT_AI_MODEL } from '@/utils/aiAgent'
+import { useRoleAccess } from '@/components/RoleAccessContext'
+import { ACCESS_SECTIONS, normalizeRolePermissionMap } from '@/utils/role-access'
 
 export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false, hideTabs = false, initialTab }) {
-  const [activeTab, setActiveTab] = useState(initialTab || (onlyAccess ? 'access' : 'dropdowns'))
+  const { canAccess } = useRoleAccess()
+  const requestedTab = initialTab || (onlyAccess ? 'access' : 'dropdowns')
+  const settingsTabKeys = ['dropdowns', 'cashflow', 'pricelist', 'store', 'category_images', 'ai_agent', 'access', 'salary']
+  const firstAllowedTab = settingsTabKeys.find((key) => canAccess(`settings.${key}`)) || 'access'
+  const [activeTab, setActiveTab] = useState(canAccess(`settings.${requestedTab}`) ? requestedTab : firstAllowedTab)
   const [isSaving, setIsSaving] = useState(false)
   const [error, setError] = useState(null)
   
@@ -70,7 +76,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
   })
 
   // State for Roles & Permissions
-  const [rolePermissions, setRolePermissions] = useState(initialSettings.role_permissions || {})
+  const [rolePermissions, setRolePermissions] = useState(() => normalizeRolePermissionMap(initialSettings.role_permissions))
   const [userRoles, setUserRoles] = useState(initialSettings.user_roles || [])
   
   // State for Category Images
@@ -89,19 +95,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
   })
   const allCategoriesList = Array.from(allCategoriesSet).filter(Boolean).sort()
   
-  const MENU_LIST = [
-    { key: 'dashboard', label: 'Dashboard' },
-    { key: 'penjualan', label: 'Penjualan (SO)' },
-    { key: 'marketplace', label: 'Marketplace' },
-    { key: 'produksi', label: 'Produksi' },
-    { key: 'gudang', label: 'Gudang (Inventory & PO)' },
-    { key: 'keuangan', label: 'Keuangan (Kas, Payroll)' },
-    { key: 'master_data', label: 'Master Data' },
-    { key: 'laporan', label: 'Laporan' },
-    { key: 'audit', label: 'AI Audit' },
-    { key: 'pengaturan', label: 'Pengaturan' }
-  ]
-  const ROLES = ['Owner', 'Admin', 'Operator']
+  const ROLES = ['Owner', 'Admin', 'Operator', 'Operator Mesin']
 
   // Handlers for Dropdowns
   const handleAddDropdownItem = (key) => {
@@ -162,13 +156,13 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
   }
 
   // Handlers for Roles & Permissions
-  const handleTogglePermission = (role, menuKey) => {
+  const handleTogglePermission = (role, permissionKey) => {
     const currentPerms = rolePermissions[role] || []
     let newPerms
-    if (currentPerms.includes(menuKey)) {
-      newPerms = currentPerms.filter(k => k !== menuKey)
+    if (currentPerms.includes(permissionKey)) {
+      newPerms = currentPerms.filter(k => k !== permissionKey)
     } else {
-      newPerms = [...currentPerms, menuKey]
+      newPerms = [...currentPerms, permissionKey]
     }
     setRolePermissions({ ...rolePermissions, [role]: newPerms })
   }
@@ -269,7 +263,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       {!hideHeader && <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-black tracking-tight text-foreground">{onlyAccess ? 'Pengaturan' : 'Sistem Konfigurasi'}</h1>
-          <p className="text-foreground/60 mt-1">{onlyAccess ? 'Kelola akses pengguna dan hak akses menu aplikasi.' : 'Konfigurasi parameter operasional, keuangan, dan alur aplikasi.'}</p>
+          <p className="text-foreground/60 mt-1">{onlyAccess ? 'Kelola akun serta akses role ke halaman dan tab aplikasi.' : 'Konfigurasi parameter operasional, keuangan, dan alur aplikasi.'}</p>
         </div>
       </div>}
 
@@ -281,7 +275,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
 
       {/* Tabs */}
       {!hideTabs && <div className="flex gap-1 border-b border-white/10 pb-px overflow-x-auto">
-        <button
+        <button hidden={!canAccess('settings.dropdowns')}
           onClick={() => setActiveTab('dropdowns')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'dropdowns' 
@@ -292,7 +286,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <ListPlus className="w-4 h-4" />
           List Dropdown Form
         </button>
-        <button
+        <button hidden={!canAccess('settings.cashflow')}
           onClick={() => setActiveTab('cashflow')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'cashflow' 
@@ -303,7 +297,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <Banknote className="w-4 h-4" />
           Pengaturan Alur Kas Tetap
         </button>
-        <button
+        <button hidden={!canAccess('settings.pricelist')}
           onClick={() => setActiveTab('pricelist')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'pricelist' 
@@ -314,7 +308,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <Percent className="w-4 h-4" />
           Pricelist & Margin
         </button>
-        <button
+        <button hidden={!canAccess('settings.store')}
           onClick={() => setActiveTab('store')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'store' 
@@ -325,7 +319,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <Store className="w-4 h-4" />
           Informasi Toko / Kop Surat
         </button>
-        <button
+        <button hidden={!canAccess('settings.category_images')}
           onClick={() => setActiveTab('category_images')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'category_images' 
@@ -336,7 +330,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <ImageIcon className="w-4 h-4" />
           Foto Kategori (Katalog)
         </button>
-        <button
+        <button hidden={!canAccess('settings.ai_agent')}
           onClick={() => setActiveTab('ai_agent')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${onlyAccess ? 'hidden' : ''} ${
             activeTab === 'ai_agent'
@@ -347,7 +341,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
           <Bot className="w-4 h-4" />
           AI & Chatbot
         </button>
-        <button
+        <button hidden={!onlyAccess || !canAccess('settings.access')}
           onClick={() => setActiveTab('access')}
           className={`flex items-center gap-2 px-4 py-2.5 font-semibold text-sm transition-colors border-b-2 whitespace-nowrap ${!onlyAccess ? 'hidden' : ''} ${
             activeTab === 'access' 
@@ -361,7 +355,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       </div>}
 
       {/* Tab Content: Dropdowns */}
-      {activeTab === 'dropdowns' && (
+      {activeTab === 'dropdowns' && canAccess('settings.dropdowns') && (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3 sm:gap-4">
             {Object.keys(dropdowns).filter(k => k !== 'category_mapping').map(key => (
@@ -469,7 +463,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: Cashflow */}
-      {activeTab === 'cashflow' && (
+      {activeTab === 'cashflow' && canAccess('settings.cashflow') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl">
           <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-6">
             <h3 className="text-lg font-bold mb-6 flex items-center gap-2">
@@ -590,7 +584,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: Pricelist & Margin */}
-      {activeTab === 'pricelist' && (
+      {activeTab === 'pricelist' && canAccess('settings.pricelist') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-6xl">
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-4">
             
@@ -791,7 +785,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: Store & Invoice */}
-      {activeTab === 'store' && (
+      {activeTab === 'store' && canAccess('settings.store') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             
@@ -962,7 +956,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: Category Images */}
-      {activeTab === 'category_images' && (
+      {activeTab === 'category_images' && canAccess('settings.category_images') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-4xl">
           <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
             <div className="mb-6">
@@ -1013,7 +1007,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: AI & Chatbot */}
-      {activeTab === 'ai_agent' && !onlyAccess && (
+      {activeTab === 'ai_agent' && !onlyAccess && canAccess('settings.ai_agent') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500 max-w-3xl">
           <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6">
             <div className="flex items-start justify-between gap-4 mb-6">
@@ -1060,47 +1054,59 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
       )}
 
       {/* Tab Content: Access & Users */}
-      {activeTab === 'access' && (
+      {activeTab === 'access' && canAccess('settings.access') && (
         <div className="space-y-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
           
           {/* Matrix Role & Permission */}
           <div className="bg-background/40 backdrop-blur-xl border border-white/10 rounded-3xl p-5 md:p-6 overflow-hidden">
             <h3 className="text-lg font-bold mb-2 flex items-center gap-2">
               <ShieldCheck className="w-5 h-5 text-primary" />
-              Matrix Hak Akses Menu
+              Hak Akses per Halaman & Tab
             </h3>
-            <p className="text-sm text-foreground/60 mb-6">Centang menu yang boleh diakses oleh masing-masing Role.</p>
+            <p className="text-sm text-foreground/60 mb-6">Pilih halaman atau tab secara terpisah untuk tiap role. Hak lama yang sebelumnya diberikan per menu tetap dipertahankan saat pertama kali dibuka.</p>
             
             <div className="overflow-x-auto custom-scrollbar">
               <table className="w-full text-sm text-left">
                 <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-xs font-bold tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 rounded-tl-xl">Nama Menu</th>
+                    <th className="px-6 py-4 rounded-tl-xl">Halaman / Tab</th>
                     {ROLES.map(role => (
                       <th key={role} className="px-6 py-4 text-center">{role}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
-                  {MENU_LIST.map((menu) => (
-                    <tr key={menu.key} className="hover:bg-white/5 transition-colors">
-                      <td className="px-6 py-4 font-medium text-foreground/90">{menu.label}</td>
-                      {ROLES.map(role => {
-                        const isChecked = (rolePermissions[role] || []).includes(menu.key)
-                        return (
-                          <td key={role} className="px-6 py-4 text-center">
-                            <label className="flex items-center justify-center cursor-pointer">
-                              <input 
-                                type="checkbox" 
-                                checked={isChecked}
-                                onChange={() => handleTogglePermission(role, menu.key)}
-                                className="w-5 h-5 rounded border-white/20 bg-black/40 text-primary focus:ring-primary focus:ring-offset-background"
-                              />
-                            </label>
+                  {ACCESS_SECTIONS.map((section) => (
+                    <Fragment key={section.key}>
+                      <tr className="bg-white/[0.04]">
+                        <th colSpan={ROLES.length + 1} className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-primary">{section.label}</th>
+                      </tr>
+                      {section.pages.flatMap((page) => page.permissions.map((permission) => (
+                        <tr key={permission.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-3 font-medium text-foreground/90">
+                            <span className="block text-xs text-foreground/50">{page.label}</span>
+                            <span>{permission.label}</span>
                           </td>
-                        )
-                      })}
-                    </tr>
+                          {ROLES.map((role) => {
+                            const isOperatorDashboard = ['Operator', 'Operator Mesin'].includes(role) && permission.id === 'dashboard.home'
+                            const isChecked = !isOperatorDashboard && (rolePermissions[role] || []).includes(permission.id)
+                            return (
+                              <td key={role} className="px-6 py-3 text-center">
+                                <label className={`flex items-center justify-center ${isOperatorDashboard ? 'cursor-not-allowed opacity-40' : 'cursor-pointer'}`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={isChecked}
+                                    disabled={isOperatorDashboard}
+                                    onChange={() => handleTogglePermission(role, permission.id)}
+                                    className="h-5 w-5 rounded border-white/20 bg-black/40 text-primary focus:ring-primary focus:ring-offset-background"
+                                  />
+                                </label>
+                              </td>
+                            )
+                          })}
+                        </tr>
+                      )))}
+                    </Fragment>
                   ))}
                 </tbody>
               </table>

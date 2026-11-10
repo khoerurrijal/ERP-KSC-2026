@@ -126,6 +126,7 @@ export async function saveEmployee(payload) {
         const roleName = schema.role_name.toLowerCase()
         if (roleName.includes('admin')) mappedRole = 'Admin'
         else if (roleName.includes('owner')) mappedRole = 'Owner'
+        else if (roleName.includes('operator mesin')) mappedRole = 'Operator Mesin'
 
         const emailToSync = `${payload.username}@kingsablon.com`.toLowerCase()
 

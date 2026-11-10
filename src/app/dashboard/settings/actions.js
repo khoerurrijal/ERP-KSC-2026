@@ -43,7 +43,8 @@ export async function getSettings() {
   const role_permissions = data.find(d => d.key === 'role_permissions')?.value || {
     "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "audit", "pengaturan", "user_management"],
     "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data", "audit"],
-    "Operator": ["dashboard", "produksi"]
+    "Operator": ["dashboard", "produksi", "gudang"],
+    "Operator Mesin": ["production.queue"]
   }
   const user_roles = data.find(d => d.key === 'user_roles')?.value || []
   const ai_agent_config = data.find(d => d.key === 'ai_agent_config')?.value || { model: DEFAULT_AI_MODEL }

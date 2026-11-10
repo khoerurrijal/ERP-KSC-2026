@@ -16,17 +16,18 @@ const MENU_GROUPS = [
     path: '/dashboard',
     icon: LayoutDashboard,
     exact: true,
-    key: 'dashboard'
+    key: 'dashboard',
+    accessKeys: ['dashboard.home']
   },
   {
     name: 'Penjualan',
     icon: TrendingUp,
     subItems: [
-      { name: 'Sales Order', path: '/sales', icon: FileText, key: 'penjualan' },
-      { name: 'Pesanan Masuk', path: '/dashboard/order-requests', icon: Inbox, key: 'penjualan' },
-      { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag, key: 'marketplace' },
-      { name: 'Produksi', path: '/production', icon: Factory, key: 'produksi' },
-      { name: 'Status Pesanan', path: '/status-pesanan', icon: PackageCheck, key: 'produksi' },
+      { name: 'Sales Order', path: '/sales', icon: FileText, key: 'penjualan', accessKeys: ['sales.orders.invoice', 'sales.orders.items', 'sales.orders.create', 'sales.orders.edit', 'sales.orders.print'] },
+      { name: 'Pesanan Masuk', path: '/dashboard/order-requests', icon: Inbox, key: 'penjualan', accessKeys: ['sales.requests.list', 'sales.requests.detail'] },
+      { name: 'Marketplace', path: '/marketplace', icon: ShoppingBag, key: 'marketplace', accessKeys: ['marketplace.orders'] },
+      { name: 'Produksi', path: '/production', icon: Factory, key: 'produksi', accessKeys: ['production.queue'] },
+      { name: 'Status Pesanan', path: '/status-pesanan', icon: PackageCheck, key: 'produksi', accessKeys: ['production.status.orders', 'production.status.items', 'production.status.shipping'] },
     ]
   },
   {
@@ -34,8 +35,8 @@ const MENU_GROUPS = [
     icon: ShoppingCart,
     key: 'gudang', // Group level key
     subItems: [
-      { name: 'Inventory', path: '/inventory', icon: Package },
-      { name: 'Purchase Order', path: '/purchases', icon: ShoppingCart },
+      { name: 'Inventory', path: '/inventory', icon: Package, accessKeys: ['inventory.table', 'inventory.pipeline', 'inventory.mutations'] },
+      { name: 'Purchase Order', path: '/purchases', icon: ShoppingCart, accessKeys: ['purchases.orders', 'purchases.items', 'purchases.create', 'purchases.edit'] },
     ]
   },
   {
@@ -43,9 +44,9 @@ const MENU_GROUPS = [
     icon: Wallet,
     key: 'keuangan', // Group level key
     subItems: [
-      { name: 'Buku Besar', path: '/transactions', icon: TrendingUp },
-      { name: 'Kasbon & Pinjaman', path: '/finance/loans', icon: Wallet },
-      { name: 'Rekap Gaji', path: '/payroll', icon: Users },
+      { name: 'Buku Besar', path: '/transactions', icon: TrendingUp, accessKeys: ['finance.ledger.main', 'finance.ledger.virtual'] },
+      { name: 'Kasbon & Pinjaman', path: '/finance/loans', icon: Wallet, accessKeys: ['finance.loans'] },
+      { name: 'Rekap Gaji', path: '/payroll', icon: Users, accessKeys: ['finance.payroll'] },
     ]
   },
   {
@@ -53,33 +54,37 @@ const MENU_GROUPS = [
     icon: Box,
     key: 'master_data',
     subItems: [
-      { name: 'Produk', path: '/master/products', icon: Box },
-      { name: 'Pelanggan', path: '/master/customers', icon: Users },
-      { name: 'Supplier', path: '/master/suppliers', icon: Package },
-      { name: 'Karyawan', path: '/master/employees', icon: Users },
+      { name: 'Produk', path: '/master/products', icon: Box, accessKeys: ['master.products'] },
+      { name: 'Pelanggan', path: '/master/customers', icon: Users, accessKeys: ['master.customers'] },
+      { name: 'Supplier', path: '/master/suppliers', icon: Package, accessKeys: ['master.suppliers'] },
+      { name: 'Karyawan', path: '/master/employees', icon: Users, accessKeys: ['master.employees'] },
     ]
   },
   {
     name: 'System',
     icon: Settings,
     subItems: [
-      { name: 'Laporan', path: '/report', icon: FileText, key: 'laporan' },
-      { name: 'AI Audit', path: '/audit', icon: ShieldCheck, key: 'audit' },
-      { name: 'Pengaturan Sistem', path: '/settings', icon: Settings, key: 'pengaturan' },
+      { name: 'Laporan', path: '/report', icon: FileText, key: 'laporan', accessKeys: ['reports.ledger', 'reports.profit'] },
+      { name: 'AI Audit', path: '/audit', icon: ShieldCheck, key: 'audit', accessKeys: ['audit.findings'] },
+      { name: 'Pengaturan Sistem', path: '/settings', icon: Settings, key: 'pengaturan', accessKeys: ['settings.dropdowns', 'settings.cashflow', 'settings.pricelist', 'settings.store', 'settings.category_images', 'settings.ai_agent', 'settings.access', 'settings.salary'] },
     ]
   }
 ]
 
-export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {}, lightweight = false }) {
+export default function Sidebar({ allowedMenus = [], allowedPermissions = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {}, lightweight = false }) {
+  const { resolvedTheme } = useTheme()
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const sidebarRef = useRef(null)
+  const logoSrc = lightweight || resolvedTheme !== 'dark' ? '/logo.png' : '/logo-dark.png'
   
   // Filter menu based on allowedMenus
+  const hasAnyAccess = (accessKeys) => !accessKeys || accessKeys.some((key) => allowedPermissions.includes(key))
   const filteredMenus = MENU_GROUPS.map(group => {
     if (group.roles && !group.roles.includes(userRole)) return null
     if (!group.subItems) {
       if (group.key && !allowedMenus.includes(group.key)) return null
+      if (!hasAnyAccess(group.accessKeys)) return null
       return group
     }
     if (group.key && !allowedMenus.includes(group.key)) {
@@ -88,6 +93,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     const filteredSubItems = group.subItems.filter(sub => {
       if (sub.roles && !sub.roles.includes(userRole)) return false
       if (sub.key && !allowedMenus.includes(sub.key)) return false
+      if (!hasAnyAccess(sub.accessKeys)) return false
       return true
     })
     if (filteredSubItems.length === 0) return null
@@ -145,8 +151,7 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
       <div ref={sidebarRef} className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center justify-between p-4">
           <div className="flex shrink-0">
-            <Image src="/logo.png" alt="Logo Light" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md block dark:hidden" />
-            <Image src="/logo-dark.png" alt="Logo Dark" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md hidden dark:block" />
+            <Image src={logoSrc} alt="King Sablon Cup" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md" />
           </div>
           <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
             <div className="w-5 h-0.5 bg-current mb-1" />
@@ -174,22 +179,13 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
     <aside ref={sidebarRef} className={`${lightweight ? 'h-screen fixed left-0 top-0 z-50 flex flex-col overflow-visible border-r border-stone-200 bg-white shadow-sm' : 'h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300'} ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className={`relative flex ${isCollapsed ? 'flex-col items-center gap-2 p-3' : 'items-center justify-center p-6 pb-2'}`}>
         <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} ${lightweight ? '' : 'transition-all duration-300 cursor-pointer hover:scale-105'}`}>
-          {lightweight ? <Image src="/logo.png" alt="King Sablon Cup" width={400} height={160} className="h-full w-full object-contain" /> : <>
-            <Image
-              src="/logo.png"
-              alt="King Sablon Logo Light"
-              width={400}
-              height={160}
-              className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden"
-            />
-            <Image
-              src="/logo-dark.png"
-              alt="King Sablon Logo Dark"
-              width={400}
-              height={160}
-              className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block"
-            />
-          </>}
+          <Image
+            src={logoSrc}
+            alt="King Sablon Cup"
+            width={400}
+            height={160}
+            className={`h-full w-full object-contain ${lightweight ? '' : 'drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)]'}`}
+          />
         </div>
       </div>
 

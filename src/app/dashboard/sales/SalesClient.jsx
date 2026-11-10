@@ -17,6 +17,7 @@ import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import SalesOrderWizard from '@/components/SalesOrderWizard'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 export default function SalesClient({ 
   salesOrders = [], 
@@ -40,12 +41,16 @@ export default function SalesClient({
   const searchParams = useSearchParams()
   const pathname = usePathname()
   const supabase = createClient()
+  const { canAccess } = useRoleAccess()
 
   // Status order is now dynamic from settings
   const productionStatuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
 
   // Tab State: 'INVOICE' | 'ITEMS'
-  const [activeTab, setActiveTab] = useState(initialTab)
+  const safeInitialTab = canAccess(initialTab === 'ITEMS' ? 'sales.orders.items' : 'sales.orders.invoice')
+    ? initialTab
+    : canAccess('sales.orders.invoice') ? 'INVOICE' : 'ITEMS'
+  const [activeTab, setActiveTab] = useState(safeInitialTab)
 
   const [searchQuery, setSearchQuery] = useState(passedSearchParams.search || '')
   const [debouncedSearch, setDebouncedSearch] = useState(passedSearchParams.search || '')
@@ -337,9 +342,9 @@ export default function SalesClient({
         <div className="hidden sm:block">
           <MonthFilter />
         </div>
-        <button type="button" onClick={() => openSalesOrderDrawer()} className="btn-primary h-10 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
+        {canAccess('sales.orders.create') && <button type="button" onClick={() => openSalesOrderDrawer()} className="btn-primary h-10 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
           <Plus className="w-4 h-4" /> Buat Sales Order Baru
-        </button>
+        </button>}
       </div>}
 
       {/* KPI Cards */}
@@ -366,13 +371,13 @@ export default function SalesClient({
 
       {/* Tabs */}
       {!embedded && showItemsTab && <div className="flex items-center gap-1 border-b border-white/10 overflow-x-auto hide-scrollbar">
-        <button 
+        {canAccess('sales.orders.invoice') && <button
           onClick={() => setActiveTab('INVOICE')}
           className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all ${activeTab === 'INVOICE' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <FileText className="w-4 h-4" /> Data Invoice & Pembayaran
-        </button>
-        {showItemsTab && (
+        </button>}
+        {showItemsTab && canAccess('sales.orders.items') && (
           <button
             onClick={() => setActiveTab('ITEMS')}
             className={`flex items-center gap-2 px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all ${activeTab === 'ITEMS' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}

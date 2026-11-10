@@ -12,6 +12,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 function removeInvoiceNumber(value) {
   return stripGeneratedInvoiceNumbers(value)
@@ -26,6 +27,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const searchParamsString = searchParams.toString()
+  const { canAccess } = useRoleAccess()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editId, setEditId] = useState(null)
   const [searchQuery, setSearchQuery] = useState(initialSearch)
@@ -33,7 +35,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const [isSubmitting, setIsSubmitting] = useState(false)
   
   // Tabs
-  const [currentTab, setCurrentTab] = useState('UTAMA') // 'UTAMA' | 'VIRTUAL'
+  const [currentTab, setCurrentTab] = useState(canAccess('finance.ledger.main') ? 'UTAMA' : 'VIRTUAL') // 'UTAMA' | 'VIRTUAL'
 
   // Filters
   const [filterMonth, setFilterMonth] = useState(() => new Date().toISOString().slice(0, 7))
@@ -248,18 +250,18 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
       {/* Tabs */}
       <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
-        <button 
+        {canAccess('finance.ledger.main') && <button
           onClick={() => setCurrentTab('UTAMA')} 
           className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${currentTab === 'UTAMA' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
         >
           Kas Utama
-        </button>
-        <button 
+        </button>}
+        {canAccess('finance.ledger.virtual') && <button
           onClick={() => setCurrentTab('VIRTUAL')} 
           className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${currentTab === 'VIRTUAL' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
         >
           Mutasi Virtual (HPP)
-        </button>
+        </button>}
       </div>
 
       {showFilters && (

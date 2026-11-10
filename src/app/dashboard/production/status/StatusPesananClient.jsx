@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { ClipboardCheck, ListChecks, PackageCheck } from 'lucide-react'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const tabs = [
   { key: 'shipping', label: 'Konfirmasi Pengiriman', icon: PackageCheck },
@@ -10,10 +11,13 @@ const tabs = [
 ]
 
 export default function StatusPesananClient({ activeTab = 'orders', children }) {
+  const { canAccess } = useRoleAccess()
+  const visibleTabs = tabs.filter((tab) => canAccess(`production.status.${tab.key}`))
+
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       <nav className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
-        {tabs.map(tab => {
+        {visibleTabs.map(tab => {
           const Icon = tab.icon
           return (
             <Link

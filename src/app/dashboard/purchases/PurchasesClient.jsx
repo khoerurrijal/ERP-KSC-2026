@@ -13,6 +13,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import PurchaseOrderWizard from '@/components/PurchaseOrderWizard'
 import { matchesSearchText } from '@/utils/search'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const getLocalDateValue = () => {
   const today = new Date()
@@ -24,7 +25,9 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
   const pathname = usePathname()
   const searchParams = useSearchParams()
   const searchParamsString = searchParams.toString()
-  const [activeTab, setActiveTab] = useState('PO') // 'PO' | 'ITEMS'
+  const { canAccess } = useRoleAccess()
+  const initialTab = canAccess('purchases.orders') ? 'PO' : 'ITEMS'
+  const [activeTab, setActiveTab] = useState(initialTab) // 'PO' | 'ITEMS'
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [itemSearchQuery, setItemSearchQuery] = useState(initialSearch)
   const [showFilters, setShowFilters] = useState(false)
@@ -287,10 +290,10 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-end gap-2">
         <MonthFilter />
-        <button type="button" onClick={openNewPurchaseOrder} className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto">
+        {canAccess('purchases.create') && <button type="button" onClick={openNewPurchaseOrder} className="btn-primary h-10 px-4 flex items-center justify-center gap-2 text-sm whitespace-nowrap w-full sm:w-auto">
           <Plus className="w-4 h-4" />
           Buat PO Baru
-        </button>
+        </button>}
       </div>
 
       {/* SUMMARY CARDS */}
@@ -315,18 +318,18 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
 
       {/* TABS */}
       <div className="flex items-center gap-1 border-b border-white/10 mb-4 overflow-x-auto hide-scrollbar">
-        <button 
+        {canAccess('purchases.orders') && <button
           onClick={() => setActiveTab('PO')}
           className={`pb-2 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'PO' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
         >
           Invoice PO
-        </button>
-        <button 
+        </button>}
+        {canAccess('purchases.items') && <button
           onClick={() => setActiveTab('ITEMS')}
           className={`pb-2 px-3 text-xs sm:text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${activeTab === 'ITEMS' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
         >
           Purchase Items
-        </button>
+        </button>}
       </div>
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">

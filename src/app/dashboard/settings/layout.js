@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useSearchParams } from 'next/navigation'
 import { Banknote, Bot, Image as ImageIcon, ListPlus, Percent, ShieldCheck, Store, Wallet } from 'lucide-react'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const TABS = [
   { key: 'dropdowns', label: 'Dropdown Form', icon: ListPlus },
@@ -17,12 +18,14 @@ const TABS = [
 
 export default function SettingsLayout({ children }) {
   const searchParams = useSearchParams()
+  const { canAccess } = useRoleAccess()
   const activeTab = searchParams.get('tab') || 'dropdowns'
+  const visibleTabs = TABS.filter(({ key }) => canAccess(`settings.${key}`))
 
   return (
     <div className="space-y-4 pb-8">
       <nav aria-label="Bagian pengaturan" className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">
-        {TABS.map(({ key, label, icon: Icon }) => {
+        {visibleTabs.map(({ key, label, icon: Icon }) => {
           const isActive = activeTab === key
           return (
             <Link

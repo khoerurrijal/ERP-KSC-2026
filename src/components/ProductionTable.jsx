@@ -11,6 +11,7 @@ import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
@@ -32,10 +33,18 @@ const getStatusColor = (st) => {
 }
 
 export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
+  const { canAccess } = useRoleAccess()
   const router = useRouter()
   const pathname = usePathname()
   const currentSearchParams = useSearchParams()
-  const [activeTab, setActiveTab] = useState(initialTab || (userRole === 'Operator' ? 'PRODUKSI' : 'SO')) // 'SO' | 'PRODUKSI'
+  const canSeeOrdersTab = canAccess('production.status.orders')
+  const canSeeProductionTab = canAccess('production.queue')
+  const safeInitialTab = initialTab === 'SO' && canSeeOrdersTab
+    ? 'SO'
+    : initialTab === 'PRODUKSI' && canSeeProductionTab
+      ? 'PRODUKSI'
+      : canSeeProductionTab ? 'PRODUKSI' : 'SO'
+  const [activeTab, setActiveTab] = useState(safeInitialTab) // 'SO' | 'PRODUKSI'
   
   const [selectedJob, setSelectedJob] = useState(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -276,20 +285,20 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       </div>}
 
       {/* Tabs */}
-      {!hideTabs && userRole !== 'Operator' && (
+      {!hideTabs && (canSeeOrdersTab || canSeeProductionTab) && (
         <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
-          <button 
+          {canSeeOrdersTab && <button
             onClick={() => setActiveTab('SO')} 
             className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
           >
             Tracking Sales Order
-          </button>
-          <button 
+          </button>}
+          {canSeeProductionTab && <button
             onClick={() => setActiveTab('PRODUKSI')} 
             className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
           >
             Tracking Produksi
-          </button>
+          </button>}
         </div>
       )}
 

@@ -2,6 +2,7 @@ import PermissionGuard from '@/components/PermissionGuard'
 import DashboardClientLayout from '@/components/DashboardClientLayout'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import { menuKeysFromPermissions, normalizeRolePermissions } from '@/utils/role-access'
 import './employee-light.css'
 
 export default async function DashboardLayout({ children }) {
@@ -18,7 +19,8 @@ export default async function DashboardLayout({ children }) {
   const defaultPermissions = {
     "Owner": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "keuangan", "master_data", "laporan", "audit", "pengaturan", "user_management"],
     "Admin": ["dashboard", "penjualan", "marketplace", "produksi", "gudang", "master_data", "audit"],
-    "Operator": ["dashboard", "produksi", "gudang"]
+    "Operator": ["dashboard", "produksi", "gudang"],
+    "Operator Mesin": ["production.queue"]
   }
 
   const rolePermissions = settingsData?.find(d => d.key === 'role_permissions')?.value || defaultPermissions
@@ -33,16 +35,16 @@ export default async function DashboardLayout({ children }) {
   })
   const userRole = matchedUser ? matchedUser.role : 'Operator'
 
-  const configuredMenus = rolePermissions[userRole] || []
-  const allowedMenus = ['Admin', 'Owner'].includes(userRole)
-    ? Array.from(new Set([...configuredMenus, 'audit']))
-    : configuredMenus
-
-  const isOperator = userRole === 'Operator'
+  const configuredPermissions = rolePermissions[userRole] ?? defaultPermissions[userRole] ?? []
+  const allowedPermissions = normalizeRolePermissions(configuredPermissions, userRole)
+  if (['Admin', 'Owner'].includes(userRole) && !allowedPermissions.includes('audit.findings')) {
+    allowedPermissions.push('audit.findings')
+  }
+  const allowedMenus = menuKeysFromPermissions(allowedPermissions)
 
   return (
-    <DashboardClientLayout allowedMenus={allowedMenus} userRole={userRole} userName={userName}>
-      <PermissionGuard allowedMenus={allowedMenus} userRole={userRole}>
+    <DashboardClientLayout allowedMenus={allowedMenus} allowedPermissions={allowedPermissions} userRole={userRole} userName={userName}>
+      <PermissionGuard allowedPermissions={allowedPermissions} userRole={userRole}>
         {children}
       </PermissionGuard>
     </DashboardClientLayout>

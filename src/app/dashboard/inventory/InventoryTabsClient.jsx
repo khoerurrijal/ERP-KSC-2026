@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { PackageSearch, Kanban, History } from 'lucide-react'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const tabs = [
   { key: 'table', label: 'Tabel Stok', icon: PackageSearch },
@@ -10,10 +11,13 @@ const tabs = [
 ]
 
 export default function InventoryTabsClient({ activeTab = 'table', children }) {
+  const { canAccess } = useRoleAccess()
+  const visibleTabs = tabs.filter((tab) => canAccess(`inventory.${tab.key}`))
+
   return (
     <div className="space-y-4">
       <nav className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
-        {tabs.map(tab => {
+        {visibleTabs.map(tab => {
           const Icon = tab.icon
           const href = `/inventory?tab=${tab.key}`
           return (

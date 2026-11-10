@@ -7,9 +7,11 @@ import CustomSelect from '@/components/CustomSelect'
 import CurrencyInput from '@/components/CurrencyInput'
 
 import { BarChart3, PieChart } from 'lucide-react'
+import { useRoleAccess } from '@/components/RoleAccessContext'
 
 export default function ReportClient({ transactions = [], summary = {}, analytics = {}, dropdownConfig = {} }) {
-  const [activeTab, setActiveTab] = useState('buku_besar')
+  const { canAccess } = useRoleAccess()
+  const [activeTab, setActiveTab] = useState(canAccess('reports.ledger') ? 'buku_besar' : 'analisa_laba')
   const [filterRef, setFilterRef] = useState('')
   const [isBalanceModalOpen, setIsBalanceModalOpen] = useState(false)
   
@@ -121,18 +123,18 @@ export default function ReportClient({ transactions = [], summary = {}, analytic
 
       {/* TABS Navigation */}
       <div className="flex items-center gap-1 border-b border-white/10 w-full overflow-x-auto hide-scrollbar">
-        <button 
+        {canAccess('reports.ledger') && <button
           onClick={() => setActiveTab('buku_besar')}
           className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center justify-center gap-2 ${activeTab === 'buku_besar' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <Wallet className="w-4 h-4" /> Kas & Buku Besar
-        </button>
-        <button 
+        </button>}
+        {canAccess('reports.profit') && <button
           onClick={() => setActiveTab('analisa_laba')}
           className={`flex-1 sm:flex-none px-3 sm:px-4 py-2 text-xs sm:text-sm font-bold whitespace-nowrap border-b-2 transition-all flex items-center justify-center gap-2 ${activeTab === 'analisa_laba' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent hover:text-foreground'}`}
         >
           <PieChart className="w-4 h-4" /> Analisa Penjualan
-        </button>
+        </button>}
       </div>
 
       {activeTab === 'buku_besar' ? (

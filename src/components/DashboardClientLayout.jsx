@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Sidebar from '@/components/Sidebar'
 import Topbar from '@/components/Topbar'
 
-export default function DashboardClientLayout({ allowedMenus, userRole, userName = '', children }) {
+export default function DashboardClientLayout({ allowedMenus, allowedPermissions = [], userRole, userName = '', children }) {
   const lightweight = !['Owner', 'Admin'].includes(userRole)
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
@@ -61,7 +61,8 @@ export default function DashboardClientLayout({ allowedMenus, userRole, userName
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'} md:translate-x-0
       `}>
         <Sidebar
-          allowedMenus={allowedMenus} 
+          allowedMenus={allowedMenus}
+          allowedPermissions={allowedPermissions}
           userRole={userRole} 
           lightweight={lightweight}
           isCollapsed={isSidebarCollapsed}

@@ -46,10 +46,18 @@ export async function updateSession(request) {
     return NextResponse.redirect(url)
   }
 
-  // If user is logged in and tries to access login page, redirect to dashboard
+  // Keep authenticated employees on the correct role landing page.
   if (user && request.nextUrl.pathname === '/login') {
+    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+    const userRoles = Array.isArray(settings?.value) ? settings.value : []
+    const userEmail = user.email?.toLowerCase() || ''
+    const matchedUser = userRoles.find((entry) => {
+      const configuredEmail = (entry.email || '').trim().toLowerCase()
+      return configuredEmail === userEmail || `${configuredEmail}@kingsablon.com` === userEmail
+    })
+    const userRole = matchedUser?.role || 'Operator'
     const url = request.nextUrl.clone()
-    url.pathname = '/dashboard'
+    url.pathname = ['Operator', 'Operator Mesin'].includes(userRole) ? '/production' : '/dashboard'
     return NextResponse.redirect(url)
   }
 
