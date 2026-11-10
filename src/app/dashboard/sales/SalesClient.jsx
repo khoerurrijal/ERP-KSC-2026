@@ -13,7 +13,7 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
-import { matchesSearchText } from '@/utils/search'
+import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import SalesOrderWizard from '@/components/SalesOrderWizard'
@@ -88,6 +88,7 @@ export default function SalesClient({
   }
   const updateQueryParams = useCallback((newParams) => {
     const params = new URLSearchParams(Array.from(searchParams.entries()))
+    if (Object.prototype.hasOwnProperty.call(newParams, 'search')) params.delete('orderId')
     Object.entries(newParams).forEach(([key, val]) => {
       if (val) {
         params.set(key, val)
@@ -242,17 +243,15 @@ export default function SalesClient({
       const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
       const prod = Array.isArray(item.products) ? item.products[0] : item.products
 
-      const invoiceNum = so?.invoice_number || ''
       const customerName = cust?.name || ''
       const productName = prod?.name || item.product_name || item.item_name || ''
       const notesStr = item.notes || ''
       const itemProdStatus = (item.status || 'BARU MASUK').toString().replace(/_/g, ' ').toUpperCase().trim()
 
       const matchSearch = !searchLower || 
-        matchesSearchText(invoiceNum, searchLower) ||
         matchesSearchText(customerName, searchLower) ||
         matchesSearchText(productName, searchLower) ||
-        matchesSearchText(notesStr, searchLower) ||
+        matchesSearchText(stripGeneratedInvoiceNumbers(notesStr), searchLower) ||
         matchesSearchText(itemProdStatus, searchLower)
       
       const rawDate = so?.date || ''
@@ -389,7 +388,7 @@ export default function SalesClient({
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-foreground/40" />
           <input 
             type="text" 
-            placeholder={activeTab === 'INVOICE' ? "Cari no invoice, pelanggan..." : "Cari produk, invoice, pelanggan..."}
+            placeholder={activeTab === 'INVOICE' ? "Cari nama pelanggan, kode pelanggan, atau status..." : "Cari pelanggan, produk, atau keterangan..."}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             className="glass-input pl-9 w-full h-10"

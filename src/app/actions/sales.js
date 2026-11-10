@@ -307,7 +307,7 @@ export async function addSalesPayment(soId, paymentData) {
         notificationType: 'PAYMENT_STATUS',
         title: paymentStatus === 'LUNAS' ? 'Pelunasan dicatat' : 'Pembayaran pesanan berubah',
         message: `${so.invoice_number}: ${so.payment_status || 'BELUM LUNAS'} → ${paymentStatus}.`,
-        href: `/sales?search=${encodeURIComponent(so.invoice_number || soId)}`,
+        href: `/sales?orderId=${encodeURIComponent(soId)}`,
         entityId: soId
       })
     }

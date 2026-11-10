@@ -4,26 +4,36 @@ import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { createAdminNotification } from '@/lib/adminNotifications'
 
+function getProductionProgressError(error) {
+  const message = String(error?.message || error || 'Gagal menyimpan progress produksi.')
+  if (message.includes('PRODUCTION_PROGRESS_CHANGED')) {
+    return 'Progress pekerjaan ini baru saja diubah operator lain. Muat ulang daftar, cek sisa Qty, lalu input lagi. Qty dari form ini tidak disimpan.'
+  }
+  if (message.includes('PRODUCTION_JOB_NOT_FOUND')) {
+    return 'Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.'
+  }
+  if (message.includes('PGRST202')) {
+    return 'Pengaman simpan belum tersedia di database. Hubungi Admin sebelum mencatat progress.'
+  }
+  return message
+}
+
 export async function saveProductionProgress(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
-    const { error } = await supabase
-      .from('production_logs')
-      .insert([{
-        job_id: payload.job_id,
-        employee_id: payload.employee_id,
-        qty_processed: payload.qty_processed,
-        qty_defect: payload.qty_defect || 0,
-        notes: payload.notes || '',
-        processed_date: new Date().toISOString()
-      }])
-    
-    if (error) throw error
+    const { error } = await supabase.rpc('record_production_progress_guarded', {
+      p_job_id: payload.job_id,
+      p_employee_id: payload.employee_id,
+      p_qty_processed: payload.qty_processed,
+      p_qty_defect: payload.qty_defect || 0,
+      p_notes: payload.notes || '',
+      p_processed_date: new Date().toISOString().slice(0, 10),
+      p_expected_total_qty: payload.expected_total_qty,
+      p_correction_total: null
+    })
 
-    // Cek total produksi untuk auto-status "SUDAH JADI"
-    const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', payload.job_id)
-    const totalProcessed = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0)
+    if (error) throw error
     
     // We update the item status via the new centralized auto-status handler
     await handleAutoStatusUpdate(payload.job_id);
@@ -32,7 +42,7 @@ export async function saveProductionProgress(payload) {
     return { success: true }
 } catch (err) {
     console.error('Error saving production log:', err)
-    return { success: false, error: err.message }
+    return { success: false, error: getProductionProgressError(err) }
   }
 }
 
@@ -263,29 +273,31 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
   }
 }
 
-export async function correctProductionProgress(jobId, newTotalQty, employeeId) {
+export async function correctProductionProgress(jobId, newTotalQty, employeeId, expectedTotalQty) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
-    const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', jobId)
-    const currentTotal = (logs || []).reduce((sum, item) => sum + item.qty_processed, 0)
-    
-    const adjustment = Number(newTotalQty) - currentTotal;
-    
-    if (adjustment !== 0) {
-      const { error } = await supabase
-        .from('production_logs')
-        .insert([{
-          job_id: jobId,
-          employee_id: employeeId,
-          qty_processed: adjustment,
-          qty_defect: 0,
-          notes: 'Koreksi Qty oleh Admin',
-          processed_date: new Date().toISOString()
-        }])
-      
-      if (error) throw error;
-      
+    const correctedTotal = Number(newTotalQty)
+    let expectedTotal = Number(expectedTotalQty)
+    if (!Number.isFinite(expectedTotal)) {
+      const { data: logs, error: logsError } = await supabase.from('production_logs').select('qty_processed').eq('job_id', jobId)
+      if (logsError) throw logsError
+      expectedTotal = (logs || []).reduce((sum, item) => sum + Number(item.qty_processed || 0), 0)
+    }
+    const { error } = await supabase.rpc('record_production_progress_guarded', {
+      p_job_id: jobId,
+      p_employee_id: employeeId,
+      p_qty_processed: 0,
+      p_qty_defect: 0,
+      p_notes: 'Koreksi Qty oleh Admin',
+      p_processed_date: new Date().toISOString().slice(0, 10),
+      p_expected_total_qty: expectedTotal,
+      p_correction_total: correctedTotal
+    })
+
+    if (error) throw error
+
+    if (correctedTotal !== expectedTotal) {
       await handleAutoStatusUpdate(jobId);
     }
     
@@ -293,6 +305,6 @@ export async function correctProductionProgress(jobId, newTotalQty, employeeId) 
     return { success: true }
   } catch (err) {
     console.error('Error correcting progress:', err)
-    return { success: false, error: err.message }
+    return { success: false, error: getProductionProgressError(err) }
   }
 }

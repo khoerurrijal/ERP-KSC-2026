@@ -11,12 +11,10 @@ import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
-import { matchesSearchText } from '@/utils/search'
+import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 
 function removeInvoiceNumber(value) {
-  return String(value || '')
-    .replace(/\bINV[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, '')
-    .replace(/\bINVOICE\s*(?:NO\.?)?[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, '')
+  return stripGeneratedInvoiceNumbers(value)
     .replace(/\bINVOICE\b/gi, '')
     .replace(/\s{2,}/g, ' ')
     .replace(/\s+([,.:;])/g, '$1')
@@ -179,10 +177,9 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
         if (methodUpper !== 'VIRTUAL') return false
       }
 
-      const matchSearch = matchesSearchText(trx.description, normalizedSearch) ||
-                          matchesSearchText(trx.reference, normalizedSearch) ||
+      const matchSearch = matchesSearchText(removeInvoiceNumber(trx.description), normalizedSearch) ||
+                          matchesSearchText(removeInvoiceNumber(trx.reference), normalizedSearch) ||
                           matchesSearchText(trx.workshop_code, normalizedSearch) ||
-                          matchesSearchText(trx.sales_orders?.invoice_number, normalizedSearch) ||
                           matchesSearchText(trx.sales_orders?.customers?.name, normalizedSearch)
       
       const transactionDate = trx.date ? new Date(trx.date) : null
@@ -230,7 +227,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
               <input 
                 type="text" 
-                placeholder="Cari transaksi..." 
+                placeholder="Cari pelanggan, keterangan, atau referensi..."
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
                 className="glass-input !pl-10 h-10 w-full text-sm"

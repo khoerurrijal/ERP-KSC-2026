@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { matchesSearchText, numericTokenPattern } from '@/utils/search'
+import { matchesSearchText } from '@/utils/search'
 import SalesClient from './SalesClient'
 
 export default async function SalesData({ searchParams = {}, itemsOnly = false }) {
@@ -8,6 +8,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   const page = parseInt(searchParams.page || '1', 10)
   const pageSize = parseInt(searchParams.pageSize || '50', 10)
   const search = String(searchParams.search || '').trim()
+  const directOrderId = search ? '' : String(searchParams.orderId || '').trim()
   const filterStatus = searchParams.status || 'BELUM_LUNAS'
   const filterCustomerType = searchParams.customerType || 'ALL'
   const now = new Date()
@@ -32,18 +33,17 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   let safeSearch = search ? search.replace(/[(),"]/g, ' ').trim() : ''
 
   if (safeSearch) {
-    const [custRes, prodRes, soRes] = await Promise.all([
-      supabase.from('customers').select('customer_code, name').ilike('name', `%${safeSearch}%`).limit(50000),
-      supabase.from('products').select('product_code, name').ilike('name', `%${safeSearch}%`).limit(50000),
-      supabase.from('sales_orders').select('id, invoice_number').ilike('invoice_number', `%${safeSearch}%`).limit(50000)
+    const [custRes, prodRes] = await Promise.all([
+      supabase.from('customers').select('customer_code, name').or(`name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%`).limit(50000),
+      supabase.from('products').select('product_code, name').or(`name.ilike.%${safeSearch}%,product_code.ilike.%${safeSearch}%`).limit(50000)
     ])
 
     matchedCustCodes = (custRes.data || [])
-      .filter(customer => matchesSearchText(customer.name, safeSearch))
+      .filter(customer => matchesSearchText(customer.name, safeSearch) || matchesSearchText(customer.customer_code, safeSearch))
       .map(customer => customer.customer_code)
       .filter(Boolean)
     matchedProductCodes = (prodRes.data || [])
-      .filter(product => matchesSearchText(product.name, safeSearch))
+      .filter(product => matchesSearchText(product.name, safeSearch) || matchesSearchText(product.product_code, safeSearch))
       .map(product => product.product_code)
       .filter(Boolean)
     
@@ -54,12 +54,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       additionalSoIds = (custSoRes || []).map(s => s.id)
     }
     
-    matchedSoIds = [
-      ...(soRes.data || [])
-        .filter(order => matchesSearchText(order.invoice_number, safeSearch))
-        .map(order => order.id),
-      ...additionalSoIds
-    ].filter(Boolean)
+    matchedSoIds = additionalSoIds.filter(Boolean)
   }
 
   // 2. Summary KPI Query untuk bulan terpilih
@@ -90,27 +85,21 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
 
   // Marketplace orders are excluded from the default operational list, but
   // a lookup must be able to find every matching Sales Order.
-  if (!safeSearch) {
+  if (!safeSearch && !directOrderId) {
     query = query.or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
   }
 
-  const isNumericSearch = Boolean(numericTokenPattern(safeSearch))
   const searchFilters = safeSearch
-    ? isNumericSearch
-      ? (matchedSoIds.length ? [`id.in.(${matchedSoIds.join(',')})`] : [])
-      : [
-          `invoice_number.ilike.%${safeSearch}%`,
-          `payment_status.ilike.%${safeSearch}%`,
-          ...(matchedCustCodes.length > 0 ? [`customer_code.in.(${matchedCustCodes.join(',')})`] : [])
-        ]
+    ? [
+        `payment_status.ilike.%${safeSearch}%`,
+        ...(matchedCustCodes.length > 0 ? [`customer_code.in.(${matchedCustCodes.join(',')})`] : [])
+      ]
     : []
 
-  if (isNumericSearch && !matchedSoIds.length) {
-    query = query.eq('invoice_number', '__NO_NUMERIC_SEARCH_MATCH__')
-  }
+  if (directOrderId) query = query.eq('id', directOrderId)
 
   // Keep unpaid orders from earlier months visible in the selected month view.
-  const monthConditionGroups = filterMonth && !safeSearch
+  const monthConditionGroups = filterMonth && !safeSearch && !directOrderId
     ? [
         [`date.gte.${startDate}`, `date.lte.${endDate}`],
         ...(filterStatus === 'LUNAS' ? [] : [[`date.lt.${startDate}`, 'payment_status.in.(BELUM LUNAS,DP)']])
@@ -129,9 +118,9 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     query = query.or(orderFilters.join(','))
   }
 
-  if (!safeSearch && filterStatus === 'BELUM_LUNAS') {
+  if (!safeSearch && !directOrderId && filterStatus === 'BELUM_LUNAS') {
     query = query.in('payment_status', ['BELUM LUNAS', 'DP'])
-  } else if (!safeSearch && filterStatus === 'LUNAS') {
+  } else if (!safeSearch && !directOrderId && filterStatus === 'LUNAS') {
     query = query.eq('payment_status', 'LUNAS')
   }
 
@@ -150,16 +139,18 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
       products(name)
     `)
 
-  if (filterMonth && !safeSearch) {
+  if (filterMonth && !safeSearch && !directOrderId) {
     itemsQuery = itemsQuery.gte('sales_orders.date', startDate).lte('sales_orders.date', endDate)
   }
 
-  if (safeSearch) {
-    const itemOrConditions = isNumericSearch ? [] : [`product_code.ilike.%${safeSearch}%`]
+  if (directOrderId) {
+    itemsQuery = itemsQuery.eq('so_id', directOrderId)
+  } else if (safeSearch) {
+    const itemOrConditions = [`product_code.ilike.%${safeSearch}%`]
     if (matchedProductCodes.length > 0) itemOrConditions.push(`product_code.in.(${matchedProductCodes.join(',')})`)
     if (matchedSoIds.length > 0) itemOrConditions.push(`so_id.in.(${matchedSoIds.join(',')})`)
     if (itemOrConditions.length) itemsQuery = itemsQuery.or(itemOrConditions.join(','))
-    else itemsQuery = itemsQuery.eq('product_code', '__NO_NUMERIC_SEARCH_MATCH__')
+    else itemsQuery = itemsQuery.eq('product_code', '__NO_PRODUCT_SEARCH_MATCH__')
   }
 
   itemsQuery = itemsQuery.order('id', { ascending: false }).limit(safeSearch ? 50000 : 1000)

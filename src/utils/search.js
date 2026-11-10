@@ -5,6 +5,14 @@ export function numericTokenPattern(query) {
     : null
 }
 
+export function stripGeneratedInvoiceNumbers(value) {
+  return String(value ?? '')
+    .replace(/\bINV[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, ' ')
+    .replace(/\bINVOICE\s*(?:NO\.?)?[\s:#-]*[A-Z0-9]+(?:-[A-Z0-9]+)*\b/gi, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
 export function matchesSearchText(value, query, { numericSubstring = false } = {}) {
   const normalizedQuery = String(query ?? '').replace(/[(),\"]/g, ' ').trim().toLowerCase()
   if (!normalizedQuery) return true

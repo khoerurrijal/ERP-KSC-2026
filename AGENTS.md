@@ -55,6 +55,11 @@
 - Aturan payroll terbaru belum diverifikasi ulang. Jangan mengubah formula payroll/denda berdasarkan catatan historis saja.
 - Mekanisme khusus SO salah input/batal setelah sudah ada pembayaran belum menjadi flow production yang di-lock. Jangan membuat refund/reversal/transfer payment otomatis tanpa kasus nyata dan approval Owner.
 
+## LOCKED — pencarian operasional
+- Kolom pencarian umum yang dipakai karyawan tidak boleh mengandalkan nomor invoice otomatis sebagai kata kunci atau petunjuk default. Karyawan biasanya tidak mengetahui nomor tersebut.
+- Pencarian umum harus cocok dengan istilah yang mudah diketahui pengguna, seperti nama pelanggan/brand, nama produk, status, keterangan pekerjaan, atau kode operasional yang memang digunakan pengguna.
+- Nomor invoice boleh tetap tampil sebagai referensi internal dan dipakai pada halaman khusus yang memang meminta nomor invoice, seperti `/track` atau `/invoice`; jangan memasukkannya sebagai sumber pencarian umum.
+
 # Project Instructions for AI Agent
 
 ## Framework

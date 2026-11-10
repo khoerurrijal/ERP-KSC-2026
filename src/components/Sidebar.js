@@ -70,7 +70,7 @@ const MENU_GROUPS = [
   }
 ]
 
-export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {} }) {
+export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {}, lightweight = false }) {
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const sidebarRef = useRef(null)
@@ -171,23 +171,25 @@ export default function Sidebar({ allowedMenus = [], userRole = '', isMobile = f
   }
 
   return (
-    <aside ref={sidebarRef} className={`h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300 ${isCollapsed ? 'w-16' : 'w-64'}`}>
+    <aside ref={sidebarRef} className={`${lightweight ? 'h-screen fixed left-0 top-0 z-50 flex flex-col overflow-visible border-r border-stone-200 bg-white shadow-sm' : 'h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300'} ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className={`relative flex ${isCollapsed ? 'flex-col items-center gap-2 p-3' : 'items-center justify-center p-6 pb-2'}`}>
-        <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} transition-all duration-300 cursor-pointer hover:scale-105`}>
-          <Image
-            src="/logo.png" 
-            alt="King Sablon Logo Light" 
-            width={400}
-            height={160}
-            className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden"
-          />
-          <Image
-            src="/logo-dark.png" 
-            alt="King Sablon Logo Dark" 
-            width={400}
-            height={160}
-            className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block"
-          />
+        <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} ${lightweight ? '' : 'transition-all duration-300 cursor-pointer hover:scale-105'}`}>
+          {lightweight ? <Image src="/logo.png" alt="King Sablon Cup" width={400} height={160} className="h-full w-full object-contain" /> : <>
+            <Image
+              src="/logo.png"
+              alt="King Sablon Logo Light"
+              width={400}
+              height={160}
+              className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] block dark:hidden"
+            />
+            <Image
+              src="/logo-dark.png"
+              alt="King Sablon Logo Dark"
+              width={400}
+              height={160}
+              className="h-full w-full object-contain drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)] hidden dark:block"
+            />
+          </>}
         </div>
       </div>
 

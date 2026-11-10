@@ -7,7 +7,7 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, ArrowDownToLine, ArrowUpFromLine, Filter } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
-import { matchesSearchText } from '@/utils/search'
+import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 
 export default function MutasiClient({ mutations = [], products = [], selectedMonth = '', initialSearch = '', error = null }) {
   const router = useRouter()
@@ -40,7 +40,7 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
     const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
     const isSearching = Boolean(normalizedSearch)
     return mutations.filter(m => {
-      const matchSearch = matchesSearchText(m.reference, normalizedSearch) ||
+      const matchSearch = matchesSearchText(stripGeneratedInvoiceNumbers(m.reference), normalizedSearch) ||
                           matchesSearchText(m.actor, normalizedSearch) ||
                           matchesSearchText(m.product_name, normalizedSearch)
       

@@ -12,6 +12,8 @@ export async function login(previousState, formData) {
     return { error: 'Username dan password wajib diisi.' }
   }
 
+  let destination = '/dashboard'
+
   try {
     const supabase = await createClient()
     const email = (username.includes('@') ? username : `${username}@kingsablon.com`).toLowerCase()
@@ -34,27 +36,28 @@ export async function login(previousState, formData) {
         await supabase.auth.signOut()
         return { error: 'Akun Anda dinonaktifkan. Hubungi Admin.' }
       }
-    } else {
-      // User is NOT in employees table (maybe they were deleted, or maybe they are a manually added Owner)
-      // Check if they exist in system_settings user_roles
-      const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
-      const userRoles = Array.isArray(settings?.value) ? settings.value : []
-      const userEmail = authData.user.email?.toLowerCase() || ''
-      const matchedUser = userRoles.find(u => {
-        const inputEmail = (u.email || '').trim().toLowerCase()
-        return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
-      })
-
-      if (!matchedUser) {
-        // Not an employee, and not in user_roles. Block them.
-        await supabase.auth.signOut()
-        return { error: 'Akun Anda tidak ditemukan atau sudah dihapus.' }
-      }
     }
+
+    const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
+    const userRoles = Array.isArray(settings?.value) ? settings.value : []
+    const userEmail = authData.user.email?.toLowerCase() || ''
+    const matchedUser = userRoles.find(u => {
+      const inputEmail = (u.email || '').trim().toLowerCase()
+      return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
+    })
+
+    if (!empData && !matchedUser) {
+      // Not an employee, and not in user_roles. Block them.
+      await supabase.auth.signOut()
+      return { error: 'Akun Anda tidak ditemukan atau sudah dihapus.' }
+    }
+
+    const userRole = matchedUser?.role || 'Operator'
+    if (['Operator', 'Operator Mesin'].includes(userRole)) destination = '/production'
 
   } catch {
     return { error: 'Login gagal karena gangguan sistem. Coba lagi.' }
   }
 
-  redirect('/dashboard')
+  redirect(destination)
 }

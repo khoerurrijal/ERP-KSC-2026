@@ -83,7 +83,7 @@ export async function approveCustomerOrderRequest(requestId, payload) {
       notificationType: 'ORDER_APPROVED',
       title: 'Pesanan customer disetujui',
       message: `${request.request_number} sudah masuk ke Sales Order ${result.invoice_number}.`,
-      href: `/sales?search=${encodeURIComponent(result.invoice_number)}`,
+      href: `/sales?orderId=${encodeURIComponent(linkedOrder.id)}`,
       entityId: linkedOrder.id
     })
 

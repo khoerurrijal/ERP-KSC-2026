@@ -34,8 +34,8 @@ export default async function DashboardPage({ searchParams }) {
   })
   const userRole = matchedUser ? matchedUser.role : 'Operator'
 
-  // If Operator hits this root dashboard page, redirect immediately
-  if (userRole === 'Operator') {
+  // Operator roles go straight to their work queue instead of loading dashboard analytics.
+  if (['Operator', 'Operator Mesin'].includes(userRole)) {
     redirect('/production')
   }
 

@@ -6,32 +6,23 @@ export const dynamic = 'force-dynamic'
 
 export const metadata = {
   title: 'Form Pemesanan | King Sablon Cup',
-  description: 'Form pemesanan produk King Sablon Cup dengan estimasi harga.',
+  description: 'Form pemesanan produk King Sablon Cup dengan informasi harga.',
 }
 
 export default async function OrderPage() {
   const supabase = createAdminClient()
 
-  // Ambil data produk
   const { data: products } = await supabase
     .from('products')
     .select('id, product_code, name, category, base_price, price_polos, workshop_code')
     .eq('is_active', true)
     .order('name')
 
-  // Ambil matrix sablon
-  const { data: matrixData } = await supabase
-    .from('sablon_matrix')
-    .select('*')
+  const { data: productUnits } = await supabase
+    .from('product_units')
+    .select('product_code, unit_name, multiplier')
+    .in('unit_name', ['ROLL', 'PACK'])
 
-  const matrix = {}
-  if (matrixData) {
-    matrixData.forEach(row => {
-      matrix[row.category] = row
-    })
-  }
-
-  // Ambil dropdown config dan pricelist config
   const { data: settings } = await supabase
     .from('system_settings')
     .select('key, value')
@@ -41,20 +32,18 @@ export default async function OrderPage() {
   const categoryImagesConfig = settings?.find(s => s.key === 'category_images_config')?.value || {}
 
   return (
-    <div className="min-h-screen bg-background text-foreground pb-20">
-      <div className="relative pt-5 sm:pt-7 pb-2 px-4 text-center">
-        <Image src="/logo-dark.png" alt="King Sablon Logo" width={400} height={160} className="h-16 sm:h-20 w-auto mx-auto drop-shadow-[0_0_15px_rgba(255,255,255,0.2)] object-contain" />
+    <main style={{ colorScheme: 'light' }} className="min-h-screen bg-[#f8f7f4] pb-32 text-stone-900">
+      <header className="border-b border-stone-200 bg-white">
+        <div className="mx-auto flex max-w-5xl items-center gap-4 px-4 py-4 sm:px-6">
+          <div className="flex h-14 w-28 items-center justify-center overflow-hidden rounded-lg bg-[#211c13] p-2">
+            <Image src="/logo-dark.png" alt="King Sablon Cup" width={160} height={78} priority className="h-full w-full object-contain" />
+          </div>
+          <div><p className="text-sm font-bold text-stone-900">King Sablon Cup</p><p className="mt-0.5 text-xs text-stone-500">Katalog & pesanan</p></div>
+        </div>
+      </header>
+      <div className="mx-auto max-w-5xl px-4 pt-7 sm:px-6 sm:pt-10">
+        <OrderClient products={products || []} productUnits={productUnits || []} dropdownConfig={dropdownConfig} pricelistConfig={pricelistConfig} categoryImagesConfig={categoryImagesConfig} />
       </div>
-
-      <div className="max-w-3xl mx-auto px-3 sm:px-4 pt-4 sm:pt-6 relative z-10">
-        <OrderClient 
-          products={products || []} 
-          matrix={matrix} 
-          dropdownConfig={dropdownConfig} 
-          pricelistConfig={pricelistConfig} 
-          categoryImagesConfig={categoryImagesConfig}
-        />
-      </div>
-    </div>
+    </main>
   )
 }

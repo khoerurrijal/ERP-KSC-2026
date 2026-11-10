@@ -132,8 +132,8 @@ export async function runAuditScan(supabase) {
       'Data Ganda',
       `Invoice ${invoice} terdaftar lebih dari sekali`,
       `${rows.length} sales order menggunakan nomor invoice yang sama.`,
-      rows.map(row => ({ label: row.id, value: row.date || '-', href: `/sales?search=${encodeURIComponent(invoice)}` })),
-      `/sales?search=${encodeURIComponent(invoice)}`
+      rows.map(row => ({ label: row.id, value: row.date || '-', href: `/sales?orderId=${encodeURIComponent(row.id)}` })),
+      `/sales?orderId=${encodeURIComponent(rows[0].id)}`
     ))
   }
 
@@ -193,7 +193,7 @@ export async function runAuditScan(supabase) {
       addToIssueGroup(legacyServicesByOrder, orderKey, {
         label: order?.invoice_number || item.so_id || item.id,
         value: item.product_code,
-        href: `/sales?search=${encodeURIComponent(order?.invoice_number || '')}`
+        href: order?.id ? `/sales?orderId=${encodeURIComponent(order.id)}` : '/sales'
       })
     }
 
@@ -215,7 +215,7 @@ export async function runAuditScan(supabase) {
       addToIssueGroup(finishedUnpaidByOrder, orderKey, {
         label: order?.invoice_number || item.so_id,
         value: `${status} / ${paymentStatus || '-'}`,
-        href: `/sales?search=${encodeURIComponent(order?.invoice_number || '')}`
+        href: order?.id ? `/sales?orderId=${encodeURIComponent(order.id)}` : '/sales'
       })
     }
 
@@ -240,7 +240,7 @@ export async function runAuditScan(supabase) {
       `Layanan legacy pada invoice ${invoice}`,
       `Ditemukan ${codes}. Ini catatan data historis; item tidak ikut tracking produksi dan tidak dihapus otomatis.`,
       rows,
-      `/sales?search=${encodeURIComponent(invoice || '')}`
+      order?.id ? `/sales?orderId=${encodeURIComponent(order.id)}` : '/sales'
     ))
   }
 
@@ -254,7 +254,7 @@ export async function runAuditScan(supabase) {
       `Invoice ${invoice} memiliki item selesai tetapi belum lunas`,
       `${rows.length} item produksi berstatus SELESAI sementara invoice belum LUNAS.`,
       rows,
-      `/sales?search=${encodeURIComponent(invoice || '')}`
+      order?.id ? `/sales?orderId=${encodeURIComponent(order.id)}` : '/sales'
     ))
   }
 
@@ -287,8 +287,8 @@ export async function runAuditScan(supabase) {
         'Relasi Data',
         `Invoice ${order.invoice_number || order.id} tidak memiliki item`,
         'Sales order aktif tidak memiliki sales item yang bisa diproduksi atau ditagihkan.',
-        [{ label: order.invoice_number || order.id, value: order.date || '-', href: `/sales?search=${encodeURIComponent(order.invoice_number || '')}` }],
-        `/sales?search=${encodeURIComponent(order.invoice_number || '')}`
+        [{ label: order.invoice_number || order.id, value: order.date || '-', href: `/sales?orderId=${encodeURIComponent(order.id)}` }],
+        `/sales?orderId=${encodeURIComponent(order.id)}`
       ))
     }
 
@@ -323,8 +323,8 @@ export async function runAuditScan(supabase) {
         'Keuangan',
         `DP invoice ${order.invoice_number || order.id} melebihi total`,
         'Nilai pembayaran tercatat lebih besar daripada total invoice.',
-        [{ label: order.invoice_number || order.id, value: `DP Rp ${Number(order.dp_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })} / Total Rp ${total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`, href: `/sales?search=${encodeURIComponent(order.invoice_number || '')}` }],
-        `/sales?search=${encodeURIComponent(order.invoice_number || '')}`
+        [{ label: order.invoice_number || order.id, value: `DP Rp ${Number(order.dp_amount).toLocaleString('id-ID', { maximumFractionDigits: 0 })} / Total Rp ${total.toLocaleString('id-ID', { maximumFractionDigits: 0 })}`, href: `/sales?orderId=${encodeURIComponent(order.id)}` }],
+        `/sales?orderId=${encodeURIComponent(order.id)}`
       ))
     }
   }

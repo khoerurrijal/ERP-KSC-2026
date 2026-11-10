@@ -10,12 +10,14 @@ import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
-import { matchesSearchText } from '@/utils/search'
+import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 
 const getDisplayStatus = (st) => {
   if (!st) return 'BARU MASUK'
   return st.toUpperCase()
 }
+
+const formatMobileQuantity = (value) => Number(value || 0).toLocaleString('id-ID')
 
 const getStatusColor = (st) => {
   const s = getDisplayStatus(st)
@@ -58,7 +60,14 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
   const [soPage, setSoPage] = useState(1)
   const [prodPage, setProdPage] = useState(1)
-  const pageSize = 50
+  const isLightweightRole = !['Owner', 'Admin'].includes(userRole)
+  const pageSize = isLightweightRole ? 20 : 50
+  const selectedJobRemainingQty = selectedJob
+    ? Math.max(0, Number(selectedJob.qty_target || 0) - Number(selectedJob.qty_processed || 0))
+    : 0
+  const qtySuggestions = [...new Set([500, 1000, 5000, selectedJobRemainingQty]
+    .map(qty => Math.min(qty, selectedJobRemainingQty))
+    .filter(qty => qty > 0))]
 
   const updateSearchParam = useCallback((value) => {
     const params = new URLSearchParams(Array.from(currentSearchParams.entries()))
@@ -97,9 +106,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       )) &&
       (!isSearching ||
        matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
-       matchesSearchText(j.sales_order_items?.sales_orders?.invoice_number, normalizedSearch) ||
        matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||
-       matchesSearchText(j.notes, normalizedSearch) ||
+       matchesSearchText(stripGeneratedInvoiceNumbers(j.notes), normalizedSearch) ||
        matchesSearchText(j.item_status, normalizedSearch))
     )
 
@@ -140,9 +148,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
     (isSearching || !['SELESAI', 'BATAL'].includes(j.item_status?.toUpperCase())) &&
     (!isSearching ||
       matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
-      matchesSearchText(j.sales_order_items?.sales_orders?.invoice_number, normalizedSearch) ||
       matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||
-      matchesSearchText(j.notes, normalizedSearch) ||
+      matchesSearchText(stripGeneratedInvoiceNumbers(j.notes), normalizedSearch) ||
       matchesSearchText(j.item_status, normalizedSearch))
   )
 
@@ -203,7 +210,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
 
     setLoading(true)
     try {
-      const res = await correctProductionProgress(selectedJob.id, parseInt(correctionQty) || 0, employeeId);
+      const res = await correctProductionProgress(selectedJob.id, parseInt(correctionQty) || 0, employeeId, Number(selectedJob.qty_processed || 0));
       if (res.success) {
         alert("Koreksi Qty berhasil disimpan.");
         window.location.reload();
@@ -230,6 +237,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
         employee_id: employeeId,
         qty_processed: parseInt(qtyProcessed) || 0,
         qty_defect: parseInt(qtyDefect) || 0,
+        expected_total_qty: Number(selectedJob.qty_processed || 0),
         notes: notes
       })
 
@@ -247,21 +255,21 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   }
 
   return (
-    <div className="space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-20">
-      {!hideHeader && <div className="flex justify-end">
-        <div className="flex items-center gap-3 w-full sm:w-auto">
-          <div className="relative">
+    <div className="space-y-3 lg:space-y-6 animate-in fade-in zoom-in-95 duration-500 pb-10 sm:pb-20">
+      {!hideHeader && <div className="flex">
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          <div className="relative w-full md:w-auto">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-foreground/40" />
             <input 
               type="text" 
-              placeholder="Cari nomor Invoice/Job..." 
+              placeholder="Cari pelanggan, produk, atau status..."
               value={searchQuery}
               onChange={e => {
                 setSearchQuery(e.target.value)
                 setSoPage(1)
                 setProdPage(1)
               }}
-              className="glass-input !pl-10 h-10 w-full sm:w-64 text-sm"
+              className="glass-input !pl-10 h-10 w-full md:w-72 text-sm"
             />
           </div>
         </div>
@@ -347,7 +355,38 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       )}
 
       {activeTab === 'PRODUKSI' && (
-        <div className="glass-card overflow-hidden animate-in fade-in">
+        <>
+        {isLightweightRole && <div className="space-y-2 lg:hidden">
+          {paginatedProdJobs.length === 0 ? <div className="rounded-xl border border-stone-200 bg-white p-5 text-center text-sm text-stone-500">Belum ada antrean pekerjaan sablon saat ini.</div> : paginatedProdJobs.map(item => (
+            <article key={item.id} className="rounded-xl border border-stone-200 bg-white p-3 shadow-sm">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-bold text-stone-900">{item.sales_order_items?.sales_orders?.customers?.name || 'Pelanggan'}</p>
+                </div>
+                <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getStatusColor(item.item_status)}`}>{getDisplayStatus(item.item_status)}</span>
+              </div>
+              <div className="mt-2 flex items-start gap-2">
+                {item.mockup_url && <button type="button" onClick={() => setZoomImage(item.mockup_url)} className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-stone-200" title="Lihat Mockup"><Image src={item.mockup_url} fill className="object-cover" alt="Mockup" sizes="44px" /></button>}
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-semibold text-stone-800">{item.sales_order_items?.products?.name || '-'}</p>
+                  <p className="text-xs text-stone-500">Target {formatMobileQuantity(item.qty_target)} {item.unit || 'pcs'}</p>
+                  {item.notes && <p className="mt-0.5 truncate text-xs text-stone-500">{item.notes}</p>}
+                </div>
+              </div>
+              <div className="mt-2 flex items-center justify-between gap-2 border-t border-stone-100 pt-2 text-xs">
+                <p className="min-w-0 truncate"><span className="font-bold text-green-700">{formatMobileQuantity(item.qty_processed)} {item.unit || 'pcs'} selesai</span><span className="ml-1 text-orange-700">· Sisa {formatMobileQuantity(Math.max(0, item.qty_target - item.qty_processed))}</span></p>
+                <p className={`shrink-0 font-semibold ${item.is_fast_track ? 'text-red-700' : 'text-blue-700'}`}>{item.target_date ? new Date(item.target_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}{item.is_fast_track && <span className="ml-1 text-red-700" aria-label="Fast Track" title="Fast Track">⚡</span>}</p>
+              </div>
+              {item.order_type?.toUpperCase() === 'SABLON' && ['BARU MASUK', 'SIAP PROSES', 'PROSES'].includes(item.item_status?.toUpperCase()) && <button type="button" onClick={() => handleOpenModal(item)} className="mt-2 min-h-11 w-full rounded-lg bg-[#755615] px-4 py-2 text-sm font-bold text-white">Input Qty</button>}
+            </article>
+          ))}
+          {filteredAndSortedJobs.length > pageSize && <div className="flex items-center justify-between gap-2 rounded-xl border border-stone-200 bg-white p-3 text-xs">
+            <button type="button" disabled={prodPage <= 1} onClick={() => setProdPage(page => page - 1)} className="min-h-11 rounded-lg border border-stone-200 px-3 font-semibold text-stone-700 disabled:opacity-40">Sebelumnya</button>
+            <span className="text-center text-stone-600">{prodPage} / {Math.ceil(filteredAndSortedJobs.length / pageSize)} · {filteredAndSortedJobs.length} pekerjaan</span>
+            <button type="button" disabled={prodPage >= Math.ceil(filteredAndSortedJobs.length / pageSize)} onClick={() => setProdPage(page => page + 1)} className="min-h-11 rounded-lg border border-stone-200 px-3 font-semibold text-stone-700 disabled:opacity-40">Berikutnya</button>
+          </div>}
+        </div>}
+        <div className={`${isLightweightRole ? 'hidden lg:block' : ''} glass-card overflow-hidden animate-in fade-in`}>
           <div className="overflow-x-auto">
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
@@ -455,6 +494,7 @@ export default function ProductionTable({ productionJobs, operators = [], curren
             </div>
           </div>
         </div>
+        </>
       )}
 
       {/* Modal Input Qty Operator */}
@@ -492,12 +532,27 @@ export default function ProductionTable({ productionJobs, operators = [], curren
                 <input 
                   type="number" 
                   min="1"
-                  max={Math.max(0, selectedJob.qty_target - selectedJob.qty_processed)}
+                  max={selectedJobRemainingQty}
                   value={qtyProcessed} 
                   onChange={e => setQtyProcessed(e.target.value)} 
                   placeholder="Berapa pcs?"
                   className="glass-input w-full" 
                 />
+                {qtySuggestions.length > 0 && <div className="space-y-2">
+                  <p className="text-xs text-foreground/60">Saran cepat</p>
+                  <div className="flex flex-wrap gap-2">
+                    {qtySuggestions.map(qty => (
+                      <button
+                        key={qty}
+                        type="button"
+                        onClick={() => setQtyProcessed(String(qty))}
+                        className="min-h-10 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
+                      >
+                        {qty === selectedJobRemainingQty ? `Sisa ${qty.toLocaleString('id-ID')} pcs` : `${qty.toLocaleString('id-ID')} pcs`}
+                      </button>
+                    ))}
+                  </div>
+                </div>}
               </div>
 
               <div className="space-y-2">

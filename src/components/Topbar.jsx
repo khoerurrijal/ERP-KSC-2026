@@ -10,7 +10,7 @@ import { useTheme } from 'next-themes'
 import { getWaBotStatus, toggleWaBotStatus } from '@/app/dashboard/settings/actions'
 import { getAdminNotifications, markAdminNotificationRead } from '@/app/actions/notifications'
 
-export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRootRef }) {
+export default function Topbar({ userRole = '', userName = '', onToggleSidebar, liquidGlassRootRef, lightweight = false }) {
   const pathname = usePathname()
   const router = useRouter()
   const [isProfileOpen, setIsProfileOpen] = useState(false)
@@ -27,14 +27,15 @@ export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRoot
 
   useEffect(() => {
     setMounted(true)
-    // Fetch initial WA bot status
-    getWaBotStatus().then(status => setIsWaBotActive(status))
-  }, [])
+    if (['Owner', 'Admin'].includes(userRole)) {
+      getWaBotStatus().then(status => setIsWaBotActive(status))
+    }
+  }, [userRole])
 
   useEffect(() => {
     const root = liquidGlassRootRef?.current
     const glassElement = liquidGlassElementRef.current
-    if (!mounted || !root || !glassElement) return undefined
+    if (lightweight || !mounted || !root || !glassElement) return undefined
 
     const isDarkTheme = resolvedTheme
       ? resolvedTheme === 'dark'
@@ -135,7 +136,7 @@ export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRoot
       sceneObserver?.disconnect()
       if (sceneRefreshTimer) window.clearTimeout(sceneRefreshTimer)
     }
-  }, [mounted, resolvedTheme, liquidGlassRootRef])
+  }, [lightweight, mounted, resolvedTheme, liquidGlassRootRef])
 
   useEffect(() => {
     if (!['Owner', 'Admin'].includes(userRole)) return undefined
@@ -232,21 +233,22 @@ export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRoot
   ].find(([path]) => displayPathname === path || displayPathname.startsWith(`${path}/`)) || ['/', 'King Sablon ERP', '']
 
   return (
-    <div ref={liquidGlassElementRef} className="liquid-glass-topbar sticky top-1 z-40 mx-2 my-1 h-12 sm:h-14 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 print:hidden">
+    <div ref={liquidGlassElementRef} className={lightweight ? 'sticky top-0 z-40 flex h-14 shrink-0 items-center justify-between border-b border-stone-200 bg-white px-3 sm:px-4 print:hidden' : 'liquid-glass-topbar sticky top-1 z-40 mx-2 my-1 h-12 sm:h-14 shrink-0 flex items-center justify-between px-3 sm:px-4 lg:px-6 print:hidden'}>
       
       {/* Left: Mobile Hamburger & Logo */}
       <div className="flex items-center gap-2 sm:gap-4 min-w-0">
         {/* Mobile Hamburger - Only visible on md:hidden */}
         <button 
           onClick={onToggleSidebar} 
-          className="p-2 md:hidden bg-white/5 border border-white/10 rounded-xl text-foreground hover:bg-white/10 transition-colors"
+          aria-label="Buka navigasi"
+          className={lightweight ? 'rounded-lg border border-stone-200 bg-white p-2 text-stone-700 md:hidden' : 'p-2 md:hidden bg-white/5 border border-white/10 rounded-xl text-foreground hover:bg-white/10 transition-colors'}
         >
           <Menu className="w-5 h-5" />
         </button>
         
         <div className="flex flex-col min-w-0">
           <h1 className="text-sm sm:text-base font-bold text-foreground truncate">{pageMeta[1]}</h1>
-          <p className="text-[10px] sm:text-xs text-foreground/50 truncate">{pageMeta[2]}</p>
+          {!lightweight && <p className="text-[10px] sm:text-xs text-foreground/50 truncate">{pageMeta[2]}</p>}
         </div>
       </div>
 
@@ -322,14 +324,14 @@ export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRoot
 
           {/* Profile Dropdown / Popover */}
           {isProfileOpen && (
-            <div className="absolute right-0 mt-2 w-56 bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
-              <div className="p-4 border-b border-white/10 bg-white/5">
-                <span className="text-xs text-foreground/60 block mb-1">Login sebagai:</span>
-                <span className="text-sm font-bold text-primary">{userRole}</span>
+            <div className={lightweight ? 'absolute right-0 mt-2 w-56 overflow-hidden rounded-xl border border-stone-200 bg-white shadow-md' : 'absolute right-0 mt-2 w-56 bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2'}>
+              <div className={lightweight ? 'border-b border-stone-100 p-4' : 'p-4 border-b border-white/10 bg-white/5'}>
+                <span className="text-xs text-foreground/60 block mb-1">Username</span>
+                <span className="text-sm font-bold text-primary">{userName || 'Pengguna'}</span>
               </div>
               
-              <div className="p-2 space-y-1">
-                {mounted && (
+              <div className="space-y-1 p-2">
+                {!lightweight && mounted && (
                   <button 
                     onClick={() => setTheme(isDark ? 'light' : 'dark')}
                     className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl hover:bg-white/5 transition-all font-medium text-foreground/80 hover:text-foreground"
@@ -340,7 +342,7 @@ export default function Topbar({ userRole = '', onToggleSidebar, liquidGlassRoot
                 )}
                 
                 <form action="/auth/signout" method="post">
-                  <button type="submit" className="flex items-center gap-3 px-3 py-2.5 w-full rounded-xl text-red-400 hover:bg-red-500/10 transition-all font-medium">
+                  <button type="submit" className={`flex w-full items-center gap-3 rounded-lg px-3 py-2.5 font-medium ${lightweight ? 'text-red-700 hover:bg-red-50' : 'text-red-400 hover:bg-red-500/10 transition-all'}`}>
                     <LogOut className="w-4 h-4" />
                     <span className="text-sm">Sign Out</span>
                   </button>

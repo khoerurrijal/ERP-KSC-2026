@@ -1,10 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { createHash } from 'node:crypto';
 import { createAdminClient } from '@/utils/supabase/admin';
 import { waitUntil } from '@vercel/functions';
 import { normalizePhone } from '@/utils/phone';
 import { getAiModelCandidates, getConfiguredAiModel, isRetryableAiError } from '@/utils/aiAgent';
+import {
+  NON_TEXT_MESSAGE,
+  buildBurstContext,
+  claimOutboundAttempt,
+  getWebhookDedupeKey,
+  normalizeFonnteFailure,
+  normalizeFonnteResponse,
+  normalizeWebhookIdentifier,
+  selectBurstMessages,
+} from '@/utils/whatsappWebhook.mjs';
 const supabase = new Proxy({}, {
   get(_target, property) {
     const client = createAdminClient()
@@ -22,23 +31,18 @@ const FONNTE_TOKEN = process.env.FONNTE_TOKEN;
 
 const ADMIN_NUMBER = '6282121316926';
 
-function getWebhookDedupeKey(body) {
-  const providerId = [
-    body.message_id,
-    body.messageId,
-    body.id,
-    body.uid,
-    body.key?.id,
-    body.data?.id,
-  ].find(value => typeof value === 'string' && value.trim());
-
-  if (!providerId) return null;
-
-  return `wa:${createHash('sha256').update(`provider:${providerId}`).digest('hex')}`;
+function getMediaKind(body) {
+  const extension = normalizeWebhookIdentifier(body.extension);
+  const filename = normalizeWebhookIdentifier(body.filename);
+  if (extension) return extension.toLowerCase();
+  if (filename?.includes('.')) return filename.split('.').pop().toLowerCase();
+  const type = normalizeWebhookIdentifier(body.type);
+  if (type && !['text', 'chat'].includes(type.toLowerCase())) return type.toLowerCase();
+  if (normalizeWebhookIdentifier(body.url) || normalizeWebhookIdentifier(body.file)) return 'lampiran';
+  return null;
 }
 
-async function claimIncomingMessage(body, sender, message) {
-  const dedupeKey = getWebhookDedupeKey(body);
+async function claimIncomingMessage(sender, message, dedupeKey) {
   const incomingMessage = { phone_number: sender, role: 'user', content: message };
   if (dedupeKey) incomingMessage.dedupe_key = dedupeKey;
   const { data, error } = await supabase
@@ -97,6 +101,82 @@ Jika pelanggan bertanya hal yang terlalu rumit, custom (seperti komplain, desain
 Kirimkan pesan penutup ini: "Untuk detail lebih lanjut, nanti dilanjut dengan rekan saya ketika sedang online ya kak. Terima kasih! 🙏"
 `;
 
+const AI_PROCESSING_TIMEOUT_MS = 35000;
+const BURST_WINDOW_MS = 2500;
+const GREETING_PATTERN = /^(halo|pagi|siang|sore|malam|assalamualaikum|ping|hi|hey|p)$/i;
+const THANKS_PATTERN = /^(terima kasih|makasih|thank you|thx|suwun|hatur nuhun|tq|makasi|thanks)$/i;
+const ACKNOWLEDGEMENT_PATTERN = /^(ok|oke|siap|sip|okey|yoi|ready|noted)$/i;
+const ORDER_STATUS_PATTERN = /^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/i;
+
+const TEMPLATE_RULES = [
+  {
+    pattern: /(alamat|dimana|lokasi|toko|tempat)/i,
+    reply: "Alamat kami di:\nJl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).\n📍 *Google Maps:* https://maps.google.com/?q=King+Sablon+Cup\n\n🕒 *Jam Buka:*\nSenin - Sabtu: 09.00 - 17.00 WIB\n(Minggu & Tanggal Merah Libur)",
+  },
+  {
+    pattern: /(pembayaran|rekening|bayar|cod)/i,
+    reply: "Pembayaran bisa cash di toko atau transfer:\n- Bank BCA: 6930240107 a/n Khoerur Rijal\n- Bank Mandiri: 9000020365095 a/n Khoerur Rijal",
+  },
+  {
+    pattern: /(desain|logo)/i,
+    reply: "Bisa kak! Jika sudah punya logo, kirim saja logonya lalu detail keinginannya via teks, nanti dibuatkan oleh editor kami.\nJika belum punya logo dan ingin *full* dibuatkan dari nol, ada biaya desain Rp 50.000.\nKakak juga bisa explore desain sendiri di aplikasi kami: cupstudio.id 🎨",
+  },
+  {
+    pattern: /(warna|rgb|cmyk|gradasi|tinta)/i,
+    reply: "Sablon cup kami menggunakan *Tinta Solid*, BUKAN sistem print/foto (RGB/CMYK) sehingga tidak bisa pakai desain gradasi/bayangan ya kak.\n\nNamun kakak bebas pilih warna tinta solid apa saja (Hitam, Merah, Gold, dll). Maksimal sablon adalah 2 warna terpisah.",
+  },
+  {
+    pattern: /(berapa sisi|sisi|full|melingkar|keliling)/i,
+    reply: "Bisa sablon 1 sisi, 2 sisi, 3 sisi, hingga *full* melingkar, harga tetap sama kak!\n\n*(Catatan penting: Untuk sablon full melingkar, pasti akan ada jarak terputus/kosong sekitar 1-2 cm di titik pertemuannya karena area jepitan mesin sablon).*",
+  },
+  {
+    pattern: /(kertas|paper cup|paper bowl|varian)/i,
+    reply: "Untuk sablon cup kertas, kami menyediakan Paper Cup dan Paper Bowl berbagai ukuran kak!",
+  },
+  {
+    pattern: /(minimal order|min order|moq|bisa pesan \d+|minimal pesan)/i,
+    reply: "Minimal order tergantung jenis cup kak. Kalau cup PET minimal order 1.000 pcs (sudah ada di matrix sablon).",
+  },
+  {
+    pattern: /(harga|pricelist|katalog|produk|price list|mau order|pesan cup|order cup|bikin sablon|mau pesan|pesen)/i,
+    reply: "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon.",
+  },
+  {
+    pattern: /(berapa lama|lama proses|proses sablon|lama pengerjaan)/i,
+    reply: "Waktu proses sablon Reguler 3-5 hari kerja. Kami juga ada jalur Fast Track 1-3 hari kerja (+Rp 100rb per 1000 pcs).\n*(1 hari kerja = kemungkinan selesai besok sore, bukan hari H ya kak).*",
+  },
+];
+
+function getTemplateReplies(messages) {
+  const normalizedMessages = messages.map(message => String(message || '').trim()).filter(Boolean);
+  if (normalizedMessages.length === 1 && GREETING_PATTERN.test(normalizedMessages[0])) {
+    return ["Halo kak! Saya Ina, Admin King Sablon Cup. Ada yang bisa dibantu? (Pricelist / Cek Pesanan / Tanya Lainnya)"];
+  }
+
+  const replies = [];
+  for (const message of normalizedMessages) {
+    for (const rule of TEMPLATE_RULES) {
+      if (rule.pattern.test(message) && !replies.includes(rule.reply)) replies.push(rule.reply);
+    }
+  }
+  return replies;
+}
+
+function logFonnteOutcome(eventKey, result) {
+  const details = {
+    event: eventKey ? eventKey.slice(-12) : 'manual-review',
+    accepted: Boolean(result?.accepted),
+    certainty: result?.certainty || 'unknown',
+    providerStatus: result?.providerStatus ?? null,
+    httpStatus: result?.httpStatus ?? null,
+    requestId: result?.requestId ?? null,
+    messageIds: result?.messageIds ?? [],
+    process: result?.process ?? null,
+    reason: result?.reason ?? result?.error ?? null,
+  };
+  console.info(`[Webhook] Fonnte send ${JSON.stringify(details)}`);
+}
+
 // Helper to run promises with timeout
 function runWithTimeout(promise, ms) {
   let timeoutId;
@@ -106,22 +186,30 @@ function runWithTimeout(promise, ms) {
   return Promise.race([promise, timeoutPromise]).finally(() => clearTimeout(timeoutId));
 }
 
-// Helper to send message via Fonnte
-async function sendFonnteMessage(target, message) {
+// Helper to send message via Fonnte. A missing/ambiguous response is not retried:
+// the provider may already have queued the message before the connection failed.
+async function sendFonnteMessage(target, message, inboxId) {
   try {
+    const formData = new URLSearchParams({ target, message });
+    if (inboxId) formData.set('inboxid', String(inboxId));
+
     const response = await fetch(FONNTE_API_URL, {
       method: 'POST',
       headers: {
         'Authorization': FONNTE_TOKEN,
       },
-      body: new URLSearchParams({
-        target: target,
-        message: message,
-      }),
+      body: formData,
+      signal: AbortSignal.timeout(10000),
     });
-    return await response.json();
+    let data;
+    try {
+      data = await response.json();
+    } catch {
+      return { accepted: false, certainty: 'unknown', httpStatus: response.status };
+    }
+    return normalizeFonnteResponse(response.ok, response.status, data);
   } catch (error) {
-    console.error('Error sending message via Fonnte:', error);
+    return normalizeFonnteFailure(error);
   }
 }
 
@@ -212,25 +300,21 @@ export async function POST(req) {
       const formData = await req.formData();
       body = Object.fromEntries(formData.entries());
     }
+    if (!body || typeof body !== 'object') body = {};
 
-    let sender = body.sender; 
-    const message = body.message || body.text || ''; 
-    const pushname = body.pushname || body.name || 'Kakak'; 
-    let afterHoursNoticeSent = false;
-    let replySent = false;
-    const sendReply = async (target, reply) => {
-      const shouldAddNotice = isOutsideBusinessHours() && !afterHoursNoticeSent;
-      const outgoingReply = shouldAddNotice
-        ? `Saat ini toko sedang tutup. Jam operasional King Sablon Cup: Senin-Sabtu, pukul 09.00-17.00 WIB.\n\n${reply}`
-        : reply;
-      if (shouldAddNotice) afterHoursNoticeSent = true;
-      // Once an outbound attempt starts, never send a second fallback for the
-      // same webhook even if a later history write or provider response fails.
-      replySent = true;
-      return sendFonnteMessage(target, outgoingReply);
-    };
+    const sender = normalizeWebhookIdentifier(body.sender);
+    const rawMessage = typeof body.message === 'string'
+      ? body.message
+      : typeof body.text === 'string' ? body.text : '';
+    const pushname = normalizeWebhookIdentifier(body.pushname || body.name) || 'Kakak';
+    const mediaKind = getMediaKind(body)
+      || (rawMessage.trim().toLowerCase() === NON_TEXT_MESSAGE ? 'lampiran' : null);
+    const textMessage = rawMessage.trim().toLowerCase() === NON_TEXT_MESSAGE ? '' : rawMessage.trim();
+    const inboundContent = textMessage
+      ? mediaKind ? `${textMessage}\n[[Lampiran:${mediaKind}]]` : textMessage
+      : mediaKind ? NON_TEXT_MESSAGE : '';
 
-    if (!sender || !message) {
+    if (!sender || !inboundContent) {
       return NextResponse.json({ success: false, error: 'Missing sender or message' }, { status: 400 });
     }
 
@@ -238,37 +322,72 @@ export async function POST(req) {
       return NextResponse.json({ success: true, message: 'Ignored group message' });
     }
 
-    // Claim before any branch that can send a response, including admin
-    // commands. Provider retries therefore exit before sending again.
-    const { data: insertedMsg, duplicate, error: claimError } = await claimIncomingMessage(body, sender, message);
+    const normalizedSender = normalizePhone(sender) || (sender.startsWith('0') ? `62${sender.slice(1)}` : sender);
+    const dedupeKey = getWebhookDedupeKey({
+      body,
+      sender,
+      normalizedSender,
+      message: inboundContent,
+      mediaKind: mediaKind || 'text',
+    });
+
+    // Claim before any reply path. The DB unique index makes provider retries
+    // atomic across concurrent webhook invocations.
+    const { data: insertedMsg, duplicate, error: claimError } = await claimIncomingMessage(sender, inboundContent, dedupeKey);
     if (claimError) {
-      console.error('[Webhook] Could not claim incoming message:', claimError);
+      console.error('[Webhook] Could not claim incoming event:', claimError);
       return NextResponse.json({ success: false, error: 'Webhook dedupe unavailable' }, { status: 503 });
     }
     if (duplicate) {
-      console.log(`[Webhook] Ignored duplicate message from ${sender}`);
+      console.info('[Webhook] Duplicate inbound event ignored.');
       return NextResponse.json({ success: true, message: 'Duplicate ignored' });
     }
-    
-    // Normalize sender for admin check
-    const normalizedSender = sender.startsWith('0') ? '62' + sender.slice(1) : sender;
+
+    if (!dedupeKey) {
+      console.warn('[Webhook] Inbound event saved for manual handling; provider supplied no stable event identity.');
+      return NextResponse.json({ success: true, message: 'Saved for manual handling' });
+    }
+
+    const inboxId = normalizeWebhookIdentifier(body.inboxid);
+    const outboundState = { attempted: false };
+    const sendReply = async (reply) => {
+      if (!claimOutboundAttempt(outboundState)) {
+        console.warn('[Webhook] Suppressed second outbound attempt for one processing burst.');
+        return { accepted: false, certainty: 'known', reason: 'outbound-already-attempted' };
+      }
+      const outgoingReply = isOutsideBusinessHours()
+        ? `Saat ini toko sedang tutup. Jam operasional King Sablon Cup: Senin-Sabtu, pukul 09.00-17.00 WIB.\n\n${reply}`
+        : reply;
+      const result = await sendFonnteMessage(sender, outgoingReply, inboxId);
+      logFonnteOutcome(dedupeKey, result);
+
+      if (result.accepted) {
+        const { error: historyError } = await supabase.from('wa_chat_history').insert([{
+          phone_number: sender,
+          role: 'model',
+          content: outgoingReply,
+        }]);
+        if (historyError) console.error('[Webhook] Fonnte accepted reply but history write failed:', historyError);
+      }
+      return result;
+    };
 
     // --- 1. GLOBAL MASTER SWITCH ---
     if (normalizedSender === ADMIN_NUMBER) {
-      const lowerMsg = message.toLowerCase().trim();
+      const lowerMsg = textMessage.toLowerCase().trim();
       if (lowerMsg === '/bot on' || lowerMsg === '/bot auto') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'auto', updated_at: new Date().toISOString() });
-        await sendReply(sender, "Sistem Otomatis / AI diatur ke mode AUTO (Aktif di luar jam operasional & hari libur).");
+        await sendReply("Sistem Otomatis / AI diatur ke mode AUTO (Aktif di luar jam operasional & hari libur).");
         return NextResponse.json({ success: true, message: 'Global bot set to auto' });
       }
       if (lowerMsg === '/bot off') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'false', updated_at: new Date().toISOString() });
-        await sendReply(sender, "Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
+        await sendReply("Sistem Otomatis / AI DIMATIKAN. Menunggu balasan manual dari Admin.");
         return NextResponse.json({ success: true, message: 'Global bot turned off' });
       }
       if (lowerMsg === '/bot always') {
         await supabase.from('system_settings').upsert({ key: 'GLOBAL_BOT_ACTIVE', value: 'always', updated_at: new Date().toISOString() });
-        await sendReply(sender, "Sistem Otomatis / AI diatur ke mode ALWAYS (Aktif 24/7).");
+        await sendReply("Sistem Otomatis / AI diatur ke mode ALWAYS (Aktif 24/7).");
         return NextResponse.json({ success: true, message: 'Global bot set to always on' });
       }
     }
@@ -281,94 +400,7 @@ export async function POST(req) {
       return NextResponse.json({ success: true, message: 'Global bot is inactive' });
     }
 
-    // --- 2. FAST-TRACK AUTO REPLY (TEMPLATES) ---
-    const msgLower = message.toLowerCase().trim();
-    let templateReply = null;
-
-    if (msgLower.match(/^(halo|pagi|siang|sore|malam|assalamualaikum|ping|hi|hey|p)$/)) {
-      templateReply = "Halo kak! Saya Ina, Admin King Sablon Cup. Ada yang bisa dibantu? (Pricelist / Cek Pesanan / Tanya Lainnya)";
-    } else if (msgLower.match(/(alamat|dimana|lokasi|toko|tempat)/)) {
-      templateReply = "Alamat kami di:\nJl. Ir. H. Juanda No. 71, Weru - Kab. Cirebon (Samping J&M Mart).\n📍 *Google Maps:* https://maps.google.com/?q=King+Sablon+Cup\n\n🕒 *Jam Buka:*\nSenin - Sabtu: 09.00 - 17.00 WIB\n(Minggu & Tanggal Merah Libur)";
-    } else if (msgLower.match(/(pembayaran|rekening|bayar|cod)/)) {
-      templateReply = "Pembayaran bisa cash di toko atau transfer:\n- Bank BCA: 6930240107 a/n Khoerur Rijal\n- Bank Mandiri: 9000020365095 a/n Khoerur Rijal";
-    } else if (msgLower.match(/(desain|logo)/)) {
-      templateReply = "Bisa kak! Jika sudah punya logo, kirim saja logonya lalu detail keinginannya via teks, nanti dibuatkan oleh editor kami.\nJika belum punya logo dan ingin *full* dibuatkan dari nol, ada biaya desain Rp 50.000.\nKakak juga bisa explore desain sendiri di aplikasi kami: cupstudio.id 🎨";
-    } else if (msgLower.match(/(warna|rgb|cmyk|gradasi|tinta)/)) {
-      templateReply = "Sablon cup kami menggunakan *Tinta Solid*, BUKAN sistem print/foto (RGB/CMYK) sehingga tidak bisa pakai desain gradasi/bayangan ya kak.\n\nNamun kakak bebas pilih warna tinta solid apa saja (Hitam, Merah, Gold, dll). Maksimal sablon adalah 2 warna terpisah.";
-    } else if (msgLower.match(/(berapa sisi|sisi|full|melingkar|keliling)/)) {
-      templateReply = "Bisa sablon 1 sisi, 2 sisi, 3 sisi, hingga *full* melingkar, harga tetap sama kak!\n\n*(Catatan penting: Untuk sablon full melingkar, pasti akan ada jarak terputus/kosong sekitar 1-2 cm di titik pertemuannya karena area jepitan mesin sablon).*";
-    } else if (msgLower.match(/(kertas|paper cup|paper bowl|varian)/)) {
-      templateReply = "Untuk sablon cup kertas, kami menyediakan Paper Cup dan Paper Bowl berbagai ukuran kak!";
-    } else if (msgLower.match(/(minimal order|min order|moq|bisa pesan \d+|minimal pesan)/)) {
-      templateReply = "Minimal order tergantung jenis cup kak. Kalau cup PET minimal order 1.000 pcs (sudah ada di matrix sablon).";
-    } else if (msgLower.match(/(harga|pricelist|katalog|produk|price list|mau order|pesan cup|order cup|bikin sablon|mau pesan|pesen)/)) {
-      templateReply = "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon.";
-    } else if (msgLower.match(/(berapa lama|lama proses|proses sablon|lama pengerjaan)/)) {
-      templateReply = "Waktu proses sablon Reguler 3-5 hari kerja. Kami juga ada jalur Fast Track 1-3 hari kerja (+Rp 100rb per 1000 pcs).\n*(1 hari kerja = kemungkinan selesai besok sore, bukan hari H ya kak).*";
-    }
-
-    if (templateReply) {
-      await sendReply(sender, templateReply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: templateReply }]);
-      return NextResponse.json({ success: true, reply: templateReply });
-    }
-
-    // --- 2.5 STATIC HANDLERS FOR COMMON INPUTS (BYPASS GEMINI) ---
-    // Handle non-text messages statically
-    if (msgLower === 'non-text message' || msgLower === '') {
-      const reply = "Maaf kak, saat ini Ina baru bisa membalas chat berupa teks. Ada yang bisa Ina bantu mengenai produk, harga, atau cek status pesanan? 🙏";
-      await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
-      return NextResponse.json({ success: true, reply });
-    }
-
-    // Handle closing phrases (thank you)
-    if (msgLower.match(/^(terima kasih|makasih|thank you|thx|suwun|hatur nuhun|tq|makasi|thanks)$/)) {
-      const reply = "Sama-sama kak! Senang bisa membantu. Jika ada hal lain yang perlu ditanyakan, silakan chat Ina lagi ya. 😊";
-      await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
-      return NextResponse.json({ success: true, reply });
-    }
-
-    // Handle quick acknowledgments (ok, oke, siap)
-    if (msgLower.match(/^(ok|oke|siap|sip|okey|yoi|ready|noted)$/)) {
-      const reply = "Siap kak! 👍";
-      await sendReply(sender, reply);
-      await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
-      return NextResponse.json({ success: true, reply });
-    }
-
-    // --- 3. FAST-TRACK ORDER STATUS (BYPASS GEMINI) ---
-    // If the message is a simple tracking intent, bypass AI completely!
-    if (msgLower.match(/^(pesanan saya|sudah jadi belum|sampai mana|cek pesanan|status pesanan|cek status|pesananku|invoice \S+)$/)) {
-      const orders = await searchOrdersWithPhoneLinking(sender, pushname);
-      
-      if (orders && orders.length > 0) {
-        const orderSummary = orders.map(o => 
-          `📌 *Invoice:* ${o.invoice_number}\n*Status:* ${o.status}\n*Item:* ${o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', ')}\n*Tracking:* https://erpkscv1.vercel.app/track/${o.invoice_number}`
-        ).join('\\n\\n');
-        
-        const reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
-        await sendReply(sender, reply);
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
-        return NextResponse.json({ success: true, reply });
-      } else {
-        const reply = "Wah maaf kak, Ina coba cari pesanan aktif atas nama WA kakak belum ketemu nih datanya. Boleh diinfokan nama brand-nya apa kak? Biar Ina bantu cari lagi 🙏";
-        await sendReply(sender, reply);
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: reply }]);
-        return NextResponse.json({ success: true, reply });
-      }
-    }
-
-    // --- 3.5 BUSINESS HOURS FILTER (BEFORE GEMINI FALLBACK) ---
-    if (globalBotValue === 'true' || globalBotValue === 'auto') {
-      if (!isOutsideBusinessHours()) {
-        console.log(`[Webhook] Inside business hours. Ignored fallback Gemini request from ${sender}.`);
-        return NextResponse.json({ success: true, message: 'Inside business hours, ignored fallback' });
-      }
-    }
-
-    // --- 4. SESSION HANDLING & AI FALLBACK ---
+    // --- 2. SESSION HANDLING ---
     let { data: session } = await supabase
       .from('wa_sessions')
       .select('*')
@@ -386,11 +418,11 @@ export async function POST(req) {
       await supabase.from('wa_sessions').update({ last_interaction: new Date().toISOString() }).eq('phone_number', sender);
     }
 
-    if (message.trim() === '/stop') {
+    if (textMessage.trim() === '/stop') {
       await supabase.from('wa_sessions').update({ is_bot_active: false }).eq('phone_number', sender);
       return NextResponse.json({ success: true, message: 'Local bot turned off' });
     }
-    if (message.trim() === '/start') {
+    if (textMessage.trim() === '/start') {
       await supabase.from('wa_sessions').update({ is_bot_active: true }).eq('phone_number', sender);
       return NextResponse.json({ success: true, message: 'Local bot turned on' });
     }
@@ -399,163 +431,221 @@ export async function POST(req) {
 
     waitUntil((async () => {
       try {
-        // --- DE-BOUNCE PROCESS ---
-        // Wait 2.5 seconds to let any consecutive user messages arrive
-        await new Promise(resolve => setTimeout(resolve, 2500));
+        await new Promise(resolve => setTimeout(resolve, BURST_WINDOW_MS));
 
-        if (insertedMsg) {
-          // Check if a newer message has been received from the same sender
-          const { data: latestMsg } = await supabase
-            .from('wa_chat_history')
-            .select('id')
-            .eq('phone_number', sender)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (latestMsg && latestMsg.length > 0 && latestMsg[0].id !== insertedMsg.id) {
-            console.log(`[Webhook] Newer message detected for ${sender}. Skipping Gemini execution.`);
-            return;
-          }
-        }
-
-        // Fetch history (limit to 7: 6 previous messages + 1 current message we just inserted)
-        const { data: historyData } = await supabase
+        const eventCreatedAt = new Date(insertedMsg.created_at);
+        const quietDeadline = new Date(eventCreatedAt.getTime() + BURST_WINDOW_MS).toISOString();
+        const { data: burstOwnerCandidates, error: laterBurstError } = await supabase
           .from('wa_chat_history')
-          .select('*')
+          .select('id, created_at')
           .eq('phone_number', sender)
+          .eq('role', 'user')
+          .gte('created_at', insertedMsg.created_at)
+          .lte('created_at', quietDeadline)
           .order('created_at', { ascending: false })
-          .limit(7); 
-
-        let rawHistory = [];
-        if (historyData && historyData.length > 0) {
-          // Skip the first message (which is the current user message we just inserted)
-          rawHistory = historyData.slice(1).reverse();
+          .order('id', { ascending: false })
+          .limit(1);
+        if (laterBurstError) throw laterBurstError;
+        if (burstOwnerCandidates?.[0]?.id !== insertedMsg.id) {
+          console.info('[Webhook] A later event inside the quiet window owns this conversation burst.');
+          return;
         }
 
-        let formattedHistory = [];
-        
-        for (let msg of rawHistory) {
-          const role = msg.role === 'user' ? 'user' : 'model';
-          const content = msg.content || ' ';
-          
-          if (formattedHistory.length === 0) {
-            // First message in history must be 'user'
-            if (role === 'user') {
-              formattedHistory.push({ role, parts: [{ text: content }] });
-            }
+        const { data: latestModelMessages, error: latestModelError } = await supabase
+          .from('wa_chat_history')
+          .select('created_at')
+          .eq('phone_number', sender)
+          .eq('role', 'model')
+          .lt('created_at', insertedMsg.created_at)
+          .order('created_at', { ascending: false })
+          .limit(1);
+        if (latestModelError) throw latestModelError;
+
+        const { data: recentUserMessages, error: burstError } = await supabase
+          .from('wa_chat_history')
+          .select('id, created_at, content')
+          .eq('phone_number', sender)
+          .eq('role', 'user')
+          .gt('created_at', latestModelMessages?.[0]?.created_at || new Date(eventCreatedAt.getTime() - 60 * 60 * 1000).toISOString())
+          .lte('created_at', insertedMsg.created_at)
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(500);
+        if (burstError) throw burstError;
+
+        const burstMessages = selectBurstMessages(recentUserMessages || [], insertedMsg.id, BURST_WINDOW_MS);
+        if (!burstMessages.length) {
+          console.warn('[Webhook] Claimed inbound event was not found in conversation history.');
+          return;
+        }
+        const conversation = buildBurstContext(burstMessages);
+        const burstText = conversation.text;
+        const mediaNote = 'Catatan: Ina belum bisa membaca lampiran yang dikirim ya kak.';
+        if (!burstText) {
+          const mediaOnlyReply = 'Maaf kak, Ina belum bisa membaca foto atau file secara langsung. Boleh jelaskan isi atau pertanyaannya lewat teks ya kak? 🙏';
+          await sendReply(mediaOnlyReply);
+          return;
+        }
+
+        const individualMessages = (burstMessages || [])
+          .map(item => buildBurstContext([item]).text)
+          .filter(Boolean);
+        const templateReplies = getTemplateReplies(individualMessages);
+        let staticReply = null;
+
+        if (!conversation.hasMedia && individualMessages.length === 1 && THANKS_PATTERN.test(burstText.trim())) {
+          staticReply = 'Sama-sama kak! Senang bisa membantu. Jika ada hal lain yang perlu ditanyakan, silakan chat Ina lagi ya. 😊';
+        } else if (!conversation.hasMedia && individualMessages.length === 1 && ACKNOWLEDGEMENT_PATTERN.test(burstText.trim())) {
+          staticReply = 'Siap kak! 👍';
+        } else if (templateReplies.length) {
+          staticReply = templateReplies.join('\n\n');
+        }
+
+        if (staticReply) {
+          await sendReply(conversation.hasMedia ? `${staticReply}\n\n${mediaNote}` : staticReply);
+          return;
+        }
+
+        if (ORDER_STATUS_PATTERN.test(burstText.trim())) {
+          const orders = await searchOrdersWithPhoneLinking(sender, pushname);
+          let reply;
+          if (orders?.length) {
+            const orderSummary = orders.map(order =>
+              `📌 *Invoice:* ${order.invoice_number}\n*Status:* ${order.status}\n*Item:* ${order.sales_items?.map(item => `${item.qty} pcs ${item.products?.name}`).join(', ')}\n*Tracking:* https://erpkscv1.vercel.app/track/${order.invoice_number}`
+            ).join('\n\n');
+            reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
           } else {
-            const lastMsg = formattedHistory[formattedHistory.length - 1];
-            if (lastMsg.role === role) {
-              // Merge consecutive messages of the same role
-              lastMsg.parts[0].text += '\n' + content;
-            } else {
-              formattedHistory.push({ role, parts: [{ text: content }] });
-            }
+            reply = 'Wah maaf kak, Ina coba cari pesanan aktif atas nama WA kakak belum ketemu nih datanya. Boleh diinfokan nama brand-nya apa kak? Biar Ina bantu cari lagi 🙏';
           }
+          await sendReply(conversation.hasMedia ? `${reply}\n\n${mediaNote}` : reply);
+          return;
         }
 
-        const agentModel = await getConfiguredAiModel(supabase);
-        const modelCandidates = getAiModelCandidates(agentModel);
+        // Keep the existing policy: templates and order lookups work anytime;
+        // free-form AI only answers outside business hours in auto mode.
+        if ((globalBotValue === 'true' || globalBotValue === 'auto') && !isOutsideBusinessHours()) {
+          console.info('[Webhook] Free-form AI response skipped during business hours.');
+          return;
+        }
+
+        const { data: priorHistory, error: historyReadError } = await supabase
+          .from('wa_chat_history')
+          .select('role, content')
+          .eq('phone_number', sender)
+          .lt('created_at', burstMessages?.[0]?.created_at || insertedMsg.created_at)
+          .order('created_at', { ascending: false })
+          .limit(6);
+        if (historyReadError) throw historyReadError;
+
+        const formattedHistory = [];
+        for (const item of (priorHistory || []).reverse()) {
+          const role = item.role === 'user' ? 'user' : 'model';
+          const content = item.content || ' ';
+          if (!formattedHistory.length) {
+            if (role === 'user') formattedHistory.push({ role, parts: [{ text: content }] });
+            continue;
+          }
+          const lastMessage = formattedHistory[formattedHistory.length - 1];
+          if (lastMessage.role === role) lastMessage.parts[0].text += `\n${content}`;
+          else formattedHistory.push({ role, parts: [{ text: content }] });
+        }
+
+        let prompt = conversation.hasMedia
+          ? `${burstText}\n\n[Pelanggan juga mengirim lampiran yang belum dapat dibaca.]`
+          : burstText;
+        const trailingHistoryMessage = formattedHistory[formattedHistory.length - 1];
+        if (trailingHistoryMessage?.role === 'user') {
+          prompt = `${trailingHistoryMessage.parts[0].text}\n${prompt}`;
+          formattedHistory.pop();
+        }
+
+        const deadline = Date.now() + AI_PROCESSING_TIMEOUT_MS;
+        const sendAiMessage = (chat, prompt) => {
+          const remainingMs = deadline - Date.now();
+          if (remainingMs <= 0) return Promise.reject(new Error('TIMEOUT'));
+          return runWithTimeout(chat.sendMessage(prompt), remainingMs);
+        };
+
+        const remainingConfigTime = deadline - Date.now();
+        if (remainingConfigTime <= 0) throw new Error('TIMEOUT');
+        const agentModel = await runWithTimeout(getConfiguredAiModel(supabase), remainingConfigTime);
+        const modelCandidates = getAiModelCandidates(agentModel).slice(0, 2);
         let chat;
         let result;
         let lastAiError;
 
-        for (const modelName of modelCandidates.slice(0, 2)) {
+        for (const modelName of modelCandidates) {
+          if (Date.now() >= deadline) {
+            lastAiError = new Error('TIMEOUT');
+            break;
+          }
           const model = genAI.getGenerativeModel({
             model: modelName,
-            systemInstruction: SYSTEM_PROMPT(pushname),
+            systemInstruction: `${SYSTEM_PROMPT(pushname)}\n\nJika pelanggan mengirim lampiran bersama teks, jawab pertanyaan teksnya dan sampaikan singkat bahwa lampiran belum dapat dibaca.`,
             tools: [{
               functionDeclarations: [{
-                name: "cek_pesanan",
-                description: "Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.",
+                name: 'cek_pesanan',
+                description: 'Mencari status pesanan pelanggan di database King Sablon Cup berdasarkan nama pelanggan atau nomor invoice.',
                 parameters: {
-                  type: "object",
-                  properties: {
-                    search_query: { type: "string" }
-                  },
-                  required: ["search_query"]
-                }
-              }]
-            }]
+                  type: 'object',
+                  properties: { search_query: { type: 'string' } },
+                  required: ['search_query'],
+                },
+              }],
+            }],
           });
           const candidateChat = model.startChat({ history: formattedHistory });
 
           try {
-            result = await runWithTimeout(candidateChat.sendMessage(message), 55000);
+            result = await sendAiMessage(candidateChat, prompt);
             chat = candidateChat;
-            console.log(`[Webhook] Gemini response completed with ${modelName}.`);
+            console.info(`[Webhook] Gemini response completed with ${modelName}.`);
             break;
           } catch (error) {
-            if (error.message === 'TIMEOUT') {
-              const fallbackMsg = "Maaf kak, sistem sedang sibuk. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
-              await sendReply(sender, fallbackMsg);
-              return;
-            }
             lastAiError = error;
-            if (!isRetryableAiError(error)) throw error;
-            console.warn(`[Webhook] Gemini ${modelName} unavailable, trying fallback model.`);
+            if (error.message === 'TIMEOUT' || !isRetryableAiError(error)) break;
+            console.warn(`[Webhook] Gemini ${modelName} unavailable; trying configured fallback candidate.`);
           }
         }
 
-        if (!result) throw lastAiError || new Error('Semua model Gemini tidak tersedia');
+        if (!result) throw lastAiError || new Error('No Gemini model candidate available');
 
         const functionCall = result.response.functionCalls()?.[0];
-        
-        if (functionCall && functionCall.name === "cek_pesanan") {
+        if (functionCall?.name === 'cek_pesanan') {
           const orders = await searchOrdersWithPhoneLinking(sender, functionCall.args.search_query);
-
-          let functionResponseData;
-          if (orders && orders.length > 0) {
-            functionResponseData = {
-              status: "success",
-              orders: orders.map(o => ({
-                invoice: o.invoice_number,
-                customer: o?.customers?.name,
-                status: o.status,
-                date: o.date,
-                items: o.sales_items?.map(i => `${i.qty} pcs ${i.products?.name}`).join(', '),
-                tracking_link: `https://erpkscv1.vercel.app/track/${o.invoice_number}`
-              }))
-            };
-          } else {
-            functionResponseData = {
-              status: "not_found",
-              message: "Tidak ditemukan pesanan aktif dengan nama atau invoice tersebut."
-            };
-          }
-
-          try {
-            // Keep the tool result as normal user context instead of replaying
-            // the legacy functionResponse role through this SDK.
-            result = await runWithTimeout(chat.sendMessage(
-              `Hasil alat cek_pesanan (gunakan data ini untuk menjawab pelanggan, jangan panggil alat lagi):\n${JSON.stringify(functionResponseData)}`
-            ), 55000);
-          } catch (error) {
-            if (error.message === 'TIMEOUT') {
-              const fallbackMsg = "Maaf kak, datanya cukup besar sehingga butuh waktu agak lama mencarinya. Nanti dilanjut dengan rekan saya ketika sedang online ya kak 🙏";
-              await sendReply(sender, fallbackMsg);
-              return;
-            }
-            throw error;
-          }
+          const functionResponseData = orders?.length
+            ? {
+                status: 'success',
+                orders: orders.map(order => ({
+                  invoice: order.invoice_number,
+                  customer: order?.customers?.name,
+                  status: order.status,
+                  date: order.date,
+                  items: order.sales_items?.map(item => `${item.qty} pcs ${item.products?.name}`).join(', '),
+                  tracking_link: `https://erpkscv1.vercel.app/track/${order.invoice_number}`,
+                })),
+              }
+            : { status: 'not_found', message: 'Tidak ditemukan pesanan aktif dengan nama atau invoice tersebut.' };
+          result = await sendAiMessage(
+            chat,
+            `Hasil alat cek_pesanan (gunakan data ini untuk menjawab pelanggan, jangan panggil alat lagi):\n${JSON.stringify(functionResponseData)}`,
+          );
         }
 
-        const aiResponseText = result.response.text();
-
-        await sendReply(sender, aiResponseText);
-        await supabase.from('wa_chat_history').insert([{ phone_number: sender, role: 'model', content: aiResponseText }]);
-
+        const aiResponseText = result.response.text()?.trim();
+        if (!aiResponseText) throw new Error('Gemini returned an empty response');
+        await sendReply(conversation.hasMedia ? `${aiResponseText}\n\n${mediaNote}` : aiResponseText);
       } catch (error) {
-        console.error('Error in background processing:', error);
-        
-        // Notify the user if Google Gemini service is unavailable or crashes
-        let fallbackMsg = "Maaf kak, sistem Ina sedang ada sedikit kendala teknis. Mohon dicoba lagi dalam beberapa menit ya kak 🙏";
+        console.error('[Webhook] Background processing failed:', error?.message || error);
+        let fallbackMsg = 'Maaf kak, sistem Ina sedang ada sedikit kendala teknis. Pesan kakak sudah tercatat dan akan diteruskan ke rekan kami ya 🙏';
         if (error.status === 503 || error.message?.includes('503')) {
-          fallbackMsg = "Maaf kak, server AI Google saat ini sedang penuh/sibuk. Mohon tunggu beberapa saat dan kirim pesan lagi ya 🙏";
+          fallbackMsg = 'Maaf kak, layanan AI sedang sibuk. Pesan kakak sudah tercatat dan akan diteruskan ke rekan kami ya 🙏';
         } else if (error.status === 429 || error.message?.includes('429') || error.message?.includes('Quota exceeded')) {
-          fallbackMsg = "Maaf kak, saat ini antrean pesan sedang padat. Pesan kakak sudah masuk antrean dan akan segera dibalas oleh tim kami ya kak 🙏";
+          fallbackMsg = 'Maaf kak, layanan AI sedang padat. Pesan kakak sudah tercatat dan akan diteruskan ke rekan kami ya 🙏';
+        } else if (error.message === 'TIMEOUT') {
+          fallbackMsg = 'Maaf kak, Ina belum bisa memproses pesan ini sekarang. Pesan kakak sudah tercatat dan akan dibantu rekan kami ya 🙏';
         }
-        if (!replySent) await sendReply(sender, fallbackMsg).catch(console.error);
+        if (!outboundState.attempted) await sendReply(fallbackMsg);
       }
     })());
 

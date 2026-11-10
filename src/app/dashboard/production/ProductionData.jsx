@@ -28,13 +28,11 @@ export default async function ProductionData({ mode = 'production', embedded = f
   let matchedOrderIds = []
   let matchedProductCodes = []
   if (search && mode === 'production') {
-    const [customersResult, productsResult, ordersResult] = await Promise.all([
-      supabase.from('customers').select('customer_code').ilike('name', `%${search}%`),
-      supabase.from('products').select('product_code').ilike('name', `%${search}%`),
-      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${search}%`)
+    const [customersResult, productsResult] = await Promise.all([
+      supabase.from('customers').select('customer_code').or(`name.ilike.%${search}%,customer_code.ilike.%${search}%`),
+      supabase.from('products').select('product_code').or(`name.ilike.%${search}%,product_code.ilike.%${search}%`)
     ])
     matchedProductCodes = (productsResult.data || []).map(product => product.product_code).filter(Boolean)
-    matchedOrderIds = (ordersResult.data || []).map(order => order.id).filter(Boolean)
 
     const customerCodes = (customersResult.data || []).map(customer => customer.customer_code).filter(Boolean)
     if (customerCodes.length) {

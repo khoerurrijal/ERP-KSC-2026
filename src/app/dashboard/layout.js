@@ -2,6 +2,7 @@ import PermissionGuard from '@/components/PermissionGuard'
 import DashboardClientLayout from '@/components/DashboardClientLayout'
 import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
+import './employee-light.css'
 
 export default async function DashboardLayout({ children }) {
   const supabase = await createClient()
@@ -25,6 +26,7 @@ export default async function DashboardLayout({ children }) {
 
   // Find user role (default Operator)
   const userEmail = user.email?.toLowerCase() || ''
+  const userName = user.email?.split('@')[0] || ''
   const matchedUser = userRoles.find(u => {
     const inputEmail = (u.email || '').trim().toLowerCase()
     return inputEmail === userEmail || `${inputEmail}@kingsablon.com` === userEmail
@@ -39,7 +41,7 @@ export default async function DashboardLayout({ children }) {
   const isOperator = userRole === 'Operator'
 
   return (
-    <DashboardClientLayout allowedMenus={allowedMenus} userRole={userRole}>
+    <DashboardClientLayout allowedMenus={allowedMenus} userRole={userRole} userName={userName}>
       <PermissionGuard allowedMenus={allowedMenus} userRole={userRole}>
         {children}
       </PermissionGuard>

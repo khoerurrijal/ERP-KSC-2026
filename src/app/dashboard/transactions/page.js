@@ -8,17 +8,14 @@ export default async function TransactionsPage({ searchParams = {} }) {
 
   let transactionsQuery = supabase
     .from('transactions')
-    .select('*, sales_orders(invoice_number, customers(name))')
+    .select('*, sales_orders(customers(name))')
     .order('date', { ascending: false })
     .limit(search ? 50000 : 1000)
 
   if (search) {
-    const [matchedCustomers, matchedOrders] = await Promise.all([
-      supabase.from('customers').select('customer_code').ilike('name', `%${search}%`),
-      supabase.from('sales_orders').select('id').ilike('invoice_number', `%${search}%`)
-    ])
-    const customerCodes = (matchedCustomers.data || []).map(customer => customer.customer_code).filter(Boolean)
-    const relatedOrderIds = (matchedOrders.data || []).map(order => order.id)
+    const { data: matchedCustomers } = await supabase.from('customers').select('customer_code').or(`name.ilike.%${search}%,customer_code.ilike.%${search}%`)
+    const customerCodes = (matchedCustomers || []).map(customer => customer.customer_code).filter(Boolean)
+    const relatedOrderIds = []
 
     if (customerCodes.length) {
       const { data: customerOrders } = await supabase
