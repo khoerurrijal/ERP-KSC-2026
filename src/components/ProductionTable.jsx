@@ -6,6 +6,7 @@ import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'luci
 
 import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
+import MonthFilter from '@/components/MonthFilter'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
@@ -191,9 +192,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   }, [trackingSoItems, soPage, pageSize])
 
   const canSeeAccumulationTab = showAccumulationTab && canSeeProductionTab && ['Owner', 'Admin'].includes(userRole)
-  const accumulationMonths = useMemo(() => [...new Set(
-    (productionHistory || []).map(log => getJakartaMonthKey(log.created_at)).filter(Boolean)
-  )].sort((a, b) => b.localeCompare(a)), [productionHistory])
   const productionAccumulation = useMemo(() => {
     const groups = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
@@ -462,26 +460,15 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div className="w-full space-y-1.5 sm:max-w-xs">
-              <label htmlFor="production-accumulation-month" className="text-xs font-medium text-foreground/60">Bulan</label>
-              <select
-                id="production-accumulation-month"
-                value={accumulationMonth}
-                onChange={event => {
-                  setAccumulationMonth(event.target.value)
-                  setExpandedEmployeeId(null)
-                }}
-                className="glass-input h-10 w-full text-sm"
-              >
-                <option value="ALL">Semua Bulan</option>
-                {accumulationMonths.map(month => (
-                  <option key={month} value={month}>
-                    {new Date(`${month}-01T12:00:00+07:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div className="flex justify-end">
+            <MonthFilter
+              value={accumulationMonth}
+              includeAll
+              onChange={month => {
+                setAccumulationMonth(month)
+                setExpandedEmployeeId(null)
+              }}
+            />
           </div>
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
