@@ -732,16 +732,15 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                         Terakhir Produksi {renderAccumulationSortIcon('latest')}
                       </button>
                     </th>
-                    <th className="px-4 py-3 text-right">Rincian</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-white/5">
                   {productionAccumulation.length === 0 ? (
-                    <tr><td colSpan="5" className="px-6 py-12 text-center text-foreground/45">Belum ada catatan produksi yang cocok.</td></tr>
+                    <tr><td colSpan="4" className="px-6 py-12 text-center text-foreground/45">Belum ada catatan produksi yang cocok.</td></tr>
                   ) : productionAccumulation.map(monthGroup => (
                     <Fragment key={monthGroup.month_key}>
                       <tr className="bg-white/[0.03]">
-                        <td colSpan="5" className="px-4 py-3 font-bold text-primary">
+                        <td colSpan="4" className="px-4 py-3 font-bold text-primary">
                           {formatJakartaMonthLabel(monthGroup.month_key)}
                           <span className="ml-2 text-xs font-medium text-foreground/55">
                             {formatMobileQuantity(monthGroup.qty)} pcs · {formatMobileQuantity(monthGroup.log_count)} catatan
@@ -753,28 +752,29 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                         const isExpanded = expandedEmployeeId === expansionKey
                         return (
                           <Fragment key={expansionKey}>
-                            <tr className="hover:bg-white/5">
+                            <tr
+                              tabIndex={0}
+                              aria-label={`${isExpanded ? 'Tutup' : 'Buka'} rincian produksi ${group.employee_name}`}
+                              aria-expanded={isExpanded}
+                              onClick={() => setExpandedEmployeeId(isExpanded ? null : expansionKey)}
+                              onKeyDown={event => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault()
+                                  setExpandedEmployeeId(isExpanded ? null : expansionKey)
+                                }
+                              }}
+                              className="cursor-pointer hover:bg-white/5 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70"
+                            >
                               <td className="px-4 py-3 font-semibold text-foreground">{group.employee_name}</td>
                               <td className="px-4 py-3 font-bold text-green-400">{formatMobileQuantity(group.qty)} pcs</td>
                               <td className="px-4 py-3 text-foreground/70">{formatMobileQuantity(group.log_count)}</td>
                               <td className="px-4 py-3 text-foreground/70">
                                 {group.latest_at ? new Date(group.latest_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
                               </td>
-                              <td className="px-4 py-3 text-right">
-                                <button
-                                  type="button"
-                                  aria-expanded={isExpanded}
-                                  onClick={() => setExpandedEmployeeId(isExpanded ? null : expansionKey)}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-foreground/75 hover:bg-white/5 hover:text-foreground"
-                                >
-                                  {isExpanded ? 'Tutup' : 'Lihat'}
-                                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                                </button>
-                              </td>
                             </tr>
                             {isExpanded && (
                               <tr>
-                                <td colSpan="5" className="bg-black/15 px-4 py-3">
+                                <td colSpan="4" className="bg-black/15 px-4 py-3">
                                   <div className="space-y-2">
                                     {group.logs.map((log, index) => (
                                       <div key={log.id || `${expansionKey}-${log.created_at}-${index}`} className="grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
