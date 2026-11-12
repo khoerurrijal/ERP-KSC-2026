@@ -6,7 +6,7 @@ import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'luci
 
 import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
-import MonthFilter from '@/components/MonthFilter'
+import CustomDatePicker from '@/components/CustomDatePicker'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
@@ -32,6 +32,20 @@ const getJakartaMonthKey = (value) => {
   const month = parts.find(part => part.type === 'month')?.value
   return year && month ? `${year}-${month}` : ''
 }
+const getJakartaDateKey = (value) => {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const year = parts.find(part => part.type === 'year')?.value
+  const month = parts.find(part => part.type === 'month')?.value
+  const day = parts.find(part => part.type === 'day')?.value
+  return year && month && day ? `${year}-${month}-${day}` : ''
+}
 
 const getStatusColor = (st) => {
   const s = getDisplayStatus(st)
@@ -45,13 +59,14 @@ const getStatusColor = (st) => {
   return 'bg-white/10 text-foreground border-white/20'
 }
 
-export default function ProductionTable({ productionJobs, productionHistory = [], operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, showAccumulationTab = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
+export default function ProductionTable({ productionJobs, productionHistory = [], operators = [], currentEmployeeId = '', userRole = 'Operator', initialTab = null, hideTabs = false, showAccumulationTab = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
   const { canAccess } = useRoleAccess()
   const router = useRouter()
   const pathname = usePathname()
   const currentSearchParams = useSearchParams()
   const canSeeOrdersTab = canAccess('production.status.orders')
   const canSeeProductionTab = canAccess('production.queue')
+  const isOperatorAccount = ['operator', 'operator mesin'].includes(String(userRole).toLowerCase())
   const safeInitialTab = initialTab === 'SO' && canSeeOrdersTab
     ? 'SO'
     : initialTab === 'PRODUKSI' && canSeeProductionTab
@@ -80,7 +95,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
   const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
   const [accumulationSort, setAccumulationSort] = useState({ key: 'qty', direction: 'desc' })
-  const [accumulationMonth, setAccumulationMonth] = useState(() => getJakartaMonthKey(new Date()))
+  const [accumulationDateFrom, setAccumulationDateFrom] = useState(() => `${getJakartaMonthKey(new Date())}-01`)
+  const [accumulationDateTo, setAccumulationDateTo] = useState(() => getJakartaDateKey(new Date()))
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null)
 
   const [soPage, setSoPage] = useState(1)
@@ -195,7 +211,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const productionAccumulation = useMemo(() => {
     const groups = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
-      (accumulationMonth === 'ALL' || getJakartaMonthKey(log.created_at) === accumulationMonth) &&
+      getJakartaDateKey(log.created_at) >= accumulationDateFrom &&
+      getJakartaDateKey(log.created_at) <= accumulationDateTo &&
       (!normalizedSearch ||
         matchesSearchText(log.employee_name, normalizedSearch) ||
         matchesSearchText(log.product_name, normalizedSearch) ||
@@ -232,7 +249,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       if (comparison === 0) comparison = collator.compare(a.employee_name, b.employee_name)
       return accumulationSort.direction === 'asc' ? comparison : -comparison
     })
-  }, [productionHistory, normalizedSearch, accumulationMonth, accumulationSort])
+  }, [productionHistory, normalizedSearch, accumulationDateFrom, accumulationDateTo, accumulationSort])
 
   const handleAccumulationSort = (key) => {
     setAccumulationSort(current => ({
@@ -251,10 +268,9 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const handleOpenModal = (job) => {
     setSelectedJob(job)
     
-    // Automatically set operator if role is Operator
-    if (userRole === 'Operator' && currentUserName) {
-      const op = operators.find(o => o.full_name?.toLowerCase().includes(currentUserName.toLowerCase()))
-      if (op) setEmployeeId(op.id.toString())
+    // Automatically attribute production to the signed-in operator.
+    if (isOperatorAccount && currentEmployeeId) {
+      setEmployeeId(String(currentEmployeeId))
     } else {
       setEmployeeId('')
     }
@@ -274,10 +290,9 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     setSelectedJob(job)
     setCorrectionQty(job.qty_processed || 0)
     
-    // Automatically set operator if role is Operator
-    if (userRole === 'Operator' && currentUserName) {
-      const op = operators.find(o => o.full_name?.toLowerCase().includes(currentUserName.toLowerCase()))
-      if (op) setEmployeeId(op.id.toString())
+    // Automatically attribute corrections to the signed-in operator.
+    if (isOperatorAccount && currentEmployeeId) {
+      setEmployeeId(String(currentEmployeeId))
     } else {
       setEmployeeId('')
     }
@@ -460,15 +475,29 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
-          <div className="flex justify-end">
-            <MonthFilter
-              value={accumulationMonth}
-              includeAll
-              onChange={month => {
-                setAccumulationMonth(month)
-                setExpandedEmployeeId(null)
-              }}
-            />
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
+            <div className="w-full space-y-1.5 sm:w-56">
+              <label className="text-xs font-medium text-foreground/60">Dari</label>
+              <CustomDatePicker
+                value={accumulationDateFrom}
+                onChange={date => {
+                  setAccumulationDateFrom(date)
+                  if (date > accumulationDateTo) setAccumulationDateTo(date)
+                  setExpandedEmployeeId(null)
+                }}
+              />
+            </div>
+            <div className="w-full space-y-1.5 sm:w-56">
+              <label className="text-xs font-medium text-foreground/60">Ke</label>
+              <CustomDatePicker
+                value={accumulationDateTo}
+                onChange={date => {
+                  setAccumulationDateTo(date)
+                  if (date < accumulationDateFrom) setAccumulationDateFrom(date)
+                  setExpandedEmployeeId(null)
+                }}
+              />
+            </div>
           </div>
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
@@ -723,7 +752,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                     { value: "", label: "- Pilih Karyawan (Operator) -" },
                     ...operators.map(op => ({ value: op.id, label: `${op.full_name} (${op.role_name})` }))
                   ]}
-                  disabled={userRole === 'Operator'}
+                  disabled={isOperatorAccount}
                 />
               </div>
 

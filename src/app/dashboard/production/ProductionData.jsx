@@ -87,7 +87,6 @@ export default async function ProductionData({ mode = 'production', embedded = f
 
   const userRoles = settingsData?.value || []
   let userRole = 'Operator'
-  let currentUserName = ''
   
   const matchedUser = userRoles.find(u => {
     const inputEmail = (u.email || '').trim().toLowerCase()
@@ -182,21 +181,22 @@ export default async function ProductionData({ mode = 'production', embedded = f
     qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
   }))
 
-  const matchedOperator = operators.find(o => o.full_name?.toLowerCase().includes(userEmail.split('@')[0].toLowerCase()))
-  if (matchedOperator) {
-    currentUserName = matchedOperator.full_name
-  } else if (matchedUser && matchedUser.email) {
-    currentUserName = matchedUser.email
-  }
+  const operatorIdentity = userEmail.split('@')[0].replace(/[^a-z0-9]/g, '')
+  const matchedOperator = operatorIdentity
+    ? operators.find(o => o.full_name?.toLowerCase().replace(/[^a-z0-9]/g, '').includes(operatorIdentity))
+    : null
+  const isOperatorAccount = ['operator', 'operator mesin'].includes(userRole.toLowerCase())
+  const visibleOperators = isOperatorAccount
+    ? (matchedOperator ? [matchedOperator] : [])
+    : operators
 
   return (
     <ProductionTable 
       productionJobs={productionJobs} 
       productionHistory={productionHistory}
-      operators={operators} 
-      currentUser={userEmail} 
+      operators={visibleOperators}
+      currentEmployeeId={matchedOperator?.id || ''}
       userRole={userRole} 
-      currentUserName={currentUserName} 
       initialSearch={search}
       initialTab={mode === 'status' ? 'SO' : 'PRODUKSI'}
       hideTabs={mode === 'production' || embedded}

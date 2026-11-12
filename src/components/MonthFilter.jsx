@@ -12,7 +12,7 @@ const MONTHS = [
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
 ]
 
-export default function MonthFilter({ value, onChange, includeAll = false, allLabel = 'Semua Bulan' }) {
+export default function MonthFilter({ value, onChange }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const pathname = usePathname()
@@ -26,7 +26,7 @@ export default function MonthFilter({ value, onChange, includeAll = false, allLa
   useEffect(() => {
     if (value !== undefined) {
       setSelectedMonth(value)
-      if (/^\d{4}-\d{2}$/.test(value)) setDisplayYear(parseInt(value.split('-')[0]))
+      if (value) setDisplayYear(parseInt(value.split('-')[0]))
     } else {
       const monthParam = searchParams.get('month')
       if (monthParam) {
@@ -67,23 +67,8 @@ export default function MonthFilter({ value, onChange, includeAll = false, allLa
     }
   }
 
-  const handleSelectAll = () => {
-    setSelectedMonth('ALL')
-    setIsOpen(false)
-
-    if (onChange) {
-      onChange('ALL')
-    } else {
-      const params = new URLSearchParams(searchParams)
-      params.delete('month')
-      const query = params.toString()
-      router.push(query ? `${pathname}?${query}` : pathname)
-    }
-  }
-
   // Format Display
   const getDisplayLabel = () => {
-    if (includeAll && selectedMonth === 'ALL') return allLabel
     if (!selectedMonth) return 'Pilih Bulan'
     const [y, m] = selectedMonth.split('-')
     return `${MONTHS[parseInt(m) - 1]} ${y}`
@@ -117,16 +102,6 @@ export default function MonthFilter({ value, onChange, includeAll = false, allLa
             </button>
           </div>
 
-          {includeAll && (
-            <button
-              type="button"
-              onClick={handleSelectAll}
-              className={`mb-2 w-full rounded-lg px-2 py-2 text-sm font-medium transition-colors ${selectedMonth === 'ALL' ? 'bg-primary text-primary-foreground' : 'text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}
-            >
-              {allLabel}
-            </button>
-          )}
-          
           <div className="grid grid-cols-3 gap-2">
             {MONTHS.map((m, idx) => {
               const isSelected = selectedMonth === `${displayYear}-${String(idx + 1).padStart(2, '0')}`
