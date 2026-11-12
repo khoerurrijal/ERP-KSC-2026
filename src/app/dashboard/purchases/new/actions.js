@@ -126,7 +126,7 @@ export async function createPurchaseOrder(payload) {
       const { error: txError } = await supabase.from('transactions').insert({
         date: payload.paymentDate,
         reference: 'PEMBELIAN',
-        description: `PEMBELIAN:${po.po_number} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
+        description: `Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
         amount_in: 0,
         amount_out: Number(payload.grandTotal || 0),
         workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
@@ -279,7 +279,7 @@ export async function updatePurchaseOrder(id, payload) {
             amount_out: Number(payload.grandTotal || 0),
             payment_method: payload.paymentAccount,
             workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
-            description: `PEMBELIAN:${poNumber} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'} (Updated)`
+            description: `Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`
           })
           .eq('id', existingTx.id)
         if (txUpdateError) throw txUpdateError
@@ -289,7 +289,7 @@ export async function updatePurchaseOrder(id, payload) {
           .insert({
             date: payload.paymentDate,
             reference: 'PEMBELIAN',
-            description: `PEMBELIAN:${poNumber} - Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
+            description: `Pembayaran Lunas ke ${payload.supplierId || 'Supplier'}`,
             amount_in: 0,
             amount_out: Number(payload.grandTotal || 0),
             workshop_code: payload.items[0]?.workshop_code || 'GLOBAL',
@@ -424,7 +424,7 @@ export async function payPurchaseOrder(id, paymentMethod, paymentDate) {
       .insert({
         date: paymentDate,
         reference: 'PEMBELIAN',
-        description: `PEMBELIAN:${po.po_number} - Pelunasan ke ${po.supplier || 'Supplier'}`,
+        description: `Pembayaran Lunas ke ${po.supplier || 'Supplier'}`,
         amount_in: 0,
         amount_out: Number(po.total_amount || 0),
         workshop_code: po.workshop_code || 'GLOBAL',

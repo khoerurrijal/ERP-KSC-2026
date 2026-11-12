@@ -38,3 +38,19 @@ export async function markAdminNotificationRead(notificationId) {
     return { success: false, error: error.message }
   }
 }
+
+export async function markAllAdminNotificationsRead() {
+  try {
+    const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
+    const { error } = await supabase
+      .from('admin_notifications')
+      .update({ read_at: new Date().toISOString() })
+      .is('read_at', null)
+
+    if (error) throw error
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (error) {
+    return { success: false, error: error.message }
+  }
+}

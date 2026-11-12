@@ -211,17 +211,22 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     })
 
     result.sort((a, b) => {
-      let valA = a[sortConfig.key]
-      let valB = b[sortConfig.key]
-      
+      let comparison = 0
       if (sortConfig.key === 'total_amount') {
-         valA = a.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
-         valB = b.purchase_items?.reduce((sum, i) => sum + Number(i.total_price || 0), 0) || 0
+        const totalA = a.purchase_items?.reduce((sum, item) => sum + Number(item.total_price || 0), 0) || 0
+        const totalB = b.purchase_items?.reduce((sum, item) => sum + Number(item.total_price || 0), 0) || 0
+        comparison = totalA - totalB
+      } else if (sortConfig.key === 'date') {
+        const dateA = Date.parse(a.date || '')
+        const dateB = Date.parse(b.date || '')
+        comparison = (Number.isFinite(dateA) ? dateA : 0) - (Number.isFinite(dateB) ? dateB : 0)
+      } else {
+        const valueA = sortConfig.key === 'status' ? (a.status || a.payment_status) : a[sortConfig.key]
+        const valueB = sortConfig.key === 'status' ? (b.status || b.payment_status) : b[sortConfig.key]
+        comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+          .compare(String(valueA || ''), String(valueB || ''))
       }
-
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
+      return sortConfig.direction === 'asc' ? comparison : -comparison
     })
 
     return result
@@ -254,24 +259,27 @@ export default function PurchasesClient({ purchaseOrders = [], purchaseItems = [
     })
 
     result.sort((a, b) => {
-      let valA, valB
+      let comparison = 0
       if (itemSortConfig.key === 'date') {
-        valA = a.purchase_orders?.date || ''
-        valB = b.purchase_orders?.date || ''
+        const dateA = Date.parse(a.purchase_orders?.date || '')
+        const dateB = Date.parse(b.purchase_orders?.date || '')
+        comparison = (Number.isFinite(dateA) ? dateA : 0) - (Number.isFinite(dateB) ? dateB : 0)
       } else if (itemSortConfig.key === 'po_number') {
-        valA = a.purchase_orders?.po_number || ''
-        valB = b.purchase_orders?.po_number || ''
+        comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+          .compare(String(a.purchase_orders?.po_number || ''), String(b.purchase_orders?.po_number || ''))
       } else if (itemSortConfig.key === 'supplier') {
-        valA = a.purchase_orders?.supplier || ''
-        valB = b.purchase_orders?.supplier || ''
+        comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+          .compare(String(a.purchase_orders?.supplier || ''), String(b.purchase_orders?.supplier || ''))
+      } else if (itemSortConfig.key === 'item_name') {
+        comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+          .compare(String(a.products?.name || a.item_name || ''), String(b.products?.name || b.item_name || ''))
+      } else if (['qty', 'unit_price', 'total_price'].includes(itemSortConfig.key)) {
+        comparison = Number(a[itemSortConfig.key] || 0) - Number(b[itemSortConfig.key] || 0)
       } else {
-        valA = a[itemSortConfig.key]
-        valB = b[itemSortConfig.key]
+        comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+          .compare(String(a[itemSortConfig.key] || ''), String(b[itemSortConfig.key] || ''))
       }
-      
-      if (valA < valB) return itemSortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return itemSortConfig.direction === 'asc' ? 1 : -1
-      return 0
+      return itemSortConfig.direction === 'asc' ? comparison : -comparison
     })
 
     return result

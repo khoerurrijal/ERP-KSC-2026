@@ -106,6 +106,44 @@ export default async function ProductionData({ mode = 'production', embedded = f
     role_name: o.salary_schemas?.role_name
   }))
 
+  let productionHistory = []
+  const canSeeProductionAccumulation = ['Owner', 'Admin'].includes(userRole) && mode === 'production' && !embedded
+  if (canSeeProductionAccumulation) {
+    const { data: rawLogs } = await supabase
+      .from('production_logs')
+      .select('id, job_id, employee_id, qty_processed, created_at')
+      .order('created_at', { ascending: false })
+      .limit(10000)
+
+    const jobIds = [...new Set((rawLogs || []).map(log => log.job_id).filter(Boolean))]
+    const employeeIds = [...new Set((rawLogs || []).map(log => log.employee_id).filter(Boolean))]
+    const [{ data: historyItems }, { data: historyEmployees }] = await Promise.all([
+      jobIds.length
+        ? supabase.from('sales_items').select('id, product_code, order_type, sales_orders (invoice_number, customers (name)), products (name)').in('id', jobIds)
+        : Promise.resolve({ data: [] }),
+      employeeIds.length
+        ? supabase.from('employees').select('id, full_name').in('id', employeeIds)
+        : Promise.resolve({ data: [] })
+    ])
+
+    const itemById = new Map((historyItems || []).map(item => [item.id, item]))
+    const employeeById = new Map((historyEmployees || []).map(employee => [employee.id, employee.full_name]))
+    productionHistory = (rawLogs || []).map(log => {
+      const item = itemById.get(log.job_id)
+      return {
+        id: log.id,
+        employee_id: log.employee_id || 'unassigned',
+        employee_name: employeeById.get(log.employee_id) || (log.employee_id ? 'Karyawan tidak diketahui' : 'Tanpa operator'),
+        qty_processed: Number(log.qty_processed || 0),
+        created_at: log.created_at,
+        product_name: item?.products?.name || item?.product_code || 'Item dihapus',
+        customer_name: item?.sales_orders?.customers?.name || '-',
+        invoice_number: item?.sales_orders?.invoice_number || '-',
+        order_type: item?.order_type || '-'
+      }
+    })
+  }
+
   const productionJobs = (rawItems || []).map(item => ({
     id: item.id,
     so_id: item.sales_orders?.id,
@@ -154,6 +192,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   return (
     <ProductionTable 
       productionJobs={productionJobs} 
+      productionHistory={productionHistory}
       operators={operators} 
       currentUser={userEmail} 
       userRole={userRole} 
@@ -161,6 +200,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
       initialSearch={search}
       initialTab={mode === 'status' ? 'SO' : 'PRODUKSI'}
       hideTabs={mode === 'production' || embedded}
+      showAccumulationTab={mode === 'production' && !embedded}
       hideHeader={embedded}
       title={mode === 'production' ? 'Produksi' : 'Status Pesanan'}
     />

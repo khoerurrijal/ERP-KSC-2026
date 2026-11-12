@@ -236,8 +236,23 @@ export default function SalesClient({
 
   // Memoized Invoice Data
   const filteredAndSortedOrders = useMemo(() => {
-    return salesOrders
-  }, [salesOrders])
+    const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+    return [...salesOrders].sort((a, b) => {
+      let comparison = 0
+      if (sortConfig.key === 'date') {
+        const dateA = Date.parse(a.date || '')
+        const dateB = Date.parse(b.date || '')
+        comparison = (Number.isFinite(dateA) ? dateA : 0) - (Number.isFinite(dateB) ? dateB : 0)
+      } else if (sortConfig.key === 'total_amount') {
+        comparison = Number(a.total_amount || 0) - Number(b.total_amount || 0)
+      } else {
+        const valueA = sortConfig.key === 'customers_name' ? a.customers?.name : a.payment_status
+        const valueB = sortConfig.key === 'customers_name' ? b.customers?.name : b.payment_status
+        comparison = collator.compare(String(valueA || ''), String(valueB || ''))
+      }
+      return sortConfig.direction === 'asc' ? comparison : -comparison
+    })
+  }, [salesOrders, sortConfig])
 
   // Memoized Item Data
   const filteredAndSortedItems = useMemo(() => {
@@ -305,9 +320,9 @@ export default function SalesClient({
         bVal = prodB?.name || b.product_name || b.item_name || ''
       }
 
-      if (aVal < bVal) return itemSortConfig.direction === 'asc' ? -1 : 1
-      if (aVal > bVal) return itemSortConfig.direction === 'asc' ? 1 : -1
-      return 0
+      const comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+        .compare(String(aVal ?? ''), String(bVal ?? ''))
+      return itemSortConfig.direction === 'asc' ? comparison : -comparison
     })
   }, [salesItems, debouncedSearch, filterMonth, itemFilterStatus, itemSortConfig])
 
@@ -498,7 +513,6 @@ export default function SalesClient({
                       <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                       <td className="px-4 py-3 text-foreground/90 font-medium">
                         {item.customers?.name}
-                        <br/><span className="text-[10px] text-foreground/50">{item.invoice_number}</span>
                       </td>
                       <td className="px-4 py-3 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3">

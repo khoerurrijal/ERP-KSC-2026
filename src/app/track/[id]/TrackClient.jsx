@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import Image from 'next/image'
-import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Printer, Settings, PackageOpen, CreditCard, XCircle, Download, MapPin, Phone, Mail, Navigation } from 'lucide-react'
+import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Settings, PackageOpen, CreditCard, XCircle, Download, MapPin, Phone, Mail, Navigation } from 'lucide-react'
 
 const STATUS_STEPS = [
   { key: 'BARU MASUK', label: 'Baru Masuk', icon: PackageOpen },
@@ -23,6 +23,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
   const amountPaid = order.dp_amount || 0
   const totalAmount = order.total_amount || 0
   const sisa = totalAmount - amountPaid
+  const canShowQris = Number(totalAmount) <= 500000
 
   const [activeTab, setActiveTab] = useState('tracking') // 'tracking' or 'invoice'
   const [expandedItems, setExpandedItems] = useState(items.length === 1 ? [items[0].id] : [])
@@ -128,7 +129,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
 
   return (
     <>
-      {isQrisOpen && (
+      {isQrisOpen && canShowQris && (
         <div className="fixed inset-0 z-[1200] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={event => event.target === event.currentTarget && setIsQrisOpen(false)}>
           <Image src="/qris.png" alt="QRIS Full" width={900} height={900} className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
@@ -181,18 +182,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
         }
       `}} />
 
-      <div className="min-h-screen bg-transparent text-white flex justify-center pb-20 print:pb-0 overflow-x-hidden">
+      <div className="min-h-screen bg-[#09090b] text-white flex justify-center pb-20 print:pb-0 overflow-x-hidden">
         <div className="w-full max-w-md bg-black/40 backdrop-blur-3xl min-h-screen shadow-2xl relative flex flex-col border-x border-white/10 print:border-none print:bg-white print:max-w-none print:shadow-none print:min-h-0 overflow-x-hidden">
           
           {/* Header */}
           <div className="p-5 sm:p-8 bg-gradient-to-b from-primary/10 to-transparent flex flex-col items-center justify-center text-center no-print">
             <div className="w-24 h-24 sm:w-32 sm:h-32 mb-2 flex items-center justify-center">
               <Image
-                src="/logo.png" 
+                src="/logo-dark.png"
                 alt="Logo" 
                 width={400}
                 height={160}
-                className="max-w-full max-h-full object-contain filter drop-shadow-[0_0_15px_rgba(212,175,55,0.4)]" 
+                className="max-w-full max-h-full object-contain"
               />
             </div>
             <h1 className="text-lg font-bold tracking-tight sr-only">{storeName}</h1>
@@ -200,16 +201,16 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex border-b border-white/10 px-4 sm:px-6 mb-5 sm:mb-6 no-print">
+          <div className="flex min-w-0 border-b border-white/10 px-2 sm:px-6 mb-5 sm:mb-6 no-print">
             <button 
               onClick={() => setActiveTab('tracking')}
-              className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'tracking' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+              className={`min-w-0 flex-1 px-1 pb-3 text-[11px] leading-tight font-bold border-b-2 transition-all min-[360px]:text-xs sm:text-sm ${activeTab === 'tracking' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
             >
               Lacak Pesanan
             </button>
             <button 
               onClick={() => setActiveTab('invoice')}
-              className={`flex-1 pb-3 text-sm font-bold border-b-2 transition-all ${activeTab === 'invoice' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
+              className={`min-w-0 flex-1 px-1 pb-3 text-[11px] leading-tight font-bold border-b-2 transition-all min-[360px]:text-xs sm:text-sm ${activeTab === 'invoice' ? 'border-primary text-primary' : 'border-transparent text-foreground/50 hover:text-foreground/80'}`}
             >
               Invoice & Pembayaran
             </button>
@@ -219,21 +220,21 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
             <div className="px-4 sm:px-6 -mt-3 sm:-mt-4 relative z-10 space-y-4 no-print">
               
               {/* Card Info Utama */}
-              <div className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md">
-                <div className="flex justify-between items-start mb-4">
-                  <div>
+              <div className="min-w-0 bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md">
+                <div className="flex justify-between items-start gap-3 mb-4">
+                  <div className="min-w-0">
                     <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-1">Nomor Pesanan</p>
-                    <p className="font-bold text-foreground text-lg">{order.invoice_number}</p>
+                    <p className="break-words font-bold text-foreground text-sm min-[360px]:text-base">{order.invoice_number}</p>
                   </div>
-                  <div className="text-right">
+                  <div className="shrink-0 text-right">
                     <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-1">Tanggal</p>
                     <p className="font-semibold text-foreground/90 text-sm">{new Date(order.date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' })}</p>
                   </div>
                 </div>
-                <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                  <div>
+                <div className="pt-4 border-t border-white/10 flex justify-between items-start gap-3">
+                  <div className="min-w-0">
                     <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider mb-1">Atas Nama</p>
-                    <p className="font-semibold text-foreground/90 flex items-center gap-2">
+                    <p className="break-words font-semibold text-foreground/90">
                       {order.customers?.name || 'Pelanggan'}
                     </p>
                   </div>
@@ -270,14 +271,14 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                   }
 
                   return (
-                    <div key={item.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md transition-all">
+                    <div key={item.id} className="min-w-0 bg-white/5 border border-white/10 rounded-2xl p-4 sm:p-5 backdrop-blur-md transition-all">
                       {/* Card Header (Clickable if items > 1) */}
                       <div 
                         className={`flex items-start justify-between ${items.length > 1 ? 'cursor-pointer group' : ''}`}
                         onClick={() => toggleExpand(item.id)}
                       >
-                        <div className="flex-1 pr-4">
-                          <p className="font-semibold text-sm text-foreground/90">{item.products?.name || `Item ${idx+1}`}</p>
+                        <div className="min-w-0 flex-1 pr-3">
+                          <p className="break-words font-semibold text-sm text-foreground/90">{item.products?.name || `Item ${idx+1}`}</p>
                           <p className="text-xs text-foreground/50 mt-1">{targetQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs {isPolos ? '(Polos)' : ''}</p>
                           
                           {/* Mini Status */}
@@ -308,7 +309,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                               </div>
                             </div>
                           ) : (
-                            <div className="relative pl-5 space-y-6 before:absolute before:inset-0 before:ml-[1.55rem] before:h-full before:w-px before:bg-gradient-to-b before:from-primary before:via-white/10 before:to-white/10">
+                            <div className="relative space-y-5 pl-0 before:absolute before:left-[11px] before:top-3 before:bottom-3 before:w-px before:bg-gradient-to-b before:from-primary before:via-white/10 before:to-white/10">
                               {STATUS_STEPS.map((step) => {
                                 // Bypass SIAP PROSES dan PROSES untuk jenis POLOS
                                 if (isPolos && (step.key === 'SIAP PROSES' || step.key === 'PROSES')) return null;
@@ -334,18 +335,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                 }
 
                                 return (
-                                  <div key={step.key} className="relative flex items-start group">
+                                  <div key={step.key} className="relative flex min-w-0 items-start group">
                                     <div className={`relative z-10 flex items-center justify-center w-6 h-6 rounded-full border shrink-0 translate-y-0.5 transition-colors ${bgColor} ${glow}`}>
                                       {state === 'passed' ? <Check className={`w-3 h-3 ${iconColor}`} /> : <Icon className={`w-3 h-3 ${iconColor}`} />}
                                     </div>
-                                    <div className="ml-4">
-                                      <h4 className={`text-sm font-bold ${state === 'future' ? 'text-foreground/30' : state === 'active-blinking' ? 'text-yellow-400' : 'text-foreground'}`}>
+                                    <div className="ml-3 min-w-0 flex-1">
+                                      <h4 className={`break-words text-sm leading-snug font-bold ${state === 'future' ? 'text-foreground/30' : state === 'active-blinking' ? 'text-yellow-400' : 'text-foreground'}`}>
                                         {step.label}
                                       </h4>
 
                                       {/* Menunggu Lunas Alert */}
                                       {state === 'active-blinking' && step.label === 'Menunggu Lunas' && sisa > 0 && (
-                                        <div className="mt-2 bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 flex items-start gap-2 text-yellow-500">
+                                        <div className="mt-2 max-w-full bg-yellow-500/10 border border-yellow-500/20 rounded-lg p-2.5 flex items-start gap-2 text-yellow-500">
                                           <AlertCircle className="w-4 h-4 shrink-0 translate-y-0.5" />
                                           <div>
                                             <span className="text-xs font-semibold block">Menunggu Pelunasan</span>
@@ -399,12 +400,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
           ) : (
             /* Tab Invoice View */
             <div className="space-y-4 px-3 sm:px-6">
-              
-              <div className="flex justify-end mb-4 no-print">
-                <button onClick={handlePrint} className="bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-primary/20 w-full sm:w-auto">
-                  <Printer className="w-4 h-4" /> Unduh PDF
-                </button>
-              </div>
 
               {/* SCALED CONTAINER FOR SMARTPHONE HIGH FIDELITY PREVIEW */}
               <div 
@@ -433,8 +428,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                         <div className="mb-2">
                           <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-16 w-auto object-contain bg-transparent" />
                         </div>
-                        <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
-
                         <div className="mt-4 space-y-1 text-xs text-gray-600">
                           <p className="flex items-center gap-2"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
                           <p className="flex items-center gap-2"><Phone className="w-3 h-3 shrink-0" /> {store.phone}</p>
@@ -522,7 +515,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       <div className="w-full md:w-1/2 p-5 bg-gray-50 rounded-xl border border-gray-200">
                         <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Metode Pembayaran</h4>
                         
-                        {order.payment_status !== 'LUNAS' && (
+                        {order.payment_status !== 'LUNAS' && canShowQris && (
                           <div className="mb-6 pb-6 border-b border-gray-200 space-y-4">
                             <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pembayaran Digital Instan (QRIS):</p>
                             
@@ -592,7 +585,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
 
                     <div className="mt-8 md:mt-12 text-center border-t border-gray-200 pt-6">
                       <p className="text-gray-500 text-sm">Terima kasih atas kepercayaan Anda kepada {store.store_name}.</p>
-                      <p className="text-gray-400 text-xs mt-1">Invoice digital ini diterbitkan secara otomatis dan sah.</p>
                     </div>
 
                   </div>
@@ -609,8 +601,6 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       <div className="mb-2">
                         <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-20 w-auto object-contain bg-transparent" />
                       </div>
-                      <p className="text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
-
                       <div className="mt-4 space-y-1 text-xs text-gray-600">
                         <p className="flex items-center gap-2"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
                         <p className="flex items-center gap-2"><Phone className="w-3 h-3 shrink-0" /> {store.phone}</p>
@@ -723,9 +713,21 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
 
                   <div className="mt-12 text-center border-t border-gray-200 pt-6">
                     <p className="text-gray-500 text-sm">Terima kasih atas kepercayaan Anda kepada {store.store_name}.</p>
-                    <p className="text-gray-400 text-xs mt-1">Invoice digital ini diterbitkan secara otomatis dan sah.</p>
                   </div>
                 </div>
+              </div>
+
+              <div className="flex justify-center pt-1 pb-2 no-print">
+                <button
+                  type="button"
+                  onClick={handlePrint}
+                  aria-label="Unduh PDF"
+                  title="Unduh PDF"
+                  className="inline-flex h-10 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <Download className="h-5 w-5" aria-hidden="true" />
+                  <span>Unduh</span>
+                </button>
               </div>
 
             </div>

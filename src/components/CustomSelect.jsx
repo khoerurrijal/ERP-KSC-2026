@@ -8,7 +8,7 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'
 import { matchesSearchText } from '@/utils/search'
 
-export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false, menuPosition = "absolute" }) {
+export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false, menuPosition = "absolute", menuZIndex = 1100 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const popoverRef = useRef(null)
@@ -49,7 +49,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
         left,
         top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
         width,
-        zIndex: 1100,
+      zIndex: menuZIndex,
         transform: opensAbove ? 'translateY(-100%)' : undefined
       })
     }
@@ -61,7 +61,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
     }
-  }, [isOpen, menuPosition, searchable])
+  }, [isOpen, menuPosition, searchable, menuZIndex])
 
   const handleSelect = (optionValue) => {
     if (onChange) {
@@ -96,7 +96,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       </button>
 
       {isOpen && menuPosition === 'relative' && (
-        <div ref={menuRef} className="relative w-full mt-2 p-2 min-w-[200px] bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-card-border animate-in fade-in zoom-in-95 duration-200 max-h-60 flex flex-col">
+        <div ref={menuRef} style={{ zIndex: menuZIndex }} className="relative w-full mt-2 p-2 min-w-[200px] bg-background/95 backdrop-blur-md rounded-xl shadow-2xl border border-card-border animate-in fade-in zoom-in-95 duration-200 max-h-60 flex flex-col">
           {searchable && (
             <div className="p-2 border-b border-card-border mb-2 shrink-0 relative">
               <Search className="w-3.5 h-3.5 text-foreground/50 absolute left-4 top-1/2 -translate-y-1/2" />

@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X, Copy, Check } from 'lucide-react'
+import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X, Copy, Check, RotateCw } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { approveCustomerOrderRequest } from '@/app/actions/orderRequests'
@@ -92,7 +92,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const returnTo = requestedReturnTo && requestedReturnTo.startsWith('/') && !requestedReturnTo.startsWith('//')
     ? requestedReturnTo
     : '/sales'
-  const isExistingOrder = Boolean(initialData?.id)
+  const [isReorder, setIsReorder] = useState(false)
+  const isExistingOrder = Boolean(initialData?.id) && !isReorder
   const [currentTab, setCurrentTab] = useState(1)
   const [localCustomers, setLocalCustomers] = useState(customers || [])
   const [showAddCustomer, setShowAddCustomer] = useState(false)
@@ -198,6 +199,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
   const [designService, setDesignService] = useState(Boolean(initialData?.designService))
   const [copiedTrackingLink, setCopiedTrackingLink] = useState(false)
+  const [showReorderConfirm, setShowReorderConfirm] = useState(false)
 
   const handleClose = () => {
     if (onClose) {
@@ -205,6 +207,20 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       return
     }
     router.replace(returnTo)
+  }
+
+  const handleReorder = () => {
+    const customer = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
+    setItems(items.map((item, index) => ({ ...item, id: `${itemIdPrefix}-reorder-${index}` })))
+    setOrderDate(new Date().toISOString().split('T')[0])
+    setIsMarketplace(isMarketplace || isMarketplaceCustomerType(customer?.type))
+    setMarketplaceReceipt('')
+    setDpAmount(0)
+    setPaymentAccount('')
+    setCurrentTab(1)
+    setError(null)
+    setIsReorder(true)
+    setShowReorderConfirm(false)
   }
 
   const handleSaved = () => {
@@ -267,6 +283,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     return [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
   }
 
+  const orderTypes = Array.from(new Set(dropdownConfig.order_type || ['SABLON', 'POLOS']))
+
   const calculateTotal = () => {
     const itemTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price)
@@ -317,6 +335,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           const selectedProduct = products.find(p => p.name === value)
           if (selectedProduct) {
             updated.product_id = selectedProduct.product_code
+            updated.category = selectedProduct.category || ''
             updated.workshop_id = selectedProduct.workshop_id || ''
             updated.unit = 'PCS'
             updated.unit_multiplier = 1
@@ -415,14 +434,14 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       let result;
       if (requestId) {
         result = await approveCustomerOrderRequest(requestId, payload)
-      } else if (initialData?.id) {
+      } else if (initialData?.id && !isReorder) {
         result = await updateSalesOrder(initialData.id, payload)
       } else {
         result = await createSalesOrder(payload)
       }
 
       if (result.success) {
-        alert(requestId ? `Request berhasil dikonfirmasi menjadi Sales Order!` : initialData ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
+        alert(requestId ? `Request berhasil dikonfirmasi menjadi Sales Order!` : isExistingOrder ? `Pesanan berhasil diupdate!` : `Pesanan berhasil dibuat!`)
         handleSaved()
       } else {
         setError(result.error || "Terjadi kesalahan saat menyimpan data.")
@@ -451,16 +470,29 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           aria-labelledby="sales-order-drawer-title"
           className="po-drawer-enter relative ml-auto flex h-full w-[92%] max-w-md flex-col border-l border-white/10 bg-background shadow-2xl will-change-transform sm:w-[80%] lg:w-[72%]"
         >
-          <header className="flex items-center justify-between gap-3 border-b border-white/10 px-3 py-2.5 md:px-4">
-            <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Sales Order</p>
-              <h1 id="sales-order-drawer-title" className="truncate text-base font-bold text-foreground md:text-lg">
-                {requestId ? 'Review Pesanan Customer' : initialData ? 'Edit Sales Order' : 'Buat Sales Order'}
-              </h1>
+          <header className="border-b border-white/10 px-3 py-2.5 md:px-4">
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Sales Order</p>
+                <h1 id="sales-order-drawer-title" className="truncate text-base font-bold text-foreground md:text-lg">
+                  {requestId ? 'Review Pesanan Customer' : isReorder ? 'Re-order Sales Order' : initialData ? 'Edit Sales Order' : 'Buat Sales Order'}
+                </h1>
+              </div>
+              <button type="button" onClick={handleClose} aria-label="Tutup" className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">
+                <X className="h-5 w-5" />
+              </button>
             </div>
-            <button type="button" onClick={handleClose} aria-label="Tutup" className="rounded-lg p-2 text-foreground/60 transition-colors hover:bg-white/10 hover:text-foreground">
-              <X className="h-5 w-5" />
-            </button>
+            {initialData?.id && !isReorder && (
+              <div className="mt-2 flex items-center gap-2">
+                <button type="button" onClick={handleCopyTrackingLink} data-copied={copiedTrackingLink} className={`copy-link-shimmer flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${copiedTrackingLink ? 'border-green-300 bg-green-500 text-white' : 'border-primary bg-primary text-primary-foreground hover:brightness-110'}`} title="Salin link tracking untuk dikirim ke konsumen">
+                  <span className="relative z-10 inline-flex items-center gap-1.5">
+                    {copiedTrackingLink ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+                    {copiedTrackingLink ? 'Tersalin' : 'Salin Link'}
+                  </span>
+                </button>
+                <a href={`/sales/${initialData.id}/invoice`} target="_blank" rel="noreferrer" className="flex h-8 items-center whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground">Print</a>
+              </div>
+            )}
           </header>
 
           <div className="flex-1 overflow-y-auto p-2.5 md:p-3">
@@ -523,8 +555,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   {items.map((item, index) => {
                     const categoryOptions = getCategoriesForItem(item.order_type)
                     const productOptions = products
-                      .filter(p => p.category === item.category && (p.is_active !== false || p.name === item.product_search))
-                      .map(p => ({ value: p.name, label: p.name }))
+                      .filter(p => categoryOptions.includes(p.category) && (p.is_active !== false || p.name === item.product_search))
+                      .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
                     const product = products.find(p => p.name === item.product_search)
                     let itemTotal = Number(item.qty) * Number(item.price)
                     if (item.isFastTrack) itemTotal += 100000 * Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
@@ -542,37 +574,33 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         </div>
 
                         <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-                          <div className="space-y-1 sm:col-span-2">
+                          <div className="space-y-1 sm:col-span-4">
                             <label className="block text-[10px] text-foreground/60">Jenis Pesanan</label>
-                            <CustomSelect
-                              value={item.order_type}
-                              onChange={e => handleItemChange(item.id, 'order_type', e.target.value)}
-                              options={[
-                                { value: '', label: 'Pilih Jenis...' },
-                                ...Array.from(new Set([...(dropdownConfig.order_type || ['SABLON', 'POLOS'])])).map(value => ({ value, label: value }))
-                              ]}
-                            />
-                          </div>
-                          <div className="space-y-1 sm:col-span-2">
-                            <label className="block text-[10px] text-foreground/60">Kategori</label>
-                            <CustomSelect
-                              value={item.category}
-                              onChange={e => handleItemChange(item.id, 'category', e.target.value)}
-                              options={[
-                                { value: '', label: 'Pilih Kategori...' },
-                                ...categoryOptions.map(value => ({ value, label: value }))
-                              ]}
-                              disabled={!item.order_type}
-                            />
+                            <div role="group" aria-label={`Jenis pesanan item ${index + 1}`} className="flex flex-wrap gap-1.5">
+                              {orderTypes.map(type => {
+                                const isSelected = item.order_type === type
+                                return (
+                                  <button
+                                    key={type}
+                                    type="button"
+                                    aria-pressed={isSelected}
+                                    onClick={() => handleItemChange(item.id, 'order_type', type)}
+                                    className={`h-7 rounded-lg border px-2.5 text-[10px] font-semibold transition-colors ${isSelected ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-foreground/70 hover:border-primary/40 hover:text-foreground'}`}
+                                  >
+                                    {type}
+                                  </button>
+                                )
+                              })}
+                            </div>
                           </div>
                           <div className="space-y-1 sm:col-span-4">
-                            <label className="block text-[10px] text-foreground/60">Produk</label>
+                            <label className="block text-[10px] text-foreground/60">Cari Produk</label>
                             <SuggestField
                               value={item.product_search}
                               onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
-                              placeholder="Pilih Produk..."
-                              options={[{ value: '', label: 'Pilih Produk...' }, ...productOptions]}
-                              disabled={!item.category}
+                              placeholder="Ketik produk atau kategori..."
+                              options={productOptions}
+                              disabled={!item.order_type}
                             />
                           </div>
                           <div className="space-y-1">
@@ -708,29 +736,71 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           </div>
 
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
-            <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {initialData?.id && (
-                <>
-                  <button type="button" onClick={handleCopyTrackingLink} className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground" title="Salin link tracking untuk dikirim ke konsumen">
-                    {copiedTrackingLink ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-                    {copiedTrackingLink ? 'Tersalin' : 'Salin Link'}
-                  </button>
-                  <a href={`/sales/${initialData.id}/invoice`} target="_blank" rel="noreferrer" className="flex h-9 items-center whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground">Print</a>
-                </>
-              )}
-              {initialData?.id && initialData.payment_status !== 'BATAL' && onCancel && (
-                <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="flex h-9 items-center whitespace-nowrap rounded-lg bg-red-500 px-2.5 text-[11px] font-bold text-white transition-colors hover:bg-red-400">
-                  Batal Pesanan
+            {initialData?.id && !isReorder && initialData.payment_status !== 'BATAL' && onCancel ? (
+              <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="flex h-9 items-center whitespace-nowrap rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-bold text-red-300 transition-colors hover:bg-red-500/20">
+                Batalkan Pesanan
+              </button>
+            ) : <span />}
+            <div className="ml-auto flex items-center gap-2">
+              {initialData?.id && !isReorder && (
+                <button type="button" onClick={() => setShowReorderConfirm(true)} title="Buat Sales Order baru dengan menyalin pelanggan dan item dari pesanan ini" className="flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-white/10 bg-white/5 px-2.5 text-[11px] font-medium text-foreground/80 transition-colors hover:bg-white/10 hover:text-foreground">
+                  <RotateCw className="h-3.5 w-3.5" /> Re-order
                 </button>
               )}
-              <button type="button" onClick={handleClose} className="btn-secondary h-9 whitespace-nowrap px-2.5 text-[11px]">Batal</button>
+              <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs">
+                {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                {loading ? 'Memproses...' : requestId ? 'Konfirmasi' : isExistingOrder ? 'Simpan' : 'Simpan SO'}
+              </button>
             </div>
-            <button type="button" onClick={handleSubmit} disabled={loading} className="btn-primary flex h-9 shrink-0 items-center gap-1.5 whitespace-nowrap px-3 text-xs">
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
-              {loading ? 'Memproses...' : requestId ? 'Konfirmasi' : initialData ? 'Simpan' : 'Simpan SO'}
-            </button>
           </footer>
         </aside>
+
+        {showReorderConfirm && (
+          <div className="fixed inset-0 z-[1400] flex items-center justify-center bg-black/65 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setShowReorderConfirm(false)}>
+            <section role="dialog" aria-modal="true" aria-labelledby="reorder-confirm-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-background shadow-2xl">
+              <div className="flex items-center gap-3 border-b border-white/10 bg-white/5 p-4">
+                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-primary/20 bg-primary/10 text-primary"><RotateCw className="h-5 w-5" /></span>
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-primary">Sales Order baru</p>
+                  <h2 id="reorder-confirm-title" className="font-bold text-foreground">Buat draf re-order?</h2>
+                </div>
+              </div>
+              <div className="space-y-3 p-4">
+                <p className="text-sm text-foreground/70">Rincian dari pesanan ini akan disalin ke draf baru:</p>
+                <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/45">Pelanggan</p>
+                      <p className="truncate text-sm font-semibold text-foreground">{localCustomers.find(c => c.customer_code === customerId || c.name === customerId)?.name || customerId || 'Belum dipilih'}</p>
+                    </div>
+                    <div className="shrink-0 text-right">
+                      <p className="text-[10px] font-semibold uppercase tracking-wider text-foreground/45">{items.length} item</p>
+                      <p className="text-sm font-bold text-primary">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-1 border-t border-white/10 pt-2">
+                    {items.slice(0, 3).map((item, index) => (
+                      <div key={item.id || index} className="flex items-start justify-between gap-3 text-xs">
+                        <span className="min-w-0 truncate text-foreground/70">{item.product_search || 'Produk belum dipilih'}</span>
+                        <span className="shrink-0 text-foreground/50">{Number(item.qty || 0).toLocaleString('id-ID')} {item.unit || 'PCS'}</span>
+                      </div>
+                    ))}
+                    {items.length > 3 && <p className="pt-1 text-[11px] text-foreground/45">+ {items.length - 3} item lainnya</p>}
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><span className="text-foreground/45">Tanggal</span><p className="mt-0.5 font-medium text-foreground">Hari ini</p></div>
+                  <div className="rounded-lg border border-white/5 bg-white/[0.03] p-2.5"><span className="text-foreground/45">Pembayaran</span><p className="mt-0.5 font-medium text-foreground">Mulai dari Rp 0</p></div>
+                </div>
+                <p className="rounded-lg border border-green-500/15 bg-green-500/5 px-3 py-2 text-xs text-foreground/60">Pembayaran dan referensi marketplace lama tidak disalin. Pesanan asal tetap utuh.</p>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-white/10 bg-white/5 p-4">
+                <button type="button" onClick={() => setShowReorderConfirm(false)} className="btn-secondary h-9 px-3 text-sm">Kembali</button>
+                <button type="button" onClick={handleReorder} className="btn-primary flex h-9 items-center gap-1.5 px-3 text-sm"><RotateCw className="h-4 w-4" /> Buat Draf Re-order</button>
+              </div>
+            </section>
+          </div>
+        )}
 
         {showAddCustomer && (
           <div className="fixed inset-0 z-[1300] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && setShowAddCustomer(false)}>
@@ -853,43 +923,37 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
                     {/* Urutan 1: Jenis Pesanan */}
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-3">
                       <label className="text-xs font-medium text-foreground/60 mb-1 block">Jenis Pesanan</label>
-                      <CustomSelect
-                        value={item.order_type}
-                        onChange={e => handleItemChange(item.id, 'order_type', e.target.value)}
-                        options={[
-                          { value: "", label: "- Pilih -" },
-                          ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])])).map(v => ({ value: v, label: v }))
-                        ]}
-                      />
-                    </div>
-
-                    <div className="space-y-1">
-                      <label className="text-xs text-foreground/60 block">Kategori</label>
-                      <CustomSelect
-                        value={item.category}
-                        onChange={e => handleItemChange(item.id, 'category', e.target.value)}
-                        options={[
-                          { value: "", label: "Semua Kategori" },
-                          ...getCategoriesForItem(item.order_type).map(c => ({ value: c, label: c }))
-                        ]}
-                        disabled={!item.order_type}
-                      />
+                      <div role="group" aria-label={`Jenis pesanan item ${index + 1}`} className="flex flex-wrap gap-1.5">
+                        {orderTypes.map(type => {
+                          const isSelected = item.order_type === type
+                          return (
+                            <button
+                              key={type}
+                              type="button"
+                              aria-pressed={isSelected}
+                              onClick={() => handleItemChange(item.id, 'order_type', type)}
+                              className={`h-8 rounded-lg border px-3 text-xs font-semibold transition-colors ${isSelected ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-foreground/70 hover:border-primary/40 hover:text-foreground'}`}
+                            >
+                              {type}
+                            </button>
+                          )
+                        })}
+                      </div>
                     </div>
 
                     {/* Urutan 3: Ukuran/Produk */}
-                    <div className="space-y-2">
-                      <label className="text-xs font-medium text-foreground/80">Ukuran / Produk</label>
-                      <CustomSelect
+                    <div className="space-y-2 md:col-span-3">
+                      <label className="text-xs font-medium text-foreground/80">Cari Produk</label>
+                      <SuggestField
                         value={item.product_search}
                         onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
-                        options={[
-                          { value: "", label: "Ketik/Pilih Produk..." },
-                          ...products.filter(p => p.category === item.category && (p.is_active !== false || p.name === item.product_search)).map(p => ({ value: p.name, label: p.name }))
-                        ]}
-                        searchable={true}
-                        disabled={!item.category}
+                        options={products
+                          .filter(p => getCategoriesForItem(item.order_type).includes(p.category) && (p.is_active !== false || p.name === item.product_search))
+                          .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))}
+                        placeholder="Ketik produk atau kategori..."
+                        disabled={!item.order_type}
                       />
                     </div>
 

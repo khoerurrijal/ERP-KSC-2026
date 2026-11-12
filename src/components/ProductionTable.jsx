@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect, useCallback } from 'react'
+import { Fragment, useState, useMemo, useEffect, useCallback } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
 
@@ -32,7 +32,7 @@ const getStatusColor = (st) => {
   return 'bg-white/10 text-foreground border-white/20'
 }
 
-export default function ProductionTable({ productionJobs, operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
+export default function ProductionTable({ productionJobs, productionHistory = [], operators = [], currentUser = '', userRole = 'Operator', currentUserName = '', initialTab = null, hideTabs = false, showAccumulationTab = false, hideHeader = false, title = 'Produksi', initialSearch = '' }) {
   const { canAccess } = useRoleAccess()
   const router = useRouter()
   const pathname = usePathname()
@@ -66,6 +66,8 @@ export default function ProductionTable({ productionJobs, operators = [], curren
   const [zoomImage, setZoomImage] = useState(null)
 
   const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
+  const [accumulationSort, setAccumulationSort] = useState({ key: 'qty', direction: 'desc' })
+  const [expandedEmployeeId, setExpandedEmployeeId] = useState(null)
 
   const [soPage, setSoPage] = useState(1)
   const [prodPage, setProdPage] = useState(1)
@@ -120,31 +122,34 @@ export default function ProductionTable({ productionJobs, operators = [], curren
        matchesSearchText(j.item_status, normalizedSearch))
     )
 
+    const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
     result.sort((a, b) => {
-      let valA, valB
-      if (sortConfig.key === 'customer') {
-        valA = a.sales_order_items?.sales_orders?.customers?.name || ''
-        valB = b.sales_order_items?.sales_orders?.customers?.name || ''
-      } else if (sortConfig.key === 'product') {
-        valA = a.sales_order_items?.products?.name || ''
-        valB = b.sales_order_items?.products?.name || ''
-      } else if (sortConfig.key === 'target_date') {
-        valA = a.target_date || ''
-        valB = b.target_date || ''
-      } else if (sortConfig.key === 'item_status') {
-        valA = a.item_status || ''
-        valB = b.item_status || ''
-      } else if (sortConfig.key === 'qty_target') {
-        valA = a.qty_target || 0
-        valB = b.qty_target || 0
+      let comparison = 0
+      if (sortConfig.key === 'qty_target') {
+        comparison = Number(a.qty_target || 0) - Number(b.qty_target || 0)
       } else {
-        valA = a[sortConfig.key]
-        valB = b[sortConfig.key]
-      }
+        let valueA
+        let valueB
+        if (sortConfig.key === 'customer') {
+          valueA = a.sales_order_items?.sales_orders?.customers?.name || ''
+          valueB = b.sales_order_items?.sales_orders?.customers?.name || ''
+        } else if (sortConfig.key === 'product') {
+          valueA = a.sales_order_items?.products?.name || ''
+          valueB = b.sales_order_items?.products?.name || ''
+        } else {
+          valueA = a[sortConfig.key] || ''
+          valueB = b[sortConfig.key] || ''
+        }
 
-      if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1
-      if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
+        if (sortConfig.key === 'target_date') {
+          const dateA = Date.parse(valueA)
+          const dateB = Date.parse(valueB)
+          comparison = (Number.isFinite(dateA) ? dateA : 0) - (Number.isFinite(dateB) ? dateB : 0)
+        } else {
+          comparison = collator.compare(String(valueA), String(valueB))
+        }
+      }
+      return sortConfig.direction === 'asc' ? comparison : -comparison
     })
 
     return result
@@ -171,6 +176,69 @@ export default function ProductionTable({ productionJobs, operators = [], curren
     const start = (soPage - 1) * pageSize
     return trackingSoItems.slice(start, start + pageSize)
   }, [trackingSoItems, soPage, pageSize])
+
+  const canSeeAccumulationTab = showAccumulationTab && canSeeProductionTab && ['Owner', 'Admin'].includes(userRole)
+  const productionAccumulation = useMemo(() => {
+    const groups = new Map()
+    const matchingLogs = (productionHistory || []).filter(log =>
+      !normalizedSearch ||
+      matchesSearchText(log.employee_name, normalizedSearch) ||
+      matchesSearchText(log.product_name, normalizedSearch) ||
+      matchesSearchText(log.customer_name, normalizedSearch) ||
+      matchesSearchText(log.invoice_number, normalizedSearch)
+    )
+
+    matchingLogs.forEach(log => {
+      const key = String(log.employee_id || 'unknown')
+      if (!groups.has(key)) {
+        groups.set(key, {
+          employee_id: key,
+          employee_name: log.employee_name || 'Karyawan tidak diketahui',
+          qty: 0,
+          log_count: 0,
+          latest_at: log.created_at,
+          logs: []
+        })
+      }
+      const group = groups.get(key)
+      group.qty += Number(log.qty_processed || 0)
+      group.log_count += 1
+      if (Date.parse(log.created_at || '') > Date.parse(group.latest_at || '')) group.latest_at = log.created_at
+      group.logs.push(log)
+    })
+
+    const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
+    return [...groups.values()].sort((a, b) => {
+      let comparison = 0
+      if (accumulationSort.key === 'qty') comparison = a.qty - b.qty
+      else if (accumulationSort.key === 'logs') comparison = a.log_count - b.log_count
+      else if (accumulationSort.key === 'latest') comparison = Date.parse(a.latest_at || '') - Date.parse(b.latest_at || '')
+      else comparison = collator.compare(a.employee_name, b.employee_name)
+      if (comparison === 0) comparison = collator.compare(a.employee_name, b.employee_name)
+      return accumulationSort.direction === 'asc' ? comparison : -comparison
+    })
+  }, [productionHistory, normalizedSearch, accumulationSort])
+
+  const handleAccumulationSort = (key) => {
+    setAccumulationSort(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }))
+  }
+
+  const renderAccumulationSortIcon = (key) => {
+    if (accumulationSort.key !== key) return null
+    return accumulationSort.direction === 'asc'
+      ? <ChevronUp className="ml-1 inline h-3 w-3" />
+      : <ChevronDown className="ml-1 inline h-3 w-3" />
+  }
+
+  const accumulationTotals = useMemo(() => productionAccumulation.reduce((totals, group) => ({
+    qty: totals.qty + group.qty,
+    logs: totals.logs + group.log_count
+  }), { qty: 0, logs: 0 }), [productionAccumulation])
+  const unassignedGroup = productionAccumulation.find(group => group.employee_id === 'unassigned')
+  const namedEmployeeCount = productionAccumulation.filter(group => group.employee_id !== 'unassigned').length
 
   const handleOpenModal = (job) => {
     setSelectedJob(job)
@@ -285,20 +353,39 @@ export default function ProductionTable({ productionJobs, operators = [], curren
       </div>}
 
       {/* Tabs */}
-      {!hideTabs && (canSeeOrdersTab || canSeeProductionTab) && (
+      {(canSeeAccumulationTab || (!hideTabs && (canSeeOrdersTab || canSeeProductionTab))) && (
         <div className="flex items-center gap-1 border-b border-white/10 pb-1 overflow-x-auto hide-scrollbar">
-          {canSeeOrdersTab && <button
-            onClick={() => setActiveTab('SO')} 
-            className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
-          >
-            Tracking Sales Order
-          </button>}
-          {canSeeProductionTab && <button
-            onClick={() => setActiveTab('PRODUKSI')} 
-            className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
-          >
-            Tracking Produksi
-          </button>}
+          {canSeeAccumulationTab ? (
+            <>
+              <button
+                onClick={() => setActiveTab('PRODUKSI')}
+                className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+              >
+                Antrean Produksi
+              </button>
+              <button
+                onClick={() => setActiveTab('AKUMULASI')}
+                className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'AKUMULASI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+              >
+                Akumulasi Produksi
+              </button>
+            </>
+          ) : (
+            <>
+              {canSeeOrdersTab && <button
+                onClick={() => setActiveTab('SO')}
+                className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'SO' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+              >
+                Tracking Sales Order
+              </button>}
+              {canSeeProductionTab && <button
+                onClick={() => setActiveTab('PRODUKSI')}
+                className={`pb-2 px-3 text-xs sm:text-sm font-bold transition-colors whitespace-nowrap ${activeTab === 'PRODUKSI' ? 'text-primary border-b-2 border-primary' : 'text-foreground/50 hover:text-foreground'}`}
+              >
+                Tracking Produksi
+              </button>}
+            </>
+          )}
         </div>
       )}
 
@@ -358,6 +445,114 @@ export default function ProductionTable({ productionJobs, operators = [], curren
               >
                 Next
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="glass-card p-4">
+              <p className="text-xs text-foreground/50">Total Diproduksi</p>
+              <p className="mt-1 text-xl font-bold text-green-400">{formatMobileQuantity(accumulationTotals.qty)} pcs</p>
+            </div>
+            <div className="glass-card p-4">
+              <p className="text-xs text-foreground/50">Karyawan Tercatat</p>
+              <p className="mt-1 text-xl font-bold text-foreground">{namedEmployeeCount}</p>
+            </div>
+            <div className="glass-card p-4">
+              <p className="text-xs text-foreground/50">Catatan Produksi</p>
+              <p className="mt-1 text-xl font-bold text-foreground">{formatMobileQuantity(accumulationTotals.logs)}</p>
+            </div>
+            <div className="glass-card p-4">
+              <p className="text-xs text-foreground/50">Tanpa Operator</p>
+              <p className={`mt-1 text-xl font-bold ${unassignedGroup?.log_count ? 'text-amber-400' : 'text-foreground'}`}>
+                {formatMobileQuantity(unassignedGroup?.log_count || 0)} catatan
+              </p>
+              <p className="mt-1 text-xs text-foreground/45">{formatMobileQuantity(unassignedGroup?.qty || 0)} pcs belum teratribusi</p>
+            </div>
+          </div>
+
+          <div className="glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[680px] text-left text-sm">
+                <thead className="border-b border-white/10 bg-white/5 text-xs uppercase text-foreground/60">
+                  <tr>
+                    <th className="px-4 py-3">
+                      <button type="button" onClick={() => handleAccumulationSort('name')} className="font-semibold hover:text-foreground">
+                        Karyawan {renderAccumulationSortIcon('name')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3">
+                      <button type="button" onClick={() => handleAccumulationSort('qty')} className="font-semibold hover:text-foreground">
+                        Total Produksi {renderAccumulationSortIcon('qty')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3">
+                      <button type="button" onClick={() => handleAccumulationSort('logs')} className="font-semibold hover:text-foreground">
+                        Catatan {renderAccumulationSortIcon('logs')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3">
+                      <button type="button" onClick={() => handleAccumulationSort('latest')} className="font-semibold hover:text-foreground">
+                        Terakhir Produksi {renderAccumulationSortIcon('latest')}
+                      </button>
+                    </th>
+                    <th className="px-4 py-3 text-right">Rincian</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/5">
+                  {productionAccumulation.length === 0 ? (
+                    <tr><td colSpan="5" className="px-6 py-12 text-center text-foreground/45">Belum ada catatan produksi yang cocok.</td></tr>
+                  ) : productionAccumulation.map(group => {
+                    const isExpanded = expandedEmployeeId === group.employee_id
+                    return (
+                      <Fragment key={group.employee_id}>
+                        <tr className="hover:bg-white/5">
+                          <td className="px-4 py-3 font-semibold text-foreground">{group.employee_name}</td>
+                          <td className="px-4 py-3 font-bold text-green-400">{formatMobileQuantity(group.qty)} pcs</td>
+                          <td className="px-4 py-3 text-foreground/70">{formatMobileQuantity(group.log_count)}</td>
+                          <td className="px-4 py-3 text-foreground/70">
+                            {group.latest_at ? new Date(group.latest_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <button
+                              type="button"
+                              aria-expanded={isExpanded}
+                              onClick={() => setExpandedEmployeeId(isExpanded ? null : group.employee_id)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-foreground/75 hover:bg-white/5 hover:text-foreground"
+                            >
+                              {isExpanded ? 'Tutup' : 'Lihat'}
+                              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                            </button>
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr>
+                            <td colSpan="5" className="bg-black/15 px-4 py-3">
+                              <div className="space-y-2">
+                                {group.logs.map((log, index) => (
+                                  <div key={log.id || `${group.employee_id}-${log.created_at}-${index}`} className="grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+                                    <span className="text-foreground/50">
+                                      {log.created_at ? new Date(log.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                    </span>
+                                    <span className="min-w-0 text-foreground/75">
+                                      <span className="font-semibold text-foreground">{log.product_name}</span>
+                                      <span className="block truncate text-foreground/45">{log.customer_name} · {log.invoice_number}</span>
+                                    </span>
+                                    <span className="font-bold text-green-400">{formatMobileQuantity(log.qty_processed)} pcs</span>
+                                  </div>
+                                ))}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>

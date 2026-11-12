@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
 import { createAdminNotification } from '@/lib/adminNotifications'
+import { formatVirtualProductDescription } from '@/utils/virtualTransactionDescription'
 
 export async function createSalesOrder(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
@@ -64,9 +65,11 @@ export async function createSalesOrder(payload) {
     let totalHppGudang = 0;
     let totalHppGlobal = 0;
     let virtualRoyaltyGlobal = 0;
+    const gudangProducts = []
+    const globalProducts = []
     
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single();
 
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
       
@@ -80,15 +83,20 @@ export async function createSalesOrder(payload) {
         profitGlobalPct
       });
 
+      const productDetail = { name: product?.name || item.product_id, qty: item.qty, unit: item.unit }
+      let usesGlobal = Number(snapshot.royaltyFee || 0) > 0
       if (product) {
         if (product.workshop_code === 'GUDANG') {
           totalHppGudang += snapshot.beliGudang;
+          if (Number(snapshot.beliGudang || 0) > 0) gudangProducts.push(productDetail)
         }
         if (product.workshop_code === 'GLOBAL') {
           totalHppGlobal += snapshot.beliGlobal - snapshot.royaltyFee;
+          if (Number(snapshot.beliGlobal - snapshot.royaltyFee) > 0) usesGlobal = true
         }
       }
       virtualRoyaltyGlobal += snapshot.royaltyFee;
+      if (usesGlobal) globalProducts.push(productDetail)
     }
     
     const finalBeliGlobal = totalHppGlobal + virtualRoyaltyGlobal;
@@ -191,7 +199,7 @@ export async function createSalesOrder(payload) {
         const { error: hppInError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
-          description: `Alokasi HPP Cup/Barang Gudang - ${invoiceNumber}`,
+          description: formatVirtualProductDescription('GUDANG', gudangProducts),
           payment_method: 'Virtual',
           amount_in: totalHppGudang,
           workshop_code: 'GUDANG',
@@ -201,8 +209,8 @@ export async function createSalesOrder(payload) {
         // King effectively "pays" this from its balance
         const { error: hppOutError } = await supabase.from('transactions').insert({
           date: orderDate,
-          reference: null,
-          description: `Potongan HPP untuk Gudang - ${invoiceNumber}`,
+          reference: 'BAYAR KE GUDANG',
+          description: formatVirtualProductDescription('KING KE GUDANG', gudangProducts),
           payment_method: 'Virtual',
           amount_out: totalHppGudang,
           workshop_code: 'KING',
@@ -217,7 +225,7 @@ export async function createSalesOrder(payload) {
         const { error: globalInError } = await supabase.from('transactions').insert({
           date: orderDate,
           reference: null,
-          description: `Alokasi HPP Bahan & Royalty - ${invoiceNumber}`,
+          description: formatVirtualProductDescription('GLOBAL', globalProducts),
           payment_method: 'Virtual',
           amount_in: totalUntukGlobal,
           workshop_code: 'GLOBAL',
@@ -226,8 +234,8 @@ export async function createSalesOrder(payload) {
         if (globalInError) throw new Error('Gagal mencatat alokasi HPP Global: ' + globalInError.message)
         const { error: globalOutError } = await supabase.from('transactions').insert({
           date: orderDate,
-          reference: null,
-          description: `Potongan HPP/Royalty untuk Global - ${invoiceNumber}`,
+          reference: 'BAYAR KE GLOBAL',
+          description: formatVirtualProductDescription('KING KE GLOBAL', globalProducts),
           payment_method: 'Virtual',
           amount_out: totalUntukGlobal,
           workshop_code: 'KING',
@@ -314,11 +322,10 @@ export async function addSalesPayment(soId, paymentData) {
 
 
     // Insert Transaction
-    const custName = so.customers?.name || so.customer_code
     const { error: paymentTransactionError } = await supabase.from('transactions').insert({
       date: paymentDate,
       reference: 'PENJUALAN',
-      description: `Pembayaran ${paymentStatus} - ${custName}`,
+      description: paymentStatus,
       payment_method: paymentMethod,
       amount_in: normalizedPaymentAmount,
       amount_out: 0,
@@ -329,31 +336,39 @@ export async function addSalesPayment(soId, paymentData) {
 
     // If it becomes LUNAS just now, distribute HPP!
     if (paymentStatus === 'LUNAS' && so.payment_status !== 'LUNAS') {
-      const { data: items } = await supabase.from('sales_items').select('beli_gudang, beli_global').eq('so_id', so.id)
+      const { data: items } = await supabase.from('sales_items').select('beli_gudang, beli_global, royalty_fee, product_code, qty, unit, products(name)').eq('so_id', so.id)
       
       let totalHppGudang = 0
       let totalUntukGlobal = 0
+      const gudangProducts = []
+      const globalProducts = []
 
       if (items) {
         items.forEach(item => {
-          totalHppGudang += Number(item.beli_gudang || 0)
-          totalUntukGlobal += Number(item.beli_global || 0)
+          const warehouseAmount = Number(item.beli_gudang || 0)
+          const globalAmount = Number(item.beli_global || 0)
+          const royaltyAmount = Number(item.royalty_fee || 0)
+          const productDetail = { name: item.products?.name || item.product_code, qty: item.qty, unit: item.unit }
+          totalHppGudang += warehouseAmount
+          totalUntukGlobal += globalAmount + royaltyAmount
+          if (warehouseAmount > 0) gudangProducts.push(productDetail)
+          if (globalAmount > 0 || royaltyAmount > 0) globalProducts.push(productDetail)
         })
       }
 
       // Record HPP to Gudang
       if (totalHppGudang > 0) {
         await supabase.from('transactions').insert([
-          { date: paymentDate, description: `Alokasi HPP Cup/Barang Gudang - ${so.invoice_number}`, payment_method: 'Virtual', amount_in: totalHppGudang, workshop_code: 'GUDANG', so_id: so.id },
-          { date: paymentDate, description: `Potongan HPP untuk Gudang - ${so.invoice_number}`, payment_method: 'Virtual', amount_out: totalHppGudang, workshop_code: 'KING', so_id: so.id }
+          { date: paymentDate, description: formatVirtualProductDescription('GUDANG', gudangProducts), payment_method: 'Virtual', amount_in: totalHppGudang, workshop_code: 'GUDANG', so_id: so.id },
+          { date: paymentDate, reference: 'BAYAR KE GUDANG', description: formatVirtualProductDescription('KING KE GUDANG', gudangProducts), payment_method: 'Virtual', amount_out: totalHppGudang, workshop_code: 'KING', so_id: so.id }
         ])
       }
 
       // Record HPP & Royalty to Global
       if (totalUntukGlobal > 0) {
         await supabase.from('transactions').insert([
-          { date: paymentDate, description: `Alokasi HPP Bahan & Royalty - ${so.invoice_number}`, payment_method: 'Virtual', amount_in: totalUntukGlobal, workshop_code: 'GLOBAL', so_id: so.id },
-          { date: paymentDate, description: `Potongan HPP/Royalty untuk Global - ${so.invoice_number}`, payment_method: 'Virtual', amount_out: totalUntukGlobal, workshop_code: 'KING', so_id: so.id }
+          { date: paymentDate, description: formatVirtualProductDescription('GLOBAL', globalProducts), payment_method: 'Virtual', amount_in: totalUntukGlobal, workshop_code: 'GLOBAL', so_id: so.id },
+          { date: paymentDate, reference: 'BAYAR KE GLOBAL', description: formatVirtualProductDescription('KING KE GLOBAL', globalProducts), payment_method: 'Virtual', amount_out: totalUntukGlobal, workshop_code: 'KING', so_id: so.id }
         ])
       }
     }
@@ -424,6 +439,8 @@ export async function updateSalesOrder(soId, payload) {
     let totalBeliGudang = 0
     let totalBeliGlobal = 0
     let virtualRoyaltyGlobal = 0
+    const gudangProducts = []
+    const globalProducts = []
     
     const preparedItems = []
     const legacyAddonCodes = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WARNA', 'BIAYA-WARNA'])
@@ -454,15 +471,21 @@ export async function updateSalesOrder(soId, payload) {
         profitGlobalPct
       });
 
+      const productDetail = { name: product?.name || item.product_id, qty: item.qty, unit: item.unit }
+      let usesGlobal = Number(snapshot.royaltyFee || 0) > 0
       if (product) {
         if (product.workshop_code === 'GUDANG') {
           totalBeliGudang += snapshot.beliGudang
+          if (Number(snapshot.beliGudang || 0) > 0) gudangProducts.push(productDetail)
         }
         if (product.workshop_code === 'GLOBAL') {
-          totalBeliGlobal += snapshot.beliGlobal - snapshot.royaltyFee
+          const globalHpp = snapshot.beliGlobal - snapshot.royaltyFee
+          totalBeliGlobal += globalHpp
+          if (Number(globalHpp || 0) > 0) usesGlobal = true
         }
       }
       virtualRoyaltyGlobal += snapshot.royaltyFee
+      if (usesGlobal) globalProducts.push(productDetail)
 
       const legacyFastTrack = legacyAddons.some(addon => ['SRV-FAST-TRACK', 'FAST-TRACK'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
       const legacyTwoColor = legacyAddons.some(addon => ['SRV-2-WARNA', 'BIAYA-WARNA'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
@@ -542,14 +565,14 @@ export async function updateSalesOrder(soId, payload) {
 
       if (totalBeliGudang > 0) {
         await supabase.from('transactions').insert([
-          { date: orderOriginalDate, description: `Alokasi HPP Cup/Barang Gudang - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_in: totalBeliGudang, workshop_code: 'GUDANG', so_id: soId },
-          { date: orderOriginalDate, description: `Potongan HPP untuk Gudang - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_out: totalBeliGudang, workshop_code: 'KING', so_id: soId }
+          { date: orderOriginalDate, description: formatVirtualProductDescription('GUDANG', gudangProducts), payment_method: 'Virtual', amount_in: totalBeliGudang, workshop_code: 'GUDANG', so_id: soId },
+          { date: orderOriginalDate, reference: 'BAYAR KE GUDANG', description: formatVirtualProductDescription('KING KE GUDANG', gudangProducts), payment_method: 'Virtual', amount_out: totalBeliGudang, workshop_code: 'KING', so_id: soId }
         ]);
       }
       if (finalBeliGlobal > 0) {
         await supabase.from('transactions').insert([
-          { date: orderOriginalDate, description: `Alokasi HPP Bahan & Royalty - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_in: finalBeliGlobal, workshop_code: 'GLOBAL', so_id: soId },
-          { date: orderOriginalDate, description: `Potongan HPP/Royalty untuk Global - ${invoiceNumber} (Update)`, payment_method: 'Virtual', amount_out: finalBeliGlobal, workshop_code: 'KING', so_id: soId }
+          { date: orderOriginalDate, description: formatVirtualProductDescription('GLOBAL', globalProducts), payment_method: 'Virtual', amount_in: finalBeliGlobal, workshop_code: 'GLOBAL', so_id: soId },
+          { date: orderOriginalDate, reference: 'BAYAR KE GLOBAL', description: formatVirtualProductDescription('KING KE GLOBAL', globalProducts), payment_method: 'Virtual', amount_out: finalBeliGlobal, workshop_code: 'KING', so_id: soId }
         ]);
       }
     }

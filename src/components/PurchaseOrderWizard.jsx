@@ -420,14 +420,22 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
                     <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
                       <div className="space-y-1 sm:col-span-2">
                         <label className="block text-[10px] text-foreground/60">Tujuan</label>
-                        <CustomSelect
-                          value={item.workshop_id}
-                          onChange={e => handleItemChange(item.id, 'workshop_id', e.target.value)}
-                          options={[
-                            { value: "", label: "Pilih Workshop..." },
-                            ...workshops.filter(ws => ws.code === 'GUDANG' || ws.code === 'GLOBAL').map(ws => ({ value: ws.id, label: ws.name }))
-                          ]}
-                        />
+                        <div role="group" aria-label={`Tujuan item ${index + 1}`} className="flex flex-wrap gap-1.5">
+                          {workshops.filter(ws => ws.code === 'GUDANG' || ws.code === 'GLOBAL').map(ws => {
+                            const isSelected = item.workshop_id === ws.id
+                            return (
+                              <button
+                                key={ws.id}
+                                type="button"
+                                aria-pressed={isSelected}
+                                onClick={() => handleItemChange(item.id, 'workshop_id', ws.id)}
+                                className={`h-8 rounded-lg border px-2.5 text-[11px] font-semibold transition-colors ${isSelected ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-background/40 text-foreground/70 hover:border-primary/40 hover:text-foreground'}`}
+                              >
+                                {ws.name}
+                              </button>
+                            )
+                          })}
+                        </div>
                       </div>
 
                       <div className="relative space-y-1 sm:col-span-2">

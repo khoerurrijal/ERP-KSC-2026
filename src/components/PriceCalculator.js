@@ -25,8 +25,9 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
   }
 
   const filteredCategories = getCategoriesForItem(orderType)
-  const filteredProducts = products.filter(p => p.category === category)
+  const filteredProducts = products.filter(p => filteredCategories.includes(p.category))
   const selectedProduct = products.find(p => p.id?.toString() === productId?.toString())
+  const orderTypes = Array.from(new Set(dropdownConfig.order_type || ['SABLON', 'POLOS']))
 
   // Calculate Main Item Price
   const isSablon = orderType?.toUpperCase() === 'SABLON'
@@ -92,41 +93,49 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
       </div>
       
       <div className="p-4 flex flex-col gap-4 flex-1">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1 col-span-2">
             <label className="text-xs font-medium text-foreground/60">Jenis Pesanan</label>
-            <CustomSelect 
-              value={orderType} 
-              onChange={e => { setOrderType(e.target.value); setCategory(''); setProductId(''); }} 
-              options={[
-                { value: "", label: "- Pilih -" },
-                ...Array.from(new Set([...(dropdownConfig.order_type || ["SABLON", "POLOS"])])).map(v => ({ value: v, label: v }))
-              ]} 
-            />
+            <div role="group" aria-label="Jenis Pesanan" className="flex flex-wrap gap-1.5">
+              {orderTypes.map(type => {
+                const isSelected = orderType === type
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    aria-pressed={isSelected}
+                    onClick={() => {
+                      setOrderType(type)
+                      setCategory('')
+                      setProductId('')
+                      setUnit('PCS')
+                    }}
+                    className={`h-7 rounded-lg border px-2.5 text-[10px] font-semibold transition-colors ${isSelected ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-foreground/70 hover:border-primary/40 hover:text-foreground'}`}
+                  >
+                    {type}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
-          <div className="space-y-1 col-span-2 md:col-span-1">
-            <label className="text-xs font-medium text-foreground/60">Kategori</label>
-            <CustomSelect 
-              value={category} 
-              onChange={(e) => { setCategory(e.target.value); setProductId(''); }} 
-              options={[
-                { value: "", label: "- Pilih -" },
-                ...filteredCategories.map(c => ({ value: c, label: c }))
-              ]} 
-              disabled={!orderType}
-            />
-          </div>
-
-          <div className="space-y-1 col-span-2 md:col-span-1">
-            <label className="text-xs font-medium text-foreground/60">Produk</label>
+          <div className="space-y-1 col-span-2">
+            <label className="text-xs font-medium text-foreground/60">Cari Produk</label>
             <CustomSelect 
               value={productId} 
-              onChange={(e) => { setProductId(e.target.value); setUnit('PCS'); }} 
+              searchable
+              placeholder="Cari produk..."
+              onChange={(e) => {
+                const nextProductId = e.target.value
+                const nextProduct = products.find(p => p.id?.toString() === nextProductId?.toString())
+                setProductId(nextProductId)
+                setCategory(nextProduct?.category || '')
+                setUnit('PCS')
+              }}
               options={[
-                { value: "", label: "- Pilih -" },
-                ...filteredProducts.map(p => ({ value: p.id, label: p.name }))
+                ...filteredProducts.map(p => ({ value: p.id, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
               ]} 
+              disabled={!orderType}
             />
           </div>
 

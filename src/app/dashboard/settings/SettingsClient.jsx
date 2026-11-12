@@ -21,14 +21,21 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
   const defaultDropdowns = {
     payment_method: ["BCA", "MANDIRI", "CASH"],
     payment_status_po: ["TEMPO", "LUNAS"],
-    transaction_reference: ["PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "HPP GUDANG", "BAYAR HPP GUDANG", "LAIN-LAIN"],
+    transaction_reference: ["PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "LAIN-LAIN"],
     customer_type: ["REGULLER", "RESELLER", "SHOPEE", "TOKOPEDIA"],
     order_type: ["SABLON", "POLOS"],
     kas_account: ["KING", "GLOBAL", "GUDANG", "TABUNGAN"],
     production_status: ["DRAFT", "BARU MASUK", "SIAP PROSES", "PROSES", "SUDAH JADI", "SIAP KIRIM", "DIKIRIM", "SUDAH DIAMBIL", "SELESAI"],
     category_mapping: {}
   }
-  const mergedDropdowns = { ...defaultDropdowns, ...(initialSettings.dropdown_config || {}) }
+  const excludedTransactionReferences = ['HPP GUDANG', 'BAYAR HPP GUDANG']
+  const storedDropdowns = initialSettings.dropdown_config || {}
+  const mergedDropdowns = {
+    ...defaultDropdowns,
+    ...storedDropdowns,
+    transaction_reference: (storedDropdowns.transaction_reference || defaultDropdowns.transaction_reference)
+      .filter(reference => !excludedTransactionReferences.includes(String(reference).trim().toUpperCase()))
+  }
   const [dropdowns, setDropdowns] = useState(mergedDropdowns)
   
   // State for Cashflow

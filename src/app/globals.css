@@ -771,6 +771,37 @@ html body .dashboard-lightweight-decor {
   100% { background-position: 0% 100%; }
 }
 
+@keyframes copy-link-shimmer-sweep {
+  from { background-position: 100% 50%, 50% 50%; }
+  to { background-position: 0 50%, 50% 50%; }
+}
+
+.copy-link-shimmer {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.copy-link-shimmer:not([data-copied="true"]) {
+  background-image: linear-gradient(110deg, transparent 22%, rgba(255, 255, 255, 0.2) 36%, rgba(255, 255, 255, 0.68) 43%, rgba(255, 255, 255, 0.2) 50%, transparent 64%), linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.14) 44%, rgba(255, 255, 255, 0.35) 50%, rgba(255, 255, 255, 0.14) 56%, transparent 70%);
+  background-size: 220% 100%, 100% 100%;
+  background-position: 100% 50%, 50% 50%;
+  animation: copy-link-shimmer-sweep 1.35s ease-in-out infinite;
+  box-shadow: 0 0 0 1px rgba(255, 220, 91, 0.4), 0 3px 10px rgba(255, 193, 7, 0.24);
+}
+
+.copy-link-shimmer[data-copied="true"] {
+  animation: none;
+  background-image: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .copy-link-shimmer:not([data-copied="true"]) {
+    animation: none;
+    background-position: 50% 50%, 50% 50%;
+  }
+}
+
 /* Shared surface, input, and action primitives used throughout the app. */
 @layer utilities {
   .glass-card {

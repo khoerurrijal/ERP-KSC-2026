@@ -41,8 +41,9 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     query = query.eq('workshop_code', workshop)
   }
 
-  const validSortKey = ['name', 'product_code', 'category', 'physical_stock', 'safety_stock'].includes(sortKey) ? sortKey : 'name'
-  query = query.order(validSortKey, { ascending: sortDir === 'asc' })
+  const validSortKey = ['name', 'product_code', 'category', 'physical_stock', 'safety_stock', 'stock_qty', 'workshop'].includes(sortKey) ? sortKey : 'name'
+  const sortColumn = validSortKey === 'workshop' ? 'workshop_code' : validSortKey
+  query = query.order(sortColumn, { ascending: sortDir === 'asc' })
 
   const start = (page - 1) * pageSize
   const end = start + pageSize - 1

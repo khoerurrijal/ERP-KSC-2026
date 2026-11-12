@@ -3,6 +3,7 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
+import { formatVirtualProductDescription } from '@/utils/virtualTransactionDescription'
 
 async function requireMarketplaceAdmin() {
   return createAuthorizedAdminClient(
@@ -149,6 +150,8 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
     let totalHppGudang = 0
     let totalHppGlobal = 0
     let virtualRoyaltyGlobal = 0
+    const gudangProducts = []
+    const globalProducts = []
 
     for (const order of pendingOrders) {
       const pencairanAmount = activePencairan.find(d => d.orderId === order.id)?.amount || 0
@@ -170,13 +173,19 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
       // Ambil items: gunakan beli_gudang/beli_global yang precomputed saat SO dibuat
       const { data: soItems } = await supabase
         .from('sales_items')
-        .select('beli_gudang, beli_global, royalty_fee')
+        .select('beli_gudang, beli_global, royalty_fee, product_code, qty, unit, products(name)')
         .eq('so_id', order.id)
 
       for (const item of (soItems || [])) {
-        totalHppGudang += Number(item.beli_gudang || 0)
-        totalHppGlobal += Number(item.beli_global || 0)
-        virtualRoyaltyGlobal += Number(item.royalty_fee || 0)
+        const warehouseAmount = Number(item.beli_gudang || 0)
+        const globalAmount = Number(item.beli_global || 0)
+        const royaltyAmount = Number(item.royalty_fee || 0)
+        const productDetail = { name: item.products?.name || item.product_code, qty: item.qty, unit: item.unit }
+        totalHppGudang += warehouseAmount
+        totalHppGlobal += globalAmount
+        virtualRoyaltyGlobal += royaltyAmount
+        if (warehouseAmount > 0) gudangProducts.push(productDetail)
+        if (globalAmount > 0 || royaltyAmount > 0) globalProducts.push(productDetail)
       }
     }
 
@@ -186,7 +195,7 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
         {
           date: settlementDate,
           reference: null,
-          description: `Alokasi HPP Cup/Barang Gudang (Marketplace) - ${pendingOrders.length} Pesanan`,
+          description: formatVirtualProductDescription('GUDANG', gudangProducts),
           payment_method: 'Virtual',
           amount_in: totalHppGudang,
           amount_out: 0,
@@ -194,8 +203,8 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
         },
         {
           date: settlementDate,
-          reference: null,
-          description: `Potongan HPP untuk Gudang (Marketplace) - ${pendingOrders.length} Pesanan`,
+          reference: 'BAYAR KE GUDANG',
+          description: formatVirtualProductDescription('KING KE GUDANG', gudangProducts),
           payment_method: 'Virtual',
           amount_in: 0,
           amount_out: totalHppGudang,
@@ -211,7 +220,7 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
         {
           date: settlementDate,
           reference: null,
-          description: `Alokasi HPP Bahan & Royalty (Marketplace) - ${pendingOrders.length} Pesanan`,
+          description: formatVirtualProductDescription('GLOBAL', globalProducts),
           payment_method: 'Virtual',
           amount_in: totalUntukGlobal,
           amount_out: 0,
@@ -219,8 +228,8 @@ export async function processMarketplaceSettlement(settlementData, paymentMethod
         },
         {
           date: settlementDate,
-          reference: null,
-          description: `Potongan HPP/Royalty untuk Global (Marketplace) - ${pendingOrders.length} Pesanan`,
+          reference: 'BAYAR KE GLOBAL',
+          description: formatVirtualProductDescription('KING KE GLOBAL', globalProducts),
           payment_method: 'Virtual',
           amount_in: 0,
           amount_out: totalUntukGlobal,

@@ -21,6 +21,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
   const invoiceId = order.invoice_number
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
+  const canShowQris = Number(order.total_amount || 0) <= 500000
   const invoiceItems = getInvoiceBaseItems(order.sales_items)
   const additionalCharges = getInvoiceAdditionalCharges(order.sales_items)
 
@@ -48,7 +49,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
 
   return (
     <>
-      {isQrisOpen && (
+      {isQrisOpen && canShowQris && (
         <div className="fixed inset-0 z-[1200] bg-black/90 flex flex-col items-center justify-center p-4 backdrop-blur-sm animate-in fade-in" onClick={event => event.target === event.currentTarget && setIsQrisOpen(false)}>
           <Image src="/qris.png" alt="QRIS Full" width={900} height={900} className="max-w-full max-h-[60vh] object-contain rounded-xl bg-white p-2" />
           <div className="mt-8 flex flex-wrap justify-center gap-4">
@@ -107,8 +108,6 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
             <div className="mb-2">
               <Image src={store.logo_url || '/logo.png'} alt="Logo" width={400} height={160} unoptimized className="h-12 sm:h-16 md:h-20 w-auto object-contain bg-transparent" />
             </div>
-            <p className="text-xs sm:text-sm text-gray-500 font-medium tracking-widest uppercase mt-4">{store.slogan}</p>
-
             <div className="mt-4 space-y-1 text-xs text-gray-600">
               <p className="flex items-center gap-2"><MapPin className="w-3 h-3 shrink-0" /> {store.address}</p>
               <p className="flex items-center gap-2"><Phone className="w-3 h-3 shrink-0" /> {store.phone}</p>
@@ -213,7 +212,7 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
           <div className="w-full md:w-1/2 p-5 bg-gray-50 rounded-xl border border-gray-200 print:w-1/2">
             <h4 className="font-bold text-gray-900 mb-4 text-sm uppercase tracking-wider">Metode Pembayaran</h4>
             
-            {order.payment_status !== 'LUNAS' && (
+            {order.payment_status !== 'LUNAS' && canShowQris && (
               <div className="mb-6 pb-6 border-b border-gray-200 no-print space-y-4">
                 <p className="text-xs text-gray-500 font-bold uppercase tracking-widest">Pembayaran Digital Instan (QRIS):</p>
                 
@@ -284,7 +283,6 @@ export default function PublicInvoiceClient({ order, storeConfig }) {
 
         <div className="mt-8 md:mt-12 text-center border-t border-gray-200 pt-6 print:mt-8 print:pt-4">
           <p className="text-gray-500 text-sm">Terima kasih atas kepercayaan Anda kepada {store.store_name}.</p>
-          <p className="text-gray-400 text-xs mt-1">Invoice digital ini diterbitkan secara otomatis dan sah.</p>
         </div>
 
       </div>

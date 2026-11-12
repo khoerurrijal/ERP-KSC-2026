@@ -7,8 +7,27 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useTheme } from 'next-themes'
+import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+
+function SidebarLogo({ lightweight, className }) {
+  const [isDark, setIsDark] = useState(false)
+
+  useEffect(() => {
+    if (lightweight) return undefined
+
+    const root = document.documentElement
+    const syncTheme = () => setIsDark(root.classList.contains('dark'))
+    const observer = new MutationObserver(syncTheme)
+
+    syncTheme()
+    observer.observe(root, { attributes: true, attributeFilter: ['class'] })
+    return () => observer.disconnect()
+  }, [lightweight])
+
+  const logoSrc = !lightweight && isDark ? '/logo-dark.png' : '/logo.png'
+  return <Image src={logoSrc} alt="King Sablon Cup" width={400} height={160} className={className} />
+}
 
 const MENU_GROUPS = [
   {
@@ -72,11 +91,9 @@ const MENU_GROUPS = [
 ]
 
 export default function Sidebar({ allowedMenus = [], allowedPermissions = [], userRole = '', isMobile = false, isOperatorOnly = false, isCollapsed = false, onToggleCollapse = () => {}, onCloseMobile = () => {}, lightweight = false }) {
-  const { resolvedTheme } = useTheme()
   const pathname = usePathname()
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const sidebarRef = useRef(null)
-  const logoSrc = lightweight || resolvedTheme !== 'dark' ? '/logo.png' : '/logo-dark.png'
   
   // Filter menu based on allowedMenus
   const hasAnyAccess = (accessKeys) => !accessKeys || accessKeys.some((key) => allowedPermissions.includes(key))
@@ -151,7 +168,7 @@ export default function Sidebar({ allowedMenus = [], allowedPermissions = [], us
       <div ref={sidebarRef} className="fixed top-0 left-0 w-full z-50 bg-background/80 backdrop-blur-xl border-b border-white/10">
         <div className="flex items-center justify-between p-4">
           <div className="flex shrink-0">
-            <Image src={logoSrc} alt="King Sablon Cup" width={400} height={160} className="h-8 w-auto object-contain drop-shadow-md" />
+            <SidebarLogo lightweight={lightweight} className="h-8 w-auto object-contain" />
           </div>
           <button onClick={() => setIsMobileOpen(!isMobileOpen)} className="p-2 bg-white/5 border border-white/10 rounded-xl text-foreground">
             <div className="w-5 h-0.5 bg-current mb-1" />
@@ -179,13 +196,7 @@ export default function Sidebar({ allowedMenus = [], allowedPermissions = [], us
     <aside ref={sidebarRef} className={`${lightweight ? 'h-screen fixed left-0 top-0 z-50 flex flex-col overflow-visible border-r border-stone-200 bg-white shadow-sm' : 'h-screen fixed left-0 top-0 glass-panel flex flex-col z-50 overflow-visible transition-[width] duration-300'} ${isCollapsed ? 'w-16' : 'w-64'}`}>
       <div className={`relative flex ${isCollapsed ? 'flex-col items-center gap-2 p-3' : 'items-center justify-center p-6 pb-2'}`}>
         <div className={`${isCollapsed ? 'h-8 w-8' : 'w-full max-w-[130px]'} ${lightweight ? '' : 'transition-all duration-300 cursor-pointer hover:scale-105'}`}>
-          <Image
-            src={logoSrc}
-            alt="King Sablon Cup"
-            width={400}
-            height={160}
-            className={`h-full w-full object-contain ${lightweight ? '' : 'drop-shadow-[0_0_12px_rgba(255,255,255,0.6)] hover:drop-shadow-[0_0_20px_rgba(255,255,255,0.9)]'}`}
-          />
+          <SidebarLogo lightweight={lightweight} className="h-full w-full object-contain" />
         </div>
       </div>
 

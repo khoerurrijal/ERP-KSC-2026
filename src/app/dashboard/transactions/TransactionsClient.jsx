@@ -58,6 +58,14 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const [formAmount, setFormAmount] = useState('')
   const [formDesc, setFormDesc] = useState('')
   const [formDate, setFormDate] = useState('')
+  const configuredTransactionReferences = (dropdownConfig.transaction_reference || [
+    "PENJUALAN", "PEMBELIAN", "GAJI KARYAWAN", "LISTRIK WIFI", "MAINTENANCE", "LAIN-LAIN"
+  ]).filter(reference => ![
+    'HPP GUDANG', 'BAYAR HPP GUDANG', 'BAYAR KE GUDANG', 'BAYAR KE GLOBAL'
+  ].includes(String(reference).trim().toUpperCase()))
+  const transactionReferenceOptions = ['BAYAR KE GUDANG', 'BAYAR KE GLOBAL'].includes(formRef)
+    ? [...configuredTransactionReferences, formRef]
+    : configuredTransactionReferences
 
   useEffect(() => {
     setSearchQuery(searchParams.get('transactionSearch') || '')
@@ -193,10 +201,23 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       return matchSearch && (isSearching || (matchMonth && matchMethod && matchWorkshop && matchRef))
     })
 
+    const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
     result.sort((a, b) => {
-      if (a[sortConfig.key] < b[sortConfig.key]) return sortConfig.direction === 'asc' ? -1 : 1
-      if (a[sortConfig.key] > b[sortConfig.key]) return sortConfig.direction === 'asc' ? 1 : -1
-      return 0
+      let comparison = 0
+      if (sortConfig.key === 'date') {
+        const dateA = Date.parse(a.date || '')
+        const dateB = Date.parse(b.date || '')
+        comparison = (Number.isFinite(dateA) ? dateA : 0) - (Number.isFinite(dateB) ? dateB : 0)
+      } else if (sortConfig.key === 'amount_in' || sortConfig.key === 'amount_out') {
+        comparison = Number(a[sortConfig.key] || 0) - Number(b[sortConfig.key] || 0)
+      } else {
+        const customerA = Array.isArray(a.sales_orders?.customers) ? a.sales_orders.customers[0]?.name : a.sales_orders?.customers?.name
+        const customerB = Array.isArray(b.sales_orders?.customers) ? b.sales_orders.customers[0]?.name : b.sales_orders?.customers?.name
+        const valueA = sortConfig.key === 'description' ? (customerA || removeInvoiceNumber(a.description)) : a[sortConfig.key]
+        const valueB = sortConfig.key === 'description' ? (customerB || removeInvoiceNumber(b.description)) : b[sortConfig.key]
+        comparison = collator.compare(String(valueA || ''), String(valueB || ''))
+      }
+      return sortConfig.direction === 'asc' ? comparison : -comparison
     })
 
     return result
@@ -303,6 +324,20 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
               ]}
             />
           </div>
+          {currentTab === 'VIRTUAL' && filterWorkshop === 'GLOBAL' && (
+            <div className="sm:col-span-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 border-t border-white/10 pt-3">
+              <p className="text-xs text-foreground/60">
+                Pemasukan GLOBAL tampil di sini. Pasangan pengeluarannya tercatat di workshop KING.
+              </p>
+              <button
+                type="button"
+                onClick={() => { setFilterWorkshop('KING'); setFilterRef('BAYAR KE GLOBAL') }}
+                className="text-xs font-semibold text-primary hover:text-primary/80 text-left sm:text-right"
+              >
+                Lihat mutasi KING → GLOBAL
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -363,6 +398,11 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                     {trx.sales_orders?.customers?.name || removeInvoiceNumber(trx.description) || (trx.sales_orders ? 'Unknown Pelanggan' : 'Sistem ERP')}
                     {trx.sales_orders?.customers?.name && removeInvoiceNumber(trx.description) && (
                       <div className="mt-0.5 text-xs font-normal text-foreground/50">{removeInvoiceNumber(trx.description)}</div>
+                    )}
+                    {trx.payment_method?.toUpperCase() === 'VIRTUAL' && ['BAYAR KE GLOBAL', 'BAYAR KE GUDANG'].includes((trx.reference || '').toUpperCase()) && (
+                      <div className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary">
+                        {trx.reference}
+                      </div>
                     )}
                   </td>
                   <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
@@ -466,10 +506,10 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                 {formWorkshop === 'KING' ? (
                   <div className="space-y-1">
                     <label className="text-xs text-foreground/60 block">Referensi (Kategori)</label>
-                    <CustomSelect 
-                      value={formRef} 
-                      onChange={e => setFormRef(e.target.value)} 
-                      options={(dropdownConfig.transaction_reference || ["PENJUALAN", "PENGIRIMAN", "LISTRIK WIFI", "GAJI KARYAWAN", "MAINTENANCE", "NOTA", "LAIN-LAIN"]).map(ref => ({
+                    <CustomSelect
+                      value={formRef}
+                      onChange={e => setFormRef(e.target.value)}
+                      options={transactionReferenceOptions.map(ref => ({
                         value: ref,
                         label: ref
                       }))}
@@ -478,9 +518,9 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                 ) : (
                   <div className="space-y-1 opacity-50 pointer-events-none">
                     <label className="text-xs text-foreground/60 block">Referensi (Kategori)</label>
-                    <CustomSelect 
-                      value="-" 
-                      onChange={() => {}} 
+                    <CustomSelect
+                      value="-"
+                      onChange={() => {}}
                       options={[{ value: "-", label: "-" }]}
                     />
                   </div>

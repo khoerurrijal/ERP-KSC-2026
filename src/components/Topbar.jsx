@@ -8,7 +8,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { LogOut, Sun, Moon, User, Menu, MessageCircle, Check, X, Bell } from 'lucide-react'
 import { useTheme } from 'next-themes'
 import { getWaBotStatus, toggleWaBotStatus } from '@/app/dashboard/settings/actions'
-import { getAdminNotifications, markAdminNotificationRead } from '@/app/actions/notifications'
+import { getAdminNotifications, markAdminNotificationRead, markAllAdminNotificationsRead } from '@/app/actions/notifications'
 
 export default function Topbar({ userRole = '', userName = '', onToggleSidebar, liquidGlassRootRef, lightweight = false }) {
   const pathname = usePathname()
@@ -19,6 +19,7 @@ export default function Topbar({ userRole = '', userName = '', onToggleSidebar, 
   const [isNotificationOpen, setIsNotificationOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [unreadCount, setUnreadCount] = useState(0)
+  const [isMarkingNotificationsRead, setIsMarkingNotificationsRead] = useState(false)
   const notificationRef = useRef(null)
   const profileRef = useRef(null)
   const liquidGlassElementRef = useRef(null)
@@ -174,11 +175,36 @@ export default function Topbar({ userRole = '', userName = '', onToggleSidebar, 
 
   const handleNotificationClick = async (notification) => {
     if (!notification.read_at) {
-      await markAdminNotificationRead(notification.id)
-      setNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
-      setUnreadCount(current => Math.max(0, current - 1))
+      const result = await markAdminNotificationRead(notification.id)
+      if (result.success) {
+        setNotifications(current => current.map(item => item.id === notification.id ? { ...item, read_at: new Date().toISOString() } : item))
+        setUnreadCount(current => Math.max(0, current - 1))
+      } else {
+        alert('Gagal menandai notifikasi: ' + result.error)
+      }
     }
     if (notification.href) router.push(notification.href)
+  }
+
+  const handleMarkAllNotificationsRead = async () => {
+    if (unreadCount === 0 || isMarkingNotificationsRead) return
+
+    setIsMarkingNotificationsRead(true)
+    try {
+      const result = await markAllAdminNotificationsRead()
+      if (!result.success) {
+        alert('Gagal menandai notifikasi: ' + result.error)
+        return
+      }
+
+      const readAt = new Date().toISOString()
+      setNotifications(current => current.map(notification => notification.read_at ? notification : { ...notification, read_at: readAt }))
+      setUnreadCount(0)
+    } catch (error) {
+      alert('Gagal menandai notifikasi: ' + (error?.message || 'silakan coba lagi.'))
+    } finally {
+      setIsMarkingNotificationsRead(false)
+    }
   }
 
   const handleToggleWaBot = async () => {
@@ -289,9 +315,20 @@ export default function Topbar({ userRole = '', userName = '', onToggleSidebar, 
 
             {isNotificationOpen && (
               <div className="absolute right-0 mt-2 w-[min(22rem,calc(100vw-2rem))] bg-background border border-white/10 rounded-2xl shadow-2xl overflow-hidden z-[60]">
-                <div className="p-3 border-b border-white/10 bg-white/5 flex items-center justify-between">
-                  <span className="font-bold text-sm">Notifikasi Admin</span>
-                  <span className="text-xs text-foreground/50">{unreadCount} belum dibaca</span>
+                <div className="p-3 border-b border-white/10 bg-white/5 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="font-bold text-sm block">Notifikasi Admin</span>
+                    <span className="text-xs text-foreground/50">{unreadCount} belum dibaca</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleMarkAllNotificationsRead}
+                    disabled={unreadCount === 0 || isMarkingNotificationsRead}
+                    className="shrink-0 inline-flex items-center gap-1 text-[10px] font-semibold text-primary hover:text-primary/80 disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Check className="w-3 h-3" />
+                    {isMarkingNotificationsRead ? 'Menyimpan...' : 'Tandai semua dibaca'}
+                  </button>
                 </div>
                 <div className="max-h-80 overflow-y-auto">
                   {notifications.length === 0 ? (
