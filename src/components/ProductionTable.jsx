@@ -233,13 +233,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       : <ChevronDown className="ml-1 inline h-3 w-3" />
   }
 
-  const accumulationTotals = useMemo(() => productionAccumulation.reduce((totals, group) => ({
-    qty: totals.qty + group.qty,
-    logs: totals.logs + group.log_count
-  }), { qty: 0, logs: 0 }), [productionAccumulation])
-  const unassignedGroup = productionAccumulation.find(group => group.employee_id === 'unassigned')
-  const namedEmployeeCount = productionAccumulation.filter(group => group.employee_id !== 'unassigned').length
-
   const handleOpenModal = (job) => {
     setSelectedJob(job)
     
@@ -452,28 +445,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-            <div className="glass-card p-4">
-              <p className="text-xs text-foreground/50">Total Diproduksi</p>
-              <p className="mt-1 text-xl font-bold text-green-400">{formatMobileQuantity(accumulationTotals.qty)} pcs</p>
-            </div>
-            <div className="glass-card p-4">
-              <p className="text-xs text-foreground/50">Karyawan Tercatat</p>
-              <p className="mt-1 text-xl font-bold text-foreground">{namedEmployeeCount}</p>
-            </div>
-            <div className="glass-card p-4">
-              <p className="text-xs text-foreground/50">Catatan Produksi</p>
-              <p className="mt-1 text-xl font-bold text-foreground">{formatMobileQuantity(accumulationTotals.logs)}</p>
-            </div>
-            <div className="glass-card p-4">
-              <p className="text-xs text-foreground/50">Tanpa Operator</p>
-              <p className={`mt-1 text-xl font-bold ${unassignedGroup?.log_count ? 'text-amber-400' : 'text-foreground'}`}>
-                {formatMobileQuantity(unassignedGroup?.log_count || 0)} catatan
-              </p>
-              <p className="mt-1 text-xs text-foreground/45">{formatMobileQuantity(unassignedGroup?.qty || 0)} pcs belum teratribusi</p>
-            </div>
-          </div>
-
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-sm">
