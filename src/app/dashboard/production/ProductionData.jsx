@@ -105,14 +105,27 @@ export default async function ProductionData({ mode = 'production', embedded = f
     role_name: o.salary_schemas?.role_name
   }))
 
+  const operatorIdentity = userEmail.split('@')[0].replace(/[^a-z0-9]/g, '')
+  const matchedOperator = operatorIdentity
+    ? operators.find(o => o.full_name?.toLowerCase().replace(/[^a-z0-9]/g, '').includes(operatorIdentity))
+    : null
+  const isOperatorAccount = ['operator', 'operator mesin'].includes(String(userRole).toLowerCase())
+  const visibleOperators = isOperatorAccount
+    ? (matchedOperator ? [matchedOperator] : [])
+    : operators
+
   let productionHistory = []
-  const canSeeProductionAccumulation = ['Owner', 'Admin'].includes(userRole) && mode === 'production' && !embedded
+  const canSeeProductionAccumulation = (
+    ['Owner', 'Admin'].includes(userRole) || (isOperatorAccount && Boolean(matchedOperator))
+  ) && mode === 'production' && !embedded
   if (canSeeProductionAccumulation) {
-    const { data: rawLogs } = await supabase
+    let productionLogsQuery = supabase
       .from('production_logs')
       .select('id, job_id, employee_id, qty_processed, created_at')
       .order('created_at', { ascending: false })
       .limit(10000)
+    if (isOperatorAccount) productionLogsQuery = productionLogsQuery.eq('employee_id', matchedOperator.id)
+    const { data: rawLogs } = await productionLogsQuery
 
     const jobIds = [...new Set((rawLogs || []).map(log => log.job_id).filter(Boolean))]
     const employeeIds = [...new Set((rawLogs || []).map(log => log.employee_id).filter(Boolean))]
@@ -181,15 +194,6 @@ export default async function ProductionData({ mode = 'production', embedded = f
     qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
   }))
 
-  const operatorIdentity = userEmail.split('@')[0].replace(/[^a-z0-9]/g, '')
-  const matchedOperator = operatorIdentity
-    ? operators.find(o => o.full_name?.toLowerCase().replace(/[^a-z0-9]/g, '').includes(operatorIdentity))
-    : null
-  const isOperatorAccount = ['operator', 'operator mesin'].includes(userRole.toLowerCase())
-  const visibleOperators = isOperatorAccount
-    ? (matchedOperator ? [matchedOperator] : [])
-    : operators
-
   return (
     <ProductionTable 
       productionJobs={productionJobs} 
@@ -200,7 +204,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
       initialSearch={search}
       initialTab={mode === 'status' ? 'SO' : 'PRODUKSI'}
       hideTabs={mode === 'production' || embedded}
-      showAccumulationTab={mode === 'production' && !embedded}
+      showAccumulationTab={canSeeProductionAccumulation}
       hideHeader={embedded}
       title={mode === 'production' ? 'Produksi' : 'Status Pesanan'}
     />

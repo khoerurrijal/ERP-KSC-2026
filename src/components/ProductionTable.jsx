@@ -1,12 +1,15 @@
 'use client'
 
-import { Fragment, useState, useMemo, useEffect, useCallback } from 'react'
+/* The layout effect positions the calendar popover against the viewport. */
+/* eslint-disable react-hooks/set-state-in-effect */
+
+import { Fragment, useState, useMemo, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw } from 'lucide-react'
+import { Search, X, CheckCircle2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Calendar } from 'lucide-react'
 
 import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
-import CustomDatePicker from '@/components/CustomDatePicker'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
@@ -45,6 +48,24 @@ const getJakartaDateKey = (value) => {
   const month = parts.find(part => part.type === 'month')?.value
   const day = parts.find(part => part.type === 'day')?.value
   return year && month && day ? `${year}-${month}-${day}` : ''
+}
+const formatJakartaDateLabel = (value) => {
+  if (!value) return '-'
+  return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta'
+  })
+}
+const formatDatePickerLabel = (value) => {
+  if (!value) return '-'
+  return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', {
+    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta'
+  })
+}
+const formatJakartaMonthLabel = (value) => {
+  if (!value) return '-'
+  return new Date(`${value}-01T12:00:00+07:00`).toLocaleDateString('id-ID', {
+    month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta'
+  })
 }
 
 const getStatusColor = (st) => {
@@ -97,6 +118,15 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const [accumulationSort, setAccumulationSort] = useState({ key: 'qty', direction: 'desc' })
   const [accumulationDateFrom, setAccumulationDateFrom] = useState(() => `${getJakartaMonthKey(new Date())}-01`)
   const [accumulationDateTo, setAccumulationDateTo] = useState(() => getJakartaDateKey(new Date()))
+  const [isAccumulationFilterOpen, setIsAccumulationFilterOpen] = useState(false)
+  const accumulationFilterButtonRef = useRef(null)
+  const accumulationFilterMenuRef = useRef(null)
+  const [accumulationFilterMenuStyle, setAccumulationFilterMenuStyle] = useState(null)
+  const [rangeSelectionStep, setRangeSelectionStep] = useState('from')
+  const [calendarView, setCalendarView] = useState(() => {
+    const [year, month] = getJakartaMonthKey(new Date()).split('-').map(Number)
+    return { year, month: month - 1 }
+  })
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null)
 
   const [soPage, setSoPage] = useState(1)
@@ -207,9 +237,11 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     return trackingSoItems.slice(start, start + pageSize)
   }, [trackingSoItems, soPage, pageSize])
 
-  const canSeeAccumulationTab = showAccumulationTab && canSeeProductionTab && ['Owner', 'Admin'].includes(userRole)
+  const canSeeAccumulationTab = showAccumulationTab && canSeeProductionTab && (
+    ['Owner', 'Admin'].includes(userRole) || isOperatorAccount
+  )
   const productionAccumulation = useMemo(() => {
-    const groups = new Map()
+    const months = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
       getJakartaDateKey(log.created_at) >= accumulationDateFrom &&
       getJakartaDateKey(log.created_at) <= accumulationDateTo &&
@@ -221,10 +253,13 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     )
 
     matchingLogs.forEach(log => {
-      const key = String(log.employee_id || 'unknown')
-      if (!groups.has(key)) {
-        groups.set(key, {
-          employee_id: key,
+      const monthKey = getJakartaMonthKey(log.created_at)
+      if (!months.has(monthKey)) months.set(monthKey, new Map())
+      const employees = months.get(monthKey)
+      const employeeKey = String(log.employee_id || 'unknown')
+      if (!employees.has(employeeKey)) {
+        employees.set(employeeKey, {
+          employee_id: employeeKey,
           employee_name: log.employee_name || 'Karyawan tidak diketahui',
           qty: 0,
           log_count: 0,
@@ -232,7 +267,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
           logs: []
         })
       }
-      const group = groups.get(key)
+      const group = employees.get(employeeKey)
       group.qty += Number(log.qty_processed || 0)
       group.log_count += 1
       if (Date.parse(log.created_at || '') > Date.parse(group.latest_at || '')) group.latest_at = log.created_at
@@ -240,7 +275,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     })
 
     const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
-    return [...groups.values()].sort((a, b) => {
+    const compareEmployees = (a, b) => {
       let comparison = 0
       if (accumulationSort.key === 'qty') comparison = a.qty - b.qty
       else if (accumulationSort.key === 'logs') comparison = a.log_count - b.log_count
@@ -248,8 +283,121 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       else comparison = collator.compare(a.employee_name, b.employee_name)
       if (comparison === 0) comparison = collator.compare(a.employee_name, b.employee_name)
       return accumulationSort.direction === 'asc' ? comparison : -comparison
-    })
+    }
+
+    return [...months.entries()]
+      .sort(([monthA], [monthB]) => monthB.localeCompare(monthA))
+      .map(([month_key, employees]) => {
+        const employeeGroups = [...employees.values()].sort(compareEmployees)
+        return {
+          month_key,
+          employees: employeeGroups,
+          qty: employeeGroups.reduce((total, group) => total + group.qty, 0),
+          log_count: employeeGroups.reduce((total, group) => total + group.log_count, 0)
+        }
+      })
   }, [productionHistory, normalizedSearch, accumulationDateFrom, accumulationDateTo, accumulationSort])
+
+  const handleAccumulationCurrentMonth = () => {
+    const today = getJakartaDateKey(new Date())
+    const currentMonth = getJakartaMonthKey(new Date())
+    const [year, month] = currentMonth.split('-').map(Number)
+    setCalendarView({ year, month: month - 1 })
+    setAccumulationDateFrom(`${currentMonth}-01`)
+    setAccumulationDateTo(today)
+    setRangeSelectionStep('from')
+    setExpandedEmployeeId(null)
+    setIsAccumulationFilterOpen(false)
+  }
+
+  const handleAccumulationDateSelect = (day) => {
+    const month = String(calendarView.month + 1).padStart(2, '0')
+    const selectedDate = `${calendarView.year}-${month}-${String(day).padStart(2, '0')}`
+    if (rangeSelectionStep === 'from') {
+      setAccumulationDateFrom(selectedDate)
+      setAccumulationDateTo(selectedDate)
+      setRangeSelectionStep('to')
+      setExpandedEmployeeId(null)
+    } else {
+      if (selectedDate < accumulationDateFrom) {
+        setAccumulationDateFrom(selectedDate)
+        setAccumulationDateTo(accumulationDateFrom)
+      } else {
+        setAccumulationDateTo(selectedDate)
+      }
+      setRangeSelectionStep('from')
+      setExpandedEmployeeId(null)
+    }
+  }
+
+  const changeAccumulationCalendarMonth = (offset) => {
+    setCalendarView(current => {
+      const nextMonth = new Date(current.year, current.month + offset, 1)
+      return { year: nextMonth.getFullYear(), month: nextMonth.getMonth() }
+    })
+  }
+
+  const calendarMonthLabel = new Date(calendarView.year, calendarView.month, 1)
+    .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
+  const calendarDays = [
+    ...Array(new Date(calendarView.year, calendarView.month, 1).getDay()).fill(null),
+    ...Array.from({ length: new Date(calendarView.year, calendarView.month + 1, 0).getDate() }, (_, index) => index + 1)
+  ]
+
+  useEffect(() => {
+    if (!isAccumulationFilterOpen) return undefined
+
+    const handleClickOutside = (event) => {
+      if (
+        !accumulationFilterButtonRef.current?.contains(event.target) &&
+        !accumulationFilterMenuRef.current?.contains(event.target)
+      ) {
+        setIsAccumulationFilterOpen(false)
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [isAccumulationFilterOpen])
+
+  useLayoutEffect(() => {
+    if (!isAccumulationFilterOpen) {
+      setAccumulationFilterMenuStyle(null)
+      return undefined
+    }
+
+    const updateMenuPosition = () => {
+      const anchor = accumulationFilterButtonRef.current?.getBoundingClientRect()
+      if (!anchor) return
+
+      const width = Math.min(288, window.innerWidth - 24)
+      const estimatedHeight = 430
+      const spaceBelow = Math.max(0, window.innerHeight - anchor.bottom - 12)
+      const spaceAbove = Math.max(0, anchor.top - 12)
+      const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+      const availableHeight = Math.min(estimatedHeight, opensAbove ? spaceAbove : spaceBelow)
+      const left = Math.min(Math.max(12, anchor.right - width), window.innerWidth - width - 12)
+
+      setAccumulationFilterMenuStyle({
+        position: 'fixed',
+        left,
+        top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
+        width,
+        maxHeight: availableHeight,
+        overflowY: 'auto',
+        zIndex: 2000,
+        transform: opensAbove ? 'translateY(-100%)' : undefined
+      })
+    }
+
+    updateMenuPosition()
+    window.addEventListener('resize', updateMenuPosition)
+    window.addEventListener('scroll', updateMenuPosition, true)
+    return () => {
+      window.removeEventListener('resize', updateMenuPosition)
+      window.removeEventListener('scroll', updateMenuPosition, true)
+    }
+  }, [isAccumulationFilterOpen])
 
   const handleAccumulationSort = (key) => {
     setAccumulationSort(current => ({
@@ -475,29 +623,89 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
-            <div className="w-full space-y-1.5 sm:w-56">
-              <label className="text-xs font-medium text-foreground/60">Dari</label>
-              <CustomDatePicker
-                value={accumulationDateFrom}
-                onChange={date => {
-                  setAccumulationDateFrom(date)
-                  if (date > accumulationDateTo) setAccumulationDateTo(date)
-                  setExpandedEmployeeId(null)
-                }}
-              />
-            </div>
-            <div className="w-full space-y-1.5 sm:w-56">
-              <label className="text-xs font-medium text-foreground/60">Ke</label>
-              <CustomDatePicker
-                value={accumulationDateTo}
-                onChange={date => {
-                  setAccumulationDateTo(date)
-                  if (date < accumulationDateFrom) setAccumulationDateFrom(date)
-                  setExpandedEmployeeId(null)
-                }}
-              />
-            </div>
+          <div className="relative flex justify-end">
+            <button
+              ref={accumulationFilterButtonRef}
+              type="button"
+              aria-expanded={isAccumulationFilterOpen}
+              aria-label="Pilih rentang tanggal akumulasi produksi"
+              onClick={() => setIsAccumulationFilterOpen(open => !open)}
+              className="glass-input flex h-10 w-full items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none sm:w-auto"
+            >
+              <span className="flex min-w-0 items-center gap-2">
+                <Calendar className="h-4 w-4 shrink-0 text-primary" />
+                <span className="truncate">{formatDatePickerLabel(accumulationDateFrom)} – {formatDatePickerLabel(accumulationDateTo)}</span>
+              </span>
+            </button>
+
+            {isAccumulationFilterOpen && accumulationFilterMenuStyle && typeof document !== 'undefined' && createPortal(
+              <div
+                ref={accumulationFilterMenuRef}
+                style={accumulationFilterMenuStyle}
+                className="rounded-xl border border-white/10 bg-[#18181B] p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
+              >
+                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
+                  <button
+                    type="button"
+                    aria-label="Bulan sebelumnya"
+                    onClick={() => changeAccumulationCalendarMonth(-1)}
+                    className="rounded-full p-1 text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground"
+                  >
+                    <ChevronLeft className="h-5 w-5" />
+                  </button>
+                  <span className="text-sm font-bold text-primary">{calendarMonthLabel}</span>
+                  <button
+                    type="button"
+                    aria-label="Bulan berikutnya"
+                    onClick={() => changeAccumulationCalendarMonth(1)}
+                    className="rounded-full p-1 text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground"
+                  >
+                    <ChevronRight className="h-5 w-5" />
+                  </button>
+                </div>
+                <div className="mb-2 grid grid-cols-7 gap-1 text-center">
+                  {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
+                    <span key={day} className="text-[10px] font-bold uppercase text-foreground/50">{day}</span>
+                  ))}
+                </div>
+                <div className="grid grid-cols-7 gap-1 text-center">
+                  {calendarDays.map((day, index) => {
+                    if (day === null) return <span key={`empty-${index}`} className="h-8 w-8" />
+                    const dayKey = `${calendarView.year}-${String(calendarView.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+                    const isRangeEdge = dayKey === accumulationDateFrom || dayKey === accumulationDateTo
+                    const isInRange = dayKey > accumulationDateFrom && dayKey < accumulationDateTo
+                    const isToday = dayKey === getJakartaDateKey(new Date())
+                    return (
+                      <button
+                        key={day}
+                        type="button"
+                        onClick={() => handleAccumulationDateSelect(day)}
+                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${isRangeEdge ? 'bg-primary font-bold text-primary-foreground shadow-[0_0_10px_rgba(212,175,55,0.5)]' : isInRange ? 'bg-primary/20 text-primary' : isToday ? 'border border-primary/50 bg-white/10 font-bold text-primary' : 'text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}
+                      >
+                        {day}
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3">
+                  <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs leading-relaxed text-foreground/55">
+                    <span className={rangeSelectionStep === 'from' ? 'font-semibold text-primary' : ''}>Dari</span>
+                    <span>{formatDatePickerLabel(accumulationDateFrom)}</span>
+                    <span className={rangeSelectionStep === 'to' ? 'font-semibold text-primary' : ''}>Ke</span>
+                    <span>{rangeSelectionStep === 'to' ? 'Pilih tanggal' : formatDatePickerLabel(accumulationDateTo)}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAccumulationCurrentMonth}
+                    className="glass-input flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none"
+                  >
+                    <Calendar className="h-4 w-4 text-primary" />
+                    Bulan Ini
+                  </button>
+                </div>
+              </div>,
+              document.body
+            )}
           </div>
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
@@ -530,52 +738,65 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 <tbody className="divide-y divide-white/5">
                   {productionAccumulation.length === 0 ? (
                     <tr><td colSpan="5" className="px-6 py-12 text-center text-foreground/45">Belum ada catatan produksi yang cocok.</td></tr>
-                  ) : productionAccumulation.map(group => {
-                    const isExpanded = expandedEmployeeId === group.employee_id
-                    return (
-                      <Fragment key={group.employee_id}>
-                        <tr className="hover:bg-white/5">
-                          <td className="px-4 py-3 font-semibold text-foreground">{group.employee_name}</td>
-                          <td className="px-4 py-3 font-bold text-green-400">{formatMobileQuantity(group.qty)} pcs</td>
-                          <td className="px-4 py-3 text-foreground/70">{formatMobileQuantity(group.log_count)}</td>
-                          <td className="px-4 py-3 text-foreground/70">
-                            {group.latest_at ? new Date(group.latest_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <button
-                              type="button"
-                              aria-expanded={isExpanded}
-                              onClick={() => setExpandedEmployeeId(isExpanded ? null : group.employee_id)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-foreground/75 hover:bg-white/5 hover:text-foreground"
-                            >
-                              {isExpanded ? 'Tutup' : 'Lihat'}
-                              <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-                          </td>
-                        </tr>
-                        {isExpanded && (
-                          <tr>
-                            <td colSpan="5" className="bg-black/15 px-4 py-3">
-                              <div className="space-y-2">
-                                {group.logs.map((log, index) => (
-                                  <div key={log.id || `${group.employee_id}-${log.created_at}-${index}`} className="grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
-                                    <span className="text-foreground/50">
-                                      {log.created_at ? new Date(log.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
-                                    </span>
-                                    <span className="min-w-0 text-foreground/75">
-                                      <span className="font-semibold text-foreground">{log.product_name}</span>
-                                      <span className="block truncate text-foreground/45">{log.customer_name} · {log.invoice_number}</span>
-                                    </span>
-                                    <span className="font-bold text-green-400">{formatMobileQuantity(log.qty_processed)} pcs</span>
+                  ) : productionAccumulation.map(monthGroup => (
+                    <Fragment key={monthGroup.month_key}>
+                      <tr className="bg-white/[0.03]">
+                        <td colSpan="5" className="px-4 py-3 font-bold text-primary">
+                          {formatJakartaMonthLabel(monthGroup.month_key)}
+                          <span className="ml-2 text-xs font-medium text-foreground/55">
+                            {formatMobileQuantity(monthGroup.qty)} pcs · {formatMobileQuantity(monthGroup.log_count)} catatan
+                          </span>
+                        </td>
+                      </tr>
+                      {monthGroup.employees.map(group => {
+                        const expansionKey = `${monthGroup.month_key}:${group.employee_id}`
+                        const isExpanded = expandedEmployeeId === expansionKey
+                        return (
+                          <Fragment key={expansionKey}>
+                            <tr className="hover:bg-white/5">
+                              <td className="px-4 py-3 font-semibold text-foreground">{group.employee_name}</td>
+                              <td className="px-4 py-3 font-bold text-green-400">{formatMobileQuantity(group.qty)} pcs</td>
+                              <td className="px-4 py-3 text-foreground/70">{formatMobileQuantity(group.log_count)}</td>
+                              <td className="px-4 py-3 text-foreground/70">
+                                {group.latest_at ? new Date(group.latest_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <button
+                                  type="button"
+                                  aria-expanded={isExpanded}
+                                  onClick={() => setExpandedEmployeeId(isExpanded ? null : expansionKey)}
+                                  className="inline-flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs font-semibold text-foreground/75 hover:bg-white/5 hover:text-foreground"
+                                >
+                                  {isExpanded ? 'Tutup' : 'Lihat'}
+                                  <ChevronDown className={`h-3.5 w-3.5 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                </button>
+                              </td>
+                            </tr>
+                            {isExpanded && (
+                              <tr>
+                                <td colSpan="5" className="bg-black/15 px-4 py-3">
+                                  <div className="space-y-2">
+                                    {group.logs.map((log, index) => (
+                                      <div key={log.id || `${expansionKey}-${log.created_at}-${index}`} className="grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+                                        <span className="text-foreground/50">
+                                          {log.created_at ? new Date(log.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                        </span>
+                                        <span className="min-w-0 text-foreground/75">
+                                          <span className="font-semibold text-foreground">{log.product_name}</span>
+                                          <span className="block truncate text-foreground/45">{log.customer_name} · {log.invoice_number}</span>
+                                        </span>
+                                        <span className="font-bold text-green-400">{formatMobileQuantity(log.qty_processed)} pcs</span>
+                                      </div>
+                                    ))}
                                   </div>
-                                ))}
-                              </div>
-                            </td>
-                          </tr>
-                        )}
-                      </Fragment>
-                    )
-                  })}
+                                </td>
+                              </tr>
+                            )}
+                          </Fragment>
+                        )
+                      })}
+                    </Fragment>
+                  ))}
                 </tbody>
               </table>
             </div>
