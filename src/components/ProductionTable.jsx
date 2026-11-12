@@ -19,6 +19,18 @@ const getDisplayStatus = (st) => {
 }
 
 const formatMobileQuantity = (value) => Number(value || 0).toLocaleString('id-ID')
+const getJakartaMonthKey = (value) => {
+  const date = new Date(value)
+  if (!Number.isFinite(date.getTime())) return ''
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit'
+  }).formatToParts(date)
+  const year = parts.find(part => part.type === 'year')?.value
+  const month = parts.find(part => part.type === 'month')?.value
+  return year && month ? `${year}-${month}` : ''
+}
 
 const getStatusColor = (st) => {
   const s = getDisplayStatus(st)
@@ -67,6 +79,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
   const [sortConfig, setSortConfig] = useState({ key: 'target_date', direction: 'asc' })
   const [accumulationSort, setAccumulationSort] = useState({ key: 'qty', direction: 'desc' })
+  const [accumulationMonth, setAccumulationMonth] = useState(() => getJakartaMonthKey(new Date()))
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null)
 
   const [soPage, setSoPage] = useState(1)
@@ -178,14 +191,18 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   }, [trackingSoItems, soPage, pageSize])
 
   const canSeeAccumulationTab = showAccumulationTab && canSeeProductionTab && ['Owner', 'Admin'].includes(userRole)
+  const accumulationMonths = useMemo(() => [...new Set(
+    (productionHistory || []).map(log => getJakartaMonthKey(log.created_at)).filter(Boolean)
+  )].sort((a, b) => b.localeCompare(a)), [productionHistory])
   const productionAccumulation = useMemo(() => {
     const groups = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
-      !normalizedSearch ||
-      matchesSearchText(log.employee_name, normalizedSearch) ||
-      matchesSearchText(log.product_name, normalizedSearch) ||
-      matchesSearchText(log.customer_name, normalizedSearch) ||
-      matchesSearchText(log.invoice_number, normalizedSearch)
+      (accumulationMonth === 'ALL' || getJakartaMonthKey(log.created_at) === accumulationMonth) &&
+      (!normalizedSearch ||
+        matchesSearchText(log.employee_name, normalizedSearch) ||
+        matchesSearchText(log.product_name, normalizedSearch) ||
+        matchesSearchText(log.customer_name, normalizedSearch) ||
+        matchesSearchText(log.invoice_number, normalizedSearch))
     )
 
     matchingLogs.forEach(log => {
@@ -217,7 +234,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       if (comparison === 0) comparison = collator.compare(a.employee_name, b.employee_name)
       return accumulationSort.direction === 'asc' ? comparison : -comparison
     })
-  }, [productionHistory, normalizedSearch, accumulationSort])
+  }, [productionHistory, normalizedSearch, accumulationMonth, accumulationSort])
 
   const handleAccumulationSort = (key) => {
     setAccumulationSort(current => ({
@@ -445,6 +462,27 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div className="w-full space-y-1.5 sm:max-w-xs">
+              <label htmlFor="production-accumulation-month" className="text-xs font-medium text-foreground/60">Bulan</label>
+              <select
+                id="production-accumulation-month"
+                value={accumulationMonth}
+                onChange={event => {
+                  setAccumulationMonth(event.target.value)
+                  setExpandedEmployeeId(null)
+                }}
+                className="glass-input h-10 w-full text-sm"
+              >
+                <option value="ALL">Semua Bulan</option>
+                {accumulationMonths.map(month => (
+                  <option key={month} value={month}>
+                    {new Date(`${month}-01T12:00:00+07:00`).toLocaleDateString('id-ID', { month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta' })}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full min-w-[680px] text-left text-sm">
