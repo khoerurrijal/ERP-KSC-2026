@@ -312,9 +312,6 @@ export default function SalesClient({
       if (itemSortConfig.key === 'customers_name') {
         aVal = custA?.name || ''
         bVal = custB?.name || ''
-      } else if (itemSortConfig.key === 'invoice_number') {
-        aVal = soA?.invoice_number || ''
-        bVal = soB?.invoice_number || ''
       } else if (itemSortConfig.key === 'product_name') {
         aVal = prodA?.name || a.product_name || a.item_name || ''
         bVal = prodB?.name || b.product_name || b.item_name || ''
@@ -567,7 +564,7 @@ export default function SalesClient({
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-4 py-3 font-medium">SO Date / Ref</th>
+                  <th className="px-4 py-3 font-medium">Tanggal SO</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', itemSortConfig)}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('product_name')}>Produk {renderSortIcon('product_name', itemSortConfig)}</th>
                   <th className="px-4 py-3 font-medium text-center">Qty</th>
@@ -607,7 +604,6 @@ export default function SalesClient({
                     <tr key={item.id} className="hover:bg-white/5 transition-colors">
                       <td className="px-4 py-2 align-middle">
                         <p className="text-xs text-foreground/80">{so?.date ? new Date(so.date).toLocaleDateString('id-ID') : '-'}</p>
-                        <p className="text-[9px] text-foreground/40 mt-0.5">{so?.invoice_number || '-'}</p>
                       </td>
                       <td className="px-4 py-2 align-middle text-xs font-semibold text-white/90">
                         {cust?.name || '-'}

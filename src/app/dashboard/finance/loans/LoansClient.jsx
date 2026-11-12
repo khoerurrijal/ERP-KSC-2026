@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { Plus, CheckCircle2, X, Loader2, Trash2, Pencil, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react'
 import { createLoans, deleteLoan, updateLoan } from './actions'
 import CustomSelect from '@/components/CustomSelect'
+import CustomDatePicker from '@/components/CustomDatePicker'
 
 const getTodayInJakarta = () => {
   const parts = new Intl.DateTimeFormat('en-GB', {
@@ -298,7 +299,7 @@ export default function LoansClient({ employees = [], initialLoans = [], error =
 
                     <div className="space-y-2">
                       <label className="text-xs font-medium text-foreground/80">Tanggal Pengajuan</label>
-                      <input type="date" value={entry.date} onChange={event => updateEntry(index, 'date', event.target.value)} className="glass-input w-full" />
+                      <CustomDatePicker value={entry.date} onChange={value => updateEntry(index, 'date', value)} menuZIndex={10010} />
                     </div>
 
                     <div className="space-y-2">

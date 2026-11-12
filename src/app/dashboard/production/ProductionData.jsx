@@ -121,7 +121,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   if (canSeeProductionAccumulation) {
     let productionLogsQuery = supabase
       .from('production_logs')
-      .select('id, job_id, employee_id, qty_processed, created_at')
+      .select('id, job_id, employee_id, qty_processed, processed_date, created_at')
       .order('created_at', { ascending: false })
       .limit(10000)
     if (isOperatorAccount) productionLogsQuery = productionLogsQuery.eq('employee_id', matchedOperator.id)
@@ -131,7 +131,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
     const employeeIds = [...new Set((rawLogs || []).map(log => log.employee_id).filter(Boolean))]
     const [{ data: historyItems }, { data: historyEmployees }] = await Promise.all([
       jobIds.length
-        ? supabase.from('sales_items').select('id, product_code, order_type, sales_orders (invoice_number, customers (name)), products (name)').in('id', jobIds)
+        ? supabase.from('sales_items').select('id, product_code, order_type, sales_orders (customers (name)), products (name)').in('id', jobIds)
         : Promise.resolve({ data: [] }),
       employeeIds.length
         ? supabase.from('employees').select('id, full_name').in('id', employeeIds)
@@ -147,10 +147,10 @@ export default async function ProductionData({ mode = 'production', embedded = f
         employee_id: log.employee_id || 'unassigned',
         employee_name: employeeById.get(log.employee_id) || (log.employee_id ? 'Karyawan tidak diketahui' : 'Tanpa operator'),
         qty_processed: Number(log.qty_processed || 0),
+        processed_date: log.processed_date,
         created_at: log.created_at,
         product_name: item?.products?.name || item?.product_code || 'Item dihapus',
         customer_name: item?.sales_orders?.customers?.name || '-',
-        invoice_number: item?.sales_orders?.invoice_number || '-',
         order_type: item?.order_type || '-'
       }
     })

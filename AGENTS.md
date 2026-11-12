@@ -60,6 +60,11 @@
 - Pencarian umum harus cocok dengan istilah yang mudah diketahui pengguna, seperti nama pelanggan/brand, nama produk, status, keterangan pekerjaan, atau kode operasional yang memang digunakan pengguna.
 - Nomor invoice boleh tetap tampil sebagai referensi internal dan dipakai pada halaman khusus yang memang meminta nomor invoice, seperti `/track` atau `/invoice`; jangan memasukkannya sebagai sumber pencarian umum.
 
+## LOCKED — pola pemilih tanggal
+- Semua kontrol untuk memilih tanggal di ERP WAJIB memakai pola visual dan interaksi `src/components/CustomDatePicker.jsx` sebagai satu standar, termasuk navigasi bulan, urutan hari, penanda tanggal terpilih/hari ini, posisi popup, dan perilaku mobile.
+- Jangan membuat kalender khusus per halaman atau memakai native `<input type="date">`. Jika butuh rentang tanggal, perluas `CustomDatePicker` agar tetap memakai pola kalender yang sama.
+- Perubahan aturan tanggal hanya boleh dilakukan Owner secara eksplisit.
+
 # Project Instructions for AI Agent
 
 ## Framework

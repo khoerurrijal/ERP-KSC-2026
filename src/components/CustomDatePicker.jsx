@@ -14,20 +14,38 @@ const MONTHS = [
 
 const DAYS = ['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab']
 
-export default function CustomDatePicker({ value, onChange, className = "" }) {
+const parseDateValue = (value) => {
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value || '')) {
+    const [year, month, day] = value.split('-').map(Number)
+    return new Date(year, month - 1, day)
+  }
+  return value ? new Date(value) : new Date()
+}
+
+const getDateKey = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+
+const formatDateLabel = (value) => {
+  if (!value) return 'Pilih Tanggal'
+  const date = parseDateValue(value)
+  if (isNaN(date.getTime())) return 'Pilih Tanggal'
+  return `${date.getDate()} ${MONTHS[date.getMonth()]} ${date.getFullYear()}`
+}
+
+export default function CustomDatePicker({ value, onChange, className = "", endValue, onRangeChange, menuZIndex = 2000 }) {
   const [isOpen, setIsOpen] = useState(false)
   const popoverRef = useRef(null)
   const menuRef = useRef(null)
   const [menuStyle, setMenuStyle] = useState(null)
+  const [rangeSelectionStep, setRangeSelectionStep] = useState('from')
+  const isRange = typeof endValue === 'string' && typeof onRangeChange === 'function'
   
-  // Parse initial value or use current date
-  const initialDate = value ? new Date(value) : new Date()
+  const initialDate = parseDateValue(value)
   const [displayYear, setDisplayYear] = useState(initialDate.getFullYear())
   const [displayMonth, setDisplayMonth] = useState(initialDate.getMonth())
 
   useEffect(() => {
     if (value) {
-      const d = new Date(value)
+      const d = parseDateValue(value)
       if (!isNaN(d.getTime())) {
         setDisplayYear(d.getFullYear())
         setDisplayMonth(d.getMonth())
@@ -58,7 +76,7 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
       if (!anchor) return
 
       const width = Math.min(288, window.innerWidth - 24)
-      const estimatedHeight = 340
+      const estimatedHeight = isRange ? 420 : 340
       const spaceBelow = Math.max(0, window.innerHeight - anchor.bottom - 20)
       const spaceAbove = Math.max(0, anchor.top - 20)
       const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
@@ -72,7 +90,7 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
         width,
         maxHeight: availableHeight,
         overflowY: 'auto',
-        zIndex: 2000,
+        zIndex: menuZIndex,
         transform: opensAbove ? 'translateY(-100%)' : undefined
       })
     }
@@ -84,7 +102,7 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
     }
-  }, [isOpen])
+  }, [isOpen, isRange, menuZIndex])
 
   const handlePrevMonth = () => {
     if (displayMonth === 0) {
@@ -105,13 +123,31 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
   }
 
   const handleSelectDate = (day) => {
-    const newDate = new Date(displayYear, displayMonth, day)
-    const year = newDate.getFullYear()
-    const month = String(newDate.getMonth() + 1).padStart(2, '0')
-    const dateStr = String(newDate.getDate()).padStart(2, '0')
-    const formatted = `${year}-${month}-${dateStr}`
-    
-    onChange(formatted)
+    const formatted = getDateKey(new Date(displayYear, displayMonth, day))
+
+    if (!isRange) {
+      onChange(formatted)
+      setIsOpen(false)
+      return
+    }
+
+    if (rangeSelectionStep === 'from') {
+      onRangeChange({ start: formatted, end: formatted })
+      setRangeSelectionStep('to')
+      return
+    }
+
+    const start = formatted < value ? formatted : value
+    const end = formatted < value ? value : formatted
+    onRangeChange({ start, end })
+    setRangeSelectionStep('from')
+    setIsOpen(false)
+  }
+
+  const handleCurrentMonth = () => {
+    const today = getDateKey(new Date())
+    onRangeChange({ start: `${today.slice(0, 7)}-01`, end: today })
+    setRangeSelectionStep('from')
     setIsOpen(false)
   }
 
@@ -129,17 +165,18 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
   }
 
   const getDisplayLabel = () => {
-    if (!value) return 'Pilih Tanggal'
-    const d = new Date(value)
-    if (isNaN(d.getTime())) return 'Pilih Tanggal'
-    return `${d.getDate()} ${MONTHS[d.getMonth()]} ${d.getFullYear()}`
+    const startLabel = formatDateLabel(value)
+    return isRange ? `${startLabel} – ${formatDateLabel(endValue)}` : startLabel
   }
 
   return (
     <div className={`relative ${className}`} ref={popoverRef}>
       <button 
         type="button"
-        onClick={() => setIsOpen(!isOpen)}
+        onClick={() => {
+          if (!isOpen && isRange) setRangeSelectionStep('from')
+          setIsOpen(!isOpen)
+        }}
         className="glass-input h-10 px-4 w-full flex items-center justify-between gap-2 text-sm font-medium hover:bg-white/10 transition-colors focus:outline-none"
       >
         <div className="flex items-center gap-2 truncate">
@@ -179,7 +216,13 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
               if (day === null) {
                 return <div key={`empty-${idx}`} className="w-8 h-8"></div>
               }
-              const isSelected = value && new Date(value).getDate() === day && new Date(value).getMonth() === displayMonth && new Date(value).getFullYear() === displayYear
+              const dayKey = getDateKey(new Date(displayYear, displayMonth, day))
+              const isStartDate = value && dayKey === value
+              const isEndDate = isRange && endValue && dayKey === endValue
+              const rangeStart = value < endValue ? value : endValue
+              const rangeEnd = value < endValue ? endValue : value
+              const isInRange = isRange && dayKey > rangeStart && dayKey < rangeEnd
+              const isSelected = isStartDate || isEndDate
               const isToday = new Date().getDate() === day && new Date().getMonth() === displayMonth && new Date().getFullYear() === displayYear
               
               return (
@@ -190,6 +233,8 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
                   className={`w-8 h-8 rounded-full flex items-center justify-center text-sm transition-all duration-200 
                     ${isSelected 
                       ? 'bg-primary text-primary-foreground font-bold shadow-[0_0_10px_rgba(212,175,55,0.5)]' 
+                      : isInRange
+                        ? 'bg-primary/20 text-primary'
                       : isToday
                         ? 'bg-white/10 text-primary font-bold border border-primary/50'
                         : 'hover:bg-white/10 text-foreground/80 hover:text-foreground'
@@ -200,6 +245,24 @@ export default function CustomDatePicker({ value, onChange, className = "" }) {
               )
             })}
           </div>
+          {isRange && (
+            <div className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3">
+              <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs leading-relaxed text-foreground/55">
+                <span className={rangeSelectionStep === 'from' ? 'font-semibold text-primary' : ''}>Dari</span>
+                <span>{formatDateLabel(value)}</span>
+                <span className={rangeSelectionStep === 'to' ? 'font-semibold text-primary' : ''}>Ke</span>
+                <span>{rangeSelectionStep === 'to' ? 'Pilih tanggal' : formatDateLabel(endValue)}</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleCurrentMonth}
+                className="glass-input flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none"
+              >
+                <Calendar className="w-4 h-4 text-primary shrink-0" />
+                Bulan Ini
+              </button>
+            </div>
+          )}
         </div>,
         document.body
       )}

@@ -4,6 +4,19 @@ import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { createAdminNotification } from '@/lib/adminNotifications'
 
+function getJakartaDateKey(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Asia/Jakarta',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(date)
+  const year = parts.find(part => part.type === 'year')?.value
+  const month = parts.find(part => part.type === 'month')?.value
+  const day = parts.find(part => part.type === 'day')?.value
+  return year && month && day ? `${year}-${month}-${day}` : ''
+}
+
 function getProductionProgressError(error) {
   const message = String(error?.message || error || 'Gagal menyimpan progress produksi.')
   if (message.includes('PRODUCTION_PROGRESS_CHANGED')) {
@@ -28,7 +41,7 @@ export async function saveProductionProgress(payload) {
       p_qty_processed: payload.qty_processed,
       p_qty_defect: payload.qty_defect || 0,
       p_notes: payload.notes || '',
-      p_processed_date: new Date().toISOString().slice(0, 10),
+      p_processed_date: getJakartaDateKey(),
       p_expected_total_qty: payload.expected_total_qty,
       p_correction_total: null
     })
@@ -290,7 +303,7 @@ export async function correctProductionProgress(jobId, newTotalQty, employeeId, 
       p_qty_processed: 0,
       p_qty_defect: 0,
       p_notes: 'Koreksi Qty oleh Admin',
-      p_processed_date: new Date().toISOString().slice(0, 10),
+      p_processed_date: getJakartaDateKey(),
       p_expected_total_qty: expectedTotal,
       p_correction_total: correctedTotal
     })
@@ -306,5 +319,85 @@ export async function correctProductionProgress(jobId, newTotalQty, employeeId, 
   } catch (err) {
     console.error('Error correcting progress:', err)
     return { success: false, error: getProductionProgressError(err) }
+  }
+}
+
+export async function updateProductionLogQty(logId, newQty, processedDate, expectedQty, expectedProcessedDate, newEmployeeId, expectedEmployeeId) {
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'], 'Hanya Admin/Owner yang dapat mengedit catatan produksi.')
+
+  try {
+    const nextQty = Number(newQty)
+    const expected = Number(expectedQty)
+    const nextDate = String(processedDate || '')
+    const dateValue = new Date(`${nextDate}T00:00:00.000Z`)
+    const isValidDate = /^\d{4}-\d{2}-\d{2}$/.test(nextDate) && Number.isFinite(dateValue.getTime()) && dateValue.toISOString().slice(0, 10) === nextDate
+    const expectedDate = expectedProcessedDate || null
+    const expectedEmployee = String(expectedEmployeeId || '')
+    const nextEmployee = String(newEmployeeId || '')
+    if (!logId || !Number.isSafeInteger(nextQty) || !Number.isSafeInteger(expected) || !isValidDate) {
+      throw new Error('Tanggal atau Qty catatan produksi tidak valid.')
+    }
+
+    const { data: currentLog, error: readError } = await supabase
+      .from('production_logs')
+      .select('job_id, qty_processed, processed_date, employee_id')
+      .eq('id', logId)
+      .maybeSingle()
+
+    if (readError) throw readError
+    if (!currentLog) throw new Error('Catatan produksi sudah tidak tersedia. Muat ulang daftar.')
+    if (Number(currentLog.qty_processed || 0) !== expected) {
+      throw new Error('Catatan ini sudah berubah. Muat ulang daftar sebelum mengedit lagi.')
+    }
+    if ((currentLog.processed_date || null) !== expectedDate) {
+      throw new Error('Tanggal catatan ini sudah berubah. Muat ulang daftar sebelum mengedit lagi.')
+    }
+    if (String(currentLog.employee_id || '') !== expectedEmployee) {
+      throw new Error('Operator catatan ini sudah berubah. Muat ulang daftar sebelum mengedit lagi.')
+    }
+
+    const updateValues = { qty_processed: nextQty, processed_date: nextDate }
+    if (nextEmployee !== expectedEmployee) {
+      if (nextEmployee) {
+        const { data: selectedEmployee, error: employeeError } = await supabase
+          .from('employees')
+          .select('id, is_active, salary_schemas(role_name)')
+          .eq('id', nextEmployee)
+          .maybeSingle()
+
+        if (employeeError) throw employeeError
+        const roleName = Array.isArray(selectedEmployee?.salary_schemas)
+          ? selectedEmployee.salary_schemas[0]?.role_name
+          : selectedEmployee?.salary_schemas?.role_name
+        if (!selectedEmployee?.is_active || !String(roleName || '').toLowerCase().includes('operator')) {
+          throw new Error('Pilih operator aktif yang valid.')
+        }
+      }
+      updateValues.employee_id = nextEmployee || null
+    }
+
+    let updateQuery = supabase
+      .from('production_logs')
+      .update(updateValues)
+      .eq('id', logId)
+      .eq('qty_processed', expected)
+    updateQuery = expectedDate
+      ? updateQuery.eq('processed_date', expectedDate)
+      : updateQuery.is('processed_date', null)
+    updateQuery = expectedEmployee
+      ? updateQuery.eq('employee_id', expectedEmployee)
+      : updateQuery.is('employee_id', null)
+
+    const { data: updatedLog, error: updateError } = await updateQuery.select('job_id').maybeSingle()
+
+    if (updateError) throw updateError
+    if (!updatedLog) throw new Error('Catatan ini baru saja berubah. Muat ulang daftar sebelum mengedit lagi.')
+
+    await handleAutoStatusUpdate(updatedLog.job_id)
+    revalidatePath('/dashboard/production')
+    return { success: true }
+  } catch (err) {
+    console.error('Error updating production log:', err)
+    return { success: false, error: err.message || 'Gagal menyimpan perubahan catatan produksi.' }
   }
 }

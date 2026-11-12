@@ -55,7 +55,6 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
               <div>
                 <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider">Nama / Brand</p>
                 <h2 className="text-lg font-bold text-primary">{order.customerName || 'Pelanggan'}</h2>
-                <p className="text-xs text-foreground/60">Invoice: {order.invoiceNumber || '-'}</p>
                 <p className="text-sm text-foreground/70">
                   Tanggal pesan: {order.orderDate ? new Date(order.orderDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} · {order.paymentStatus}
                 </p>

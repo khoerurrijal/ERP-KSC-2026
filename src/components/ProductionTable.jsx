@@ -1,15 +1,12 @@
 'use client'
 
-/* The layout effect positions the calendar popover against the viewport. */
-/* eslint-disable react-hooks/set-state-in-effect */
-
-import { Fragment, useState, useMemo, useEffect, useCallback, useRef, useLayoutEffect } from 'react'
-import { createPortal } from 'react-dom'
+import { Fragment, useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X, CheckCircle2, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, RefreshCw, Calendar } from 'lucide-react'
+import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
 
-import { saveProductionProgress, correctProductionProgress } from '@/app/dashboard/production/actions'
+import { saveProductionProgress, correctProductionProgress, updateProductionLogQty } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
+import CustomDatePicker from '@/components/CustomDatePicker'
 import TrackingTimeline from '@/components/TrackingTimeline'
 import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
@@ -23,6 +20,16 @@ const getDisplayStatus = (st) => {
 }
 
 const formatMobileQuantity = (value) => Number(value || 0).toLocaleString('id-ID')
+const formatProductionDate = (value) => {
+  if (!value) return '-'
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return formatJakartaDateLabel(value)
+  return new Date(value).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta' })
+}
+const isValidProductionDate = (value) => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const date = new Date(`${value}T00:00:00.000Z`)
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
+}
 const getJakartaMonthKey = (value) => {
   const date = new Date(value)
   if (!Number.isFinite(date.getTime())) return ''
@@ -49,16 +56,11 @@ const getJakartaDateKey = (value) => {
   const day = parts.find(part => part.type === 'day')?.value
   return year && month && day ? `${year}-${month}-${day}` : ''
 }
+const getProductionDateValue = (log) => log?.processed_date || getJakartaDateKey(log?.created_at)
 const formatJakartaDateLabel = (value) => {
   if (!value) return '-'
   return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', {
     day: 'numeric', month: 'short', year: 'numeric', timeZone: 'Asia/Jakarta'
-  })
-}
-const formatDatePickerLabel = (value) => {
-  if (!value) return '-'
-  return new Date(`${value}T12:00:00+07:00`).toLocaleDateString('id-ID', {
-    day: 'numeric', month: 'long', year: 'numeric', timeZone: 'Asia/Jakarta'
   })
 }
 const formatJakartaMonthLabel = (value) => {
@@ -101,6 +103,12 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   // Correction Modal
   const [isCorrectionModalOpen, setIsCorrectionModalOpen] = useState(false)
   const [correctionQty, setCorrectionQty] = useState('')
+  const [editingProductionLog, setEditingProductionLog] = useState(null)
+  const [productionLogQtyDraft, setProductionLogQtyDraft] = useState('')
+  const [productionLogDateDraft, setProductionLogDateDraft] = useState('')
+  const [productionLogEmployeeDraft, setProductionLogEmployeeDraft] = useState('')
+  const [productionLogEditError, setProductionLogEditError] = useState('')
+  const [isSavingProductionLog, setIsSavingProductionLog] = useState(false)
 
   // Form State
   const [employeeId, setEmployeeId] = useState('')
@@ -118,20 +126,12 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const [accumulationSort, setAccumulationSort] = useState({ key: 'qty', direction: 'desc' })
   const [accumulationDateFrom, setAccumulationDateFrom] = useState(() => `${getJakartaMonthKey(new Date())}-01`)
   const [accumulationDateTo, setAccumulationDateTo] = useState(() => getJakartaDateKey(new Date()))
-  const [isAccumulationFilterOpen, setIsAccumulationFilterOpen] = useState(false)
-  const accumulationFilterButtonRef = useRef(null)
-  const accumulationFilterMenuRef = useRef(null)
-  const [accumulationFilterMenuStyle, setAccumulationFilterMenuStyle] = useState(null)
-  const [rangeSelectionStep, setRangeSelectionStep] = useState('from')
-  const [calendarView, setCalendarView] = useState(() => {
-    const [year, month] = getJakartaMonthKey(new Date()).split('-').map(Number)
-    return { year, month: month - 1 }
-  })
   const [expandedEmployeeId, setExpandedEmployeeId] = useState(null)
 
   const [soPage, setSoPage] = useState(1)
   const [prodPage, setProdPage] = useState(1)
   const isLightweightRole = !['Owner', 'Admin'].includes(userRole)
+  const canEditProductionHistory = ['OWNER', 'ADMIN'].includes(String(userRole).toUpperCase())
   const pageSize = isLightweightRole ? 20 : 50
   const selectedJobRemainingQty = selectedJob
     ? Math.max(0, Number(selectedJob.qty_target || 0) - Number(selectedJob.qty_processed || 0))
@@ -243,17 +243,17 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const productionAccumulation = useMemo(() => {
     const months = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
-      getJakartaDateKey(log.created_at) >= accumulationDateFrom &&
-      getJakartaDateKey(log.created_at) <= accumulationDateTo &&
+      getProductionDateValue(log) >= accumulationDateFrom &&
+      getProductionDateValue(log) <= accumulationDateTo &&
       (!normalizedSearch ||
         matchesSearchText(log.employee_name, normalizedSearch) ||
         matchesSearchText(log.product_name, normalizedSearch) ||
-        matchesSearchText(log.customer_name, normalizedSearch) ||
-        matchesSearchText(log.invoice_number, normalizedSearch))
+        matchesSearchText(log.customer_name, normalizedSearch))
     )
 
     matchingLogs.forEach(log => {
-      const monthKey = getJakartaMonthKey(log.created_at)
+      const productionDate = getProductionDateValue(log)
+      const monthKey = getJakartaMonthKey(productionDate)
       if (!months.has(monthKey)) months.set(monthKey, new Map())
       const employees = months.get(monthKey)
       const employeeKey = String(log.employee_id || 'unknown')
@@ -263,14 +263,14 @@ export default function ProductionTable({ productionJobs, productionHistory = []
           employee_name: log.employee_name || 'Karyawan tidak diketahui',
           qty: 0,
           log_count: 0,
-          latest_at: log.created_at,
+          latest_at: productionDate,
           logs: []
         })
       }
       const group = employees.get(employeeKey)
       group.qty += Number(log.qty_processed || 0)
       group.log_count += 1
-      if (Date.parse(log.created_at || '') > Date.parse(group.latest_at || '')) group.latest_at = log.created_at
+      if (Date.parse(productionDate || '') > Date.parse(group.latest_at || '')) group.latest_at = productionDate
       group.logs.push(log)
     })
 
@@ -298,106 +298,11 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       })
   }, [productionHistory, normalizedSearch, accumulationDateFrom, accumulationDateTo, accumulationSort])
 
-  const handleAccumulationCurrentMonth = () => {
-    const today = getJakartaDateKey(new Date())
-    const currentMonth = getJakartaMonthKey(new Date())
-    const [year, month] = currentMonth.split('-').map(Number)
-    setCalendarView({ year, month: month - 1 })
-    setAccumulationDateFrom(`${currentMonth}-01`)
-    setAccumulationDateTo(today)
-    setRangeSelectionStep('from')
+  const handleAccumulationDateRangeChange = ({ start, end }) => {
+    setAccumulationDateFrom(start)
+    setAccumulationDateTo(end)
     setExpandedEmployeeId(null)
-    setIsAccumulationFilterOpen(false)
   }
-
-  const handleAccumulationDateSelect = (day) => {
-    const month = String(calendarView.month + 1).padStart(2, '0')
-    const selectedDate = `${calendarView.year}-${month}-${String(day).padStart(2, '0')}`
-    if (rangeSelectionStep === 'from') {
-      setAccumulationDateFrom(selectedDate)
-      setAccumulationDateTo(selectedDate)
-      setRangeSelectionStep('to')
-      setExpandedEmployeeId(null)
-    } else {
-      if (selectedDate < accumulationDateFrom) {
-        setAccumulationDateFrom(selectedDate)
-        setAccumulationDateTo(accumulationDateFrom)
-      } else {
-        setAccumulationDateTo(selectedDate)
-      }
-      setRangeSelectionStep('from')
-      setExpandedEmployeeId(null)
-    }
-  }
-
-  const changeAccumulationCalendarMonth = (offset) => {
-    setCalendarView(current => {
-      const nextMonth = new Date(current.year, current.month + offset, 1)
-      return { year: nextMonth.getFullYear(), month: nextMonth.getMonth() }
-    })
-  }
-
-  const calendarMonthLabel = new Date(calendarView.year, calendarView.month, 1)
-    .toLocaleDateString('id-ID', { month: 'long', year: 'numeric' })
-  const calendarDays = [
-    ...Array(new Date(calendarView.year, calendarView.month, 1).getDay()).fill(null),
-    ...Array.from({ length: new Date(calendarView.year, calendarView.month + 1, 0).getDate() }, (_, index) => index + 1)
-  ]
-
-  useEffect(() => {
-    if (!isAccumulationFilterOpen) return undefined
-
-    const handleClickOutside = (event) => {
-      if (
-        !accumulationFilterButtonRef.current?.contains(event.target) &&
-        !accumulationFilterMenuRef.current?.contains(event.target)
-      ) {
-        setIsAccumulationFilterOpen(false)
-      }
-    }
-
-    document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isAccumulationFilterOpen])
-
-  useLayoutEffect(() => {
-    if (!isAccumulationFilterOpen) {
-      setAccumulationFilterMenuStyle(null)
-      return undefined
-    }
-
-    const updateMenuPosition = () => {
-      const anchor = accumulationFilterButtonRef.current?.getBoundingClientRect()
-      if (!anchor) return
-
-      const width = Math.min(288, window.innerWidth - 24)
-      const estimatedHeight = 430
-      const spaceBelow = Math.max(0, window.innerHeight - anchor.bottom - 12)
-      const spaceAbove = Math.max(0, anchor.top - 12)
-      const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
-      const availableHeight = Math.min(estimatedHeight, opensAbove ? spaceAbove : spaceBelow)
-      const left = Math.min(Math.max(12, anchor.right - width), window.innerWidth - width - 12)
-
-      setAccumulationFilterMenuStyle({
-        position: 'fixed',
-        left,
-        top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
-        width,
-        maxHeight: availableHeight,
-        overflowY: 'auto',
-        zIndex: 2000,
-        transform: opensAbove ? 'translateY(-100%)' : undefined
-      })
-    }
-
-    updateMenuPosition()
-    window.addEventListener('resize', updateMenuPosition)
-    window.addEventListener('scroll', updateMenuPosition, true)
-    return () => {
-      window.removeEventListener('resize', updateMenuPosition)
-      window.removeEventListener('scroll', updateMenuPosition, true)
-    }
-  }, [isAccumulationFilterOpen])
 
   const handleAccumulationSort = (key) => {
     setAccumulationSort(current => ({
@@ -469,6 +374,47 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       alert("Error system");
     } finally {
       setLoading(false);
+    }
+  }
+
+  const openProductionLogEditor = (log) => {
+    if (!canEditProductionHistory) return
+    setEditingProductionLog(log)
+    setProductionLogQtyDraft(String(log.qty_processed ?? 0))
+    setProductionLogDateDraft(getProductionDateValue(log))
+    setProductionLogEmployeeDraft(log.employee_id === 'unassigned' ? '' : String(log.employee_id || ''))
+    setProductionLogEditError('')
+  }
+
+  const handleSaveProductionLog = async () => {
+    const nextQty = Number(productionLogQtyDraft)
+    if (!editingProductionLog || productionLogQtyDraft.trim() === '' || !Number.isSafeInteger(nextQty) || !isValidProductionDate(productionLogDateDraft)) {
+      setProductionLogEditError('Masukkan tanggal dan Qty berupa bilangan bulat yang valid.')
+      return
+    }
+
+    setIsSavingProductionLog(true)
+    setProductionLogEditError('')
+    try {
+      const result = await updateProductionLogQty(
+        editingProductionLog.id,
+        nextQty,
+        productionLogDateDraft,
+        Number(editingProductionLog.qty_processed || 0),
+        editingProductionLog.processed_date || null,
+        productionLogEmployeeDraft,
+        editingProductionLog.employee_id === 'unassigned' ? '' : String(editingProductionLog.employee_id || '')
+      )
+      if (!result.success) {
+        setProductionLogEditError(result.error || 'Gagal menyimpan perubahan.')
+        return
+      }
+      setEditingProductionLog(null)
+      router.refresh()
+    } catch (error) {
+      setProductionLogEditError(error.message || 'Terjadi kesalahan saat menyimpan.')
+    } finally {
+      setIsSavingProductionLog(false)
     }
   }
 
@@ -577,7 +523,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                     <p className="text-xs text-foreground/70 uppercase">
                       {item.sales_order_items?.products?.product_name || item.sales_order_items?.products?.name} ({item.qty_target} {item.unit || 'pcs'})
                     </p>
-                    <p className="text-[10px] text-foreground/50 mt-0.5">{item.sales_order_items?.sales_orders?.invoice_number}</p>
                   </div>
                   
                   {/* Bagian Tengah: Timeline UI */}
@@ -624,88 +569,12 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       {activeTab === 'AKUMULASI' && canSeeAccumulationTab && (
         <div className="space-y-4">
           <div className="relative flex justify-end">
-            <button
-              ref={accumulationFilterButtonRef}
-              type="button"
-              aria-expanded={isAccumulationFilterOpen}
-              aria-label="Pilih rentang tanggal akumulasi produksi"
-              onClick={() => setIsAccumulationFilterOpen(open => !open)}
-              className="glass-input flex h-10 w-full items-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none sm:w-auto"
-            >
-              <span className="flex min-w-0 items-center gap-2">
-                <Calendar className="h-4 w-4 shrink-0 text-primary" />
-                <span className="truncate">{formatDatePickerLabel(accumulationDateFrom)} – {formatDatePickerLabel(accumulationDateTo)}</span>
-              </span>
-            </button>
-
-            {isAccumulationFilterOpen && accumulationFilterMenuStyle && typeof document !== 'undefined' && createPortal(
-              <div
-                ref={accumulationFilterMenuRef}
-                style={accumulationFilterMenuStyle}
-                className="rounded-xl border border-white/10 bg-[#18181B] p-4 shadow-2xl animate-in fade-in zoom-in-95 duration-200"
-              >
-                <div className="mb-3 flex items-center justify-between border-b border-white/10 pb-2">
-                  <button
-                    type="button"
-                    aria-label="Bulan sebelumnya"
-                    onClick={() => changeAccumulationCalendarMonth(-1)}
-                    className="rounded-full p-1 text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground"
-                  >
-                    <ChevronLeft className="h-5 w-5" />
-                  </button>
-                  <span className="text-sm font-bold text-primary">{calendarMonthLabel}</span>
-                  <button
-                    type="button"
-                    aria-label="Bulan berikutnya"
-                    onClick={() => changeAccumulationCalendarMonth(1)}
-                    className="rounded-full p-1 text-foreground/70 transition-colors hover:bg-white/10 hover:text-foreground"
-                  >
-                    <ChevronRight className="h-5 w-5" />
-                  </button>
-                </div>
-                <div className="mb-2 grid grid-cols-7 gap-1 text-center">
-                  {['Min', 'Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab'].map(day => (
-                    <span key={day} className="text-[10px] font-bold uppercase text-foreground/50">{day}</span>
-                  ))}
-                </div>
-                <div className="grid grid-cols-7 gap-1 text-center">
-                  {calendarDays.map((day, index) => {
-                    if (day === null) return <span key={`empty-${index}`} className="h-8 w-8" />
-                    const dayKey = `${calendarView.year}-${String(calendarView.month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-                    const isRangeEdge = dayKey === accumulationDateFrom || dayKey === accumulationDateTo
-                    const isInRange = dayKey > accumulationDateFrom && dayKey < accumulationDateTo
-                    const isToday = dayKey === getJakartaDateKey(new Date())
-                    return (
-                      <button
-                        key={day}
-                        type="button"
-                        onClick={() => handleAccumulationDateSelect(day)}
-                        className={`flex h-8 w-8 items-center justify-center rounded-full text-sm transition-all duration-200 ${isRangeEdge ? 'bg-primary font-bold text-primary-foreground shadow-[0_0_10px_rgba(212,175,55,0.5)]' : isInRange ? 'bg-primary/20 text-primary' : isToday ? 'border border-primary/50 bg-white/10 font-bold text-primary' : 'text-foreground/80 hover:bg-white/10 hover:text-foreground'}`}
-                      >
-                        {day}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div className="mt-3 flex flex-col gap-3 border-t border-white/10 pt-3">
-                  <div className="grid grid-cols-[2.5rem_minmax(0,1fr)] gap-x-2 gap-y-1 text-xs leading-relaxed text-foreground/55">
-                    <span className={rangeSelectionStep === 'from' ? 'font-semibold text-primary' : ''}>Dari</span>
-                    <span>{formatDatePickerLabel(accumulationDateFrom)}</span>
-                    <span className={rangeSelectionStep === 'to' ? 'font-semibold text-primary' : ''}>Ke</span>
-                    <span>{rangeSelectionStep === 'to' ? 'Pilih tanggal' : formatDatePickerLabel(accumulationDateTo)}</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={handleAccumulationCurrentMonth}
-                    className="glass-input flex h-10 w-full items-center justify-center gap-2 px-4 text-sm font-medium transition-colors hover:bg-white/10 focus:outline-none"
-                  >
-                    <Calendar className="h-4 w-4 text-primary" />
-                    Bulan Ini
-                  </button>
-                </div>
-              </div>,
-              document.body
-            )}
+            <CustomDatePicker
+              value={accumulationDateFrom}
+              endValue={accumulationDateTo}
+              onRangeChange={handleAccumulationDateRangeChange}
+              className="w-full sm:w-[360px]"
+            />
           </div>
           <div className="glass-card overflow-hidden">
             <div className="overflow-x-auto">
@@ -769,25 +638,46 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                               <td className="px-4 py-3 font-bold text-green-400">{formatMobileQuantity(group.qty)} pcs</td>
                               <td className="px-4 py-3 text-foreground/70">{formatMobileQuantity(group.log_count)}</td>
                               <td className="px-4 py-3 text-foreground/70">
-                                {group.latest_at ? new Date(group.latest_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}
+                                {formatProductionDate(group.latest_at)}
                               </td>
                             </tr>
                             {isExpanded && (
                               <tr>
                                 <td colSpan="4" className="bg-black/15 px-4 py-3">
                                   <div className="space-y-2">
-                                    {group.logs.map((log, index) => (
-                                      <div key={log.id || `${expansionKey}-${log.created_at}-${index}`} className="grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3">
+                                    {group.logs.map((log, index) => {
+                                      const rowKey = log.id || `${expansionKey}-${log.processed_date}-${log.created_at}-${index}`
+                                      const productionDate = getProductionDateValue(log)
+                                      const productionTime = log.created_at ? new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) : ''
+                                      const rowContent = <>
                                         <span className="text-foreground/50">
-                                          {log.created_at ? new Date(log.created_at).toLocaleString('id-ID', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '-'}
+                                          {productionDate ? `${formatProductionDate(productionDate)}${productionTime ? `, ${productionTime}` : ''}` : '-'}
                                         </span>
                                         <span className="min-w-0 text-foreground/75">
                                           <span className="font-semibold text-foreground">{log.product_name}</span>
-                                          <span className="block truncate text-foreground/45">{log.customer_name} · {log.invoice_number}</span>
+                                          <span className="block truncate text-foreground/45">{log.customer_name}</span>
                                         </span>
-                                        <span className="font-bold text-green-400">{formatMobileQuantity(log.qty_processed)} pcs</span>
-                                      </div>
-                                    ))}
+                                        <span className={`flex items-center gap-2 font-bold ${Number(log.qty_processed) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                          {formatMobileQuantity(log.qty_processed)} pcs
+                                          {canEditProductionHistory && <Pencil aria-hidden="true" className="h-3 w-3 text-foreground/45" />}
+                                        </span>
+                                      </>
+                                      const rowClassName = `grid w-full grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-left text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3 ${canEditProductionHistory ? 'cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70' : ''}`
+
+                                      return canEditProductionHistory ? (
+                                        <button
+                                          key={rowKey}
+                                          type="button"
+                                          onClick={() => openProductionLogEditor(log)}
+                                          aria-label={`Edit catatan produksi ${log.product_name}, ${formatMobileQuantity(log.qty_processed)} pcs`}
+                                          className={rowClassName}
+                                        >
+                                          {rowContent}
+                                        </button>
+                                      ) : (
+                                        <div key={rowKey} className={rowClassName}>{rowContent}</div>
+                                      )
+                                    })}
                                   </div>
                                 </td>
                               </tr>
@@ -861,7 +751,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3 font-medium text-purple-400">
                       {item.sales_order_items?.sales_orders?.customers?.name || '-'}
-                      <div className="text-xs text-foreground/50">{item.sales_order_items?.sales_orders?.invoice_number}</div>
                     </td>
                     <td className="px-4 py-3">
                       {item.mockup_url ? (
@@ -1035,6 +924,63 @@ export default function ProductionTable({ productionJobs, productionHistory = []
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Edit individual production log */}
+      {editingProductionLog && (
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && !isSavingProductionLog && setEditingProductionLog(null)}>
+          <section role="dialog" aria-modal="true" aria-labelledby="production-log-edit-title" className="w-full max-w-md overflow-hidden rounded-2xl border border-white/10 bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <h3 id="production-log-edit-title" className="font-bold">Edit Catatan Produksi</h3>
+              <button type="button" onClick={() => !isSavingProductionLog && setEditingProductionLog(null)} aria-label="Tutup" className="text-foreground/50 hover:text-foreground disabled:opacity-50" disabled={isSavingProductionLog}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-4 p-5">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3 text-sm">
+                <p className="font-semibold">{editingProductionLog.product_name}</p>
+                <p className="mt-1 text-foreground/55">{editingProductionLog.customer_name} · {productionLogEmployeeDraft ? operators.find(operator => String(operator.id) === productionLogEmployeeDraft)?.full_name || editingProductionLog.employee_name : 'Tanpa operator'}</p>
+                <p className="mt-1 text-xs text-foreground/45">{formatProductionDate(productionLogDateDraft)}</p>
+              </div>
+              <label className="block space-y-2 text-sm font-medium">
+                <span>Operator</span>
+                <CustomSelect
+                  value={productionLogEmployeeDraft}
+                  onChange={event => setProductionLogEmployeeDraft(event.target.value)}
+                  options={[
+                    { value: '', label: 'Tanpa operator' },
+                    ...((operators || []).map(operator => ({ value: String(operator.id), label: operator.full_name })))
+                  ]}
+                  searchable
+                  menuZIndex={1101}
+                />
+              </label>
+              <label className="block space-y-2 text-sm font-medium">
+                <span>Tanggal produksi</span>
+                <CustomDatePicker value={productionLogDateDraft} onChange={setProductionLogDateDraft} />
+              </label>
+              <label className="block space-y-2 text-sm font-medium">
+                <span>Qty pada catatan (pcs)</span>
+                <input
+                  type="number"
+                  step="1"
+                  value={productionLogQtyDraft}
+                  onChange={event => setProductionLogQtyDraft(event.target.value)}
+                  className="glass-input w-full"
+                  autoFocus
+                />
+              </label>
+              <p className="text-xs text-foreground/55">Perubahan Qty dicatat sebagai mutasi stok. Tanggal juga memperbarui periode akumulasi.</p>
+              {productionLogEditError && <p role="alert" className="text-sm text-red-400">{productionLogEditError}</p>}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-white/10 bg-white/[0.03] px-5 py-4">
+              <button type="button" onClick={() => setEditingProductionLog(null)} disabled={isSavingProductionLog} className="btn-secondary h-10 px-4 text-sm disabled:opacity-50">Batal</button>
+              <button type="button" onClick={handleSaveProductionLog} disabled={isSavingProductionLog} className="btn-primary flex h-10 items-center gap-2 px-4 text-sm disabled:opacity-50">
+                <CheckCircle2 className="h-4 w-4" /> {isSavingProductionLog ? 'Menyimpan...' : 'Simpan perubahan'}
+              </button>
+            </div>
+          </section>
         </div>
       )}
 

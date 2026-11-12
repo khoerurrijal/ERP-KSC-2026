@@ -229,7 +229,6 @@ export default async function DashboardPage({ searchParams }) {
                           <div key={so.id} className="flex justify-between items-center text-sm border-b border-white/5 pb-2 last:border-0 last:pb-0 hover:bg-white/5 p-1 rounded transition-colors">
                              <div>
                                <p className="font-bold text-foreground/90">{so.customers?.name || 'Unknown'}</p>
-                               <p className="text-[10px] text-foreground/50">{so.invoice_number}</p>
                              </div>
                              <p className="font-semibold text-yellow-400">Rp {so.sisaTagihan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                           </div>

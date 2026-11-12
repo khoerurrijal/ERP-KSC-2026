@@ -67,7 +67,7 @@ async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') 
       return receipt && receiptCounts.get(receipt) > 1
     })
     .map(order => ({
-      invoice_number: order.invoice_number,
+      customer_name: (Array.isArray(order.customers) ? order.customers[0] : order.customers)?.name || null,
       date: order.date,
       marketplace_receipt: order.marketplace_receipt
     }))
@@ -277,7 +277,6 @@ export async function previewQuickMarketplaceSettlement(cutoffDate, platform = '
       count: orders.length,
       candidateCount: orders.length + excludedDuplicateCount,
       total: orders.reduce((sum, order) => sum + Number(order.total_amount || 0), 0),
-      invoices: orders.slice(0, 10).map(order => order.invoice_number),
       excludedDuplicateCount,
       excludedDuplicateOrders: excludedDuplicateOrders.slice(0, 20)
     }

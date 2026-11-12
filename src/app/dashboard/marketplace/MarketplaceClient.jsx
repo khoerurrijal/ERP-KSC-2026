@@ -332,7 +332,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                       type="checkbox"
                       checked={selectedExternalIds.includes(item.id)}
                       onChange={() => toggleExternalSelection(item.id)}
-                      aria-label={`Pilih ${item.invoice_number || 'order'}`}
+                      aria-label="Pilih pesanan marketplace"
                     />
                   </td>
                   <td className="px-4 py-3 text-foreground/80">{new Date(item.date).toLocaleDateString('id-ID')}</td>
@@ -535,7 +535,6 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                         <tr>
                           <th className="px-3 py-2">No Pesanan</th>
                           <th className="px-3 py-2">Nominal</th>
-                          <th className="px-3 py-2">Invoice</th>
                           <th className="px-3 py-2">Pelanggan</th>
                           <th className="px-3 py-2">Status</th>
                         </tr>
@@ -545,7 +544,6 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                           <tr key={`${row.receipt}-${row.line}-${index}`}>
                             <td className="px-3 py-2 font-mono">{row.receipt || '-'}</td>
                             <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
-                            <td className="px-3 py-2">{row.invoiceNumber || '-'}</td>
                             <td className="px-3 py-2">{row.customerName || '-'}</td>
                             <td className={`px-3 py-2 font-bold ${row.status === 'COCOK' ? 'text-green-400' : row.status === 'SUDAH CAIR' ? 'text-amber-300' : 'text-red-400'}`}>{row.status}</td>
                           </tr>
@@ -641,21 +639,18 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                   {quickPreview.candidateCount === 0 && (
                     <p className="text-xs text-red-300">Tidak ada pesanan untuk filter ini. Pilih tanggal order yang lebih akhir atau platform yang sesuai.</p>
                   )}
-                  {quickPreview.invoices?.length > 0 && (
-                    <p className="text-xs text-foreground/50">Invoice yang akan diproses: {quickPreview.invoices.join(', ')}{quickPreview.count > quickPreview.invoices.length ? ' ...' : ''}</p>
-                  )}
                   {quickPreview.excludedDuplicateCount > 0 && (
                     <div className="rounded-lg border border-amber-400/20 bg-black/20 p-3 space-y-1">
-                      <p className="text-xs font-semibold text-amber-300">{quickPreview.excludedDuplicateCount} invoice ditunda karena resinya dipakai lebih dari satu invoice. Perlu cek manual:</p>
+                      <p className="text-xs font-semibold text-amber-300">{quickPreview.excludedDuplicateCount} pesanan ditunda karena nomor pesanannya digunakan lebih dari satu kali. Perlu cek manual:</p>
                       <ul className="text-xs text-foreground/70 space-y-1">
                         {quickPreview.excludedDuplicateOrders?.map((order, index) => (
-                          <li key={`${order.invoice_number || 'invoice'}-${order.marketplace_receipt}-${order.date}-${index}`}>
-                            {order.invoice_number || 'Invoice tanpa nomor'} — {order.date} — Resi {order.marketplace_receipt}
+                          <li key={`${order.marketplace_receipt}-${order.date}-${index}`}>
+                            {order.customer_name || 'Pesanan marketplace'} — {order.date} — No. Pesanan {order.marketplace_receipt}
                           </li>
                         ))}
                       </ul>
                       {quickPreview.excludedDuplicateCount > (quickPreview.excludedDuplicateOrders?.length || 0) && (
-                        <p className="text-xs text-foreground/50">Menampilkan 20 invoice pertama.</p>
+                        <p className="text-xs text-foreground/50">Menampilkan 20 pesanan pertama.</p>
                       )}
                     </div>
                   )}
