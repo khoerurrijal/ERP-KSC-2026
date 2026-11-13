@@ -393,7 +393,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const openProductionLogEditor = (log) => {
     if (!canEditProductionHistory) return
     setEditingProductionLog(log)
-    setProductionLogQtyDraft(String(log.qty_processed ?? 0))
+    // Edit against the raw database row, not the reconciled W1/W2 display quantity.
+    setProductionLogQtyDraft(String(log.source_qty_processed ?? log.qty_processed ?? 0))
     setProductionLogDateDraft(getProductionDateValue(log))
     setProductionLogEmployeeDraft(log.employee_id === 'unassigned' ? '' : String(log.employee_id || ''))
     setProductionLogEditError('')
@@ -413,7 +414,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
         editingProductionLog.id,
         nextQty,
         productionLogDateDraft,
-        Number(editingProductionLog.qty_processed || 0),
+        Number(editingProductionLog.source_qty_processed ?? editingProductionLog.qty_processed ?? 0),
         editingProductionLog.processed_date || null,
         productionLogEmployeeDraft,
         editingProductionLog.employee_id === 'unassigned' ? '' : String(editingProductionLog.employee_id || '')
