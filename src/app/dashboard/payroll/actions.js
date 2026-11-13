@@ -268,6 +268,136 @@ export async function calculatePayroll(startDate, endDate) {
   }
 }
 
+export async function getSavedPayrolls() {
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
+  try {
+    const { data: payrolls, error: payrollError } = await supabase
+      .from('payrolls')
+      .select('id, start_date, end_date, total_amount, created_at')
+      .order('start_date', { ascending: false })
+      .order('created_at', { ascending: false })
+    if (payrollError) throw payrollError
+
+    const payrollIds = (payrolls || []).map(payroll => payroll.id)
+    if (!payrollIds.length) return { success: true, payrolls: [] }
+
+    const { data: items, error: itemsError } = await supabase
+      .from('payroll_items')
+      .select('payroll_id, employee_id')
+      .in('payroll_id', payrollIds)
+    if (itemsError) throw itemsError
+
+    const employeeCounts = new Map()
+    for (const item of items || []) {
+      const employeeIds = employeeCounts.get(item.payroll_id) || new Set()
+      employeeIds.add(item.employee_id)
+      employeeCounts.set(item.payroll_id, employeeIds)
+    }
+
+    return {
+      success: true,
+      payrolls: (payrolls || []).map(payroll => ({
+        id: payroll.id,
+        startDate: payroll.start_date,
+        endDate: payroll.end_date,
+        totalAmount: Number(payroll.total_amount || 0),
+        employeeCount: employeeCounts.get(payroll.id)?.size || 0
+      }))
+    }
+  } catch (err) {
+    console.error('Error loading saved payrolls:', err)
+    return { success: false, error: err.message || 'Gagal memuat rekap gaji tersimpan.' }
+  }
+}
+
+export async function getSavedPayroll(payrollId) {
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
+  try {
+    if (!payrollId) throw new Error('Rekap gaji tidak valid.')
+
+    const { data: payroll, error: payrollError } = await supabase
+      .from('payrolls')
+      .select('id, start_date, end_date, total_amount')
+      .eq('id', payrollId)
+      .maybeSingle()
+    if (payrollError) throw payrollError
+    if (!payroll) throw new Error('Rekap gaji tidak ditemukan.')
+
+    const { data: savedItems, error: itemsError } = await supabase
+      .from('payroll_items')
+      .select('*')
+      .eq('payroll_id', payroll.id)
+    if (itemsError) throw itemsError
+    if (!savedItems?.length) throw new Error('Rincian karyawan pada rekap ini tidak ditemukan.')
+
+    const employeeIds = [...new Set(savedItems.map(item => item.employee_id).filter(Boolean))]
+    const employeesById = new Map()
+    if (employeeIds.length) {
+      const { data: employees, error: employeesError } = await supabase
+        .from('employees')
+        .select('id, full_name, salary_schemas(role_name)')
+        .in('id', employeeIds)
+      if (employeesError) throw employeesError
+      for (const employee of employees || []) employeesById.set(employee.id, employee)
+    }
+
+    const items = savedItems.map(item => {
+      const snapshot = item.calculation_snapshot || {}
+      const production = snapshot.production || {}
+      const attendance = snapshot.attendance || {}
+      const employee = employeesById.get(item.employee_id)
+      const schema = Array.isArray(employee?.salary_schemas)
+        ? employee.salary_schemas[0]
+        : employee?.salary_schemas
+
+      return {
+        employee_id: item.employee_id,
+        employee_name: snapshot.employee_name || employee?.full_name || 'Karyawan',
+        role_name: snapshot.role_name || schema?.role_name || '-',
+        attendance_days: Number(item.attendance_days ?? attendance.days ?? 0),
+        work_dates: attendance.work_dates || [],
+        myQty: Number(item.piecework_qty ?? production.piecework_qty ?? production.qty ?? 0),
+        twoColorQty: Number(item.two_color_qty ?? production.two_color_qty ?? 0),
+        dailyQty: production.daily_qty || {},
+        dailyTwoColorQty: production.daily_two_color_qty || {},
+        base_salary: Number(item.base_salary || 0),
+        meal_allowance: Number(item.meal_allowance || 0),
+        borongan_amount: Number(item.borongan_amount || 0),
+        two_color_amount: Number(item.two_color_amount || 0),
+        weekly_bonus: Number(item.weekly_bonus || 0),
+        bawahan_bonus: Number(item.bawahan_bonus || 0),
+        other_bonuses: Number(item.daily_bonus_amount ?? item.other_bonuses ?? 0),
+        overtime_amount: Number(item.overtime_amount || 0),
+        kasbon_amount: Number(item.kasbon_amount || 0),
+        pinjaman_amount: Number(item.pinjaman_amount || 0),
+        late_deduction: Number(item.late_deduction || 0),
+        gross_total: Number(item.gross_total || 0),
+        total_deductions: Number(item.total_deductions || 0),
+        total: Number(item.total || 0),
+        piecework_rate: Number(item.piecework_rate ?? snapshot.rates?.piecework ?? 0),
+        two_color_rate: Number(item.two_color_rate ?? snapshot.rates?.two_color ?? 0),
+        weekly_bonus_weeks: Number(item.weekly_bonus_weeks || 0),
+        calculation_snapshot: snapshot
+      }
+    }).sort((a, b) => a.employee_name.localeCompare(b.employee_name, 'id'))
+
+    return {
+      success: true,
+      payroll: {
+        id: payroll.id,
+        startDate: payroll.start_date,
+        endDate: payroll.end_date,
+        grandTotal: Number(payroll.total_amount || 0),
+        items,
+        isSaved: true
+      }
+    }
+  } catch (err) {
+    console.error('Error loading saved payroll:', err)
+    return { success: false, error: err.message || 'Gagal membuka rekap gaji tersimpan.' }
+  }
+}
+
 export async function savePayroll(payload) {
   const { supabase, user } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
@@ -397,6 +527,8 @@ export async function savePayroll(payload) {
       recalculatedLedgerTotal += values.ledgerSalaryOut
       const snapshot = {
         ...(item.calculation_snapshot || {}),
+        employee_name: item.employee_name || 'Karyawan',
+        role_name: item.role_name || '-',
         component_amounts: {
           base_salary: values.baseSalary,
           meal_allowance: values.mealAllowance,
@@ -463,7 +595,7 @@ export async function savePayroll(payload) {
 
     revalidatePath('/dashboard/payroll')
     revalidatePath('/dashboard/transactions')
-    return { success: true }
+    return { success: true, payrollId: payrollRow.id }
   } catch (err) {
     console.error('Error saving payroll:', err)
     return { success: false, error: err.message || 'Gagal menyimpan rekap gaji.' }

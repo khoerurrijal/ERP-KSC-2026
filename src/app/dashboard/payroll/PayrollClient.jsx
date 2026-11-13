@@ -2,10 +2,10 @@
 
 import { Fragment, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Calendar, Check, CheckCircle2, ClipboardCheck, Calculator, ChevronDown, Loader2, Printer, Wallet } from 'lucide-react'
+import { Calendar, Check, CheckCircle2, ClipboardCheck, Calculator, ChevronDown, History, Loader2, Printer, Wallet } from 'lucide-react'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CustomSelect from '@/components/CustomSelect'
-import { calculatePayroll, getWeeklyAttendance, saveWeeklyAttendance, savePayroll } from './actions'
+import { calculatePayroll, getWeeklyAttendance, getSavedPayroll, getSavedPayrolls, saveWeeklyAttendance, savePayroll } from './actions'
 import { calculatePayrollTotals, getPayrollLedgerAmount, getPayrollWeekStart } from './calculations.mjs'
 
 const currency = value => `Rp ${Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
@@ -82,6 +82,11 @@ export default function PayrollClient({ dropdownConfig = {} }) {
   const [saving, setSaving] = useState(false)
   const [payrollData, setPayrollData] = useState(null)
   const [expandedPayrollId, setExpandedPayrollId] = useState(null)
+  const [savedPayrolls, setSavedPayrolls] = useState([])
+  const [savedPayrollsLoading, setSavedPayrollsLoading] = useState(true)
+  const [savedPayrollLoadingId, setSavedPayrollLoadingId] = useState(null)
+  const [savedPayrollsError, setSavedPayrollsError] = useState('')
+  const [savedPayrollsVersion, setSavedPayrollsVersion] = useState(0)
 
   const [attendanceDate, setAttendanceDate] = useState(() => getPayrollWeekStart(todayKey()))
   const [attendanceRows, setAttendanceRows] = useState([])
@@ -176,6 +181,25 @@ export default function PayrollClient({ dropdownConfig = {} }) {
     return () => { cancelled = true }
   }, [activeTab, attendanceDate])
 
+  useEffect(() => {
+    if (activeTab !== 'history') return undefined
+    let cancelled = false
+    getSavedPayrolls()
+      .then(result => {
+        if (cancelled) return
+        if (!result.success) throw new Error(result.error)
+        setSavedPayrollsError('')
+        setSavedPayrolls(result.payrolls || [])
+      })
+      .catch(error => {
+        if (!cancelled) setSavedPayrollsError(error.message || 'Gagal memuat rekap gaji tersimpan.')
+      })
+      .finally(() => {
+        if (!cancelled) setSavedPayrollsLoading(false)
+      })
+    return () => { cancelled = true }
+  }, [activeTab, savedPayrollsVersion])
+
   const saveAttendance = async () => {
     try {
       const result = await persistAttendance()
@@ -203,7 +227,8 @@ export default function PayrollClient({ dropdownConfig = {} }) {
         startDate,
         endDate,
         items,
-        grandTotal: items.reduce((sum, item) => sum + item.total, 0)
+        grandTotal: items.reduce((sum, item) => sum + item.total, 0),
+        isSaved: false
       })
       setExpandedPayrollId(null)
     } catch (error) {
@@ -215,7 +240,7 @@ export default function PayrollClient({ dropdownConfig = {} }) {
 
   const updatePayrollItem = (employeeId, field, value) => {
     setPayrollData(previous => {
-      if (!previous) return previous
+      if (!previous || previous.isSaved) return previous
       const items = previous.items.map(item => {
         if (item.employee_id !== employeeId) return item
         const nextValue = parseAmount(value)
@@ -235,7 +260,7 @@ export default function PayrollClient({ dropdownConfig = {} }) {
   }
 
   const handleSaveSubmit = async () => {
-    if (!payrollData) return
+    if (!payrollData || payrollData.isSaved) return
     setSaveModalOpen(false)
     setSaving(true)
     try {
@@ -250,11 +275,31 @@ export default function PayrollClient({ dropdownConfig = {} }) {
       })
       if (!result.success) throw new Error(result.error)
       alert('Rekap gaji berhasil disimpan.')
-      setPayrollData(null)
+      setPayrollData(previous => previous ? { ...previous, id: result.payrollId, isSaved: true } : previous)
+      setSavedPayrollsVersion(version => version + 1)
     } catch (error) {
       alert(error.message || 'Gagal menyimpan rekap gaji.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const openSavedPayroll = async payrollId => {
+    setSavedPayrollLoadingId(payrollId)
+    setSavedPayrollsError('')
+    try {
+      const result = await getSavedPayroll(payrollId)
+      if (!result.success) throw new Error(result.error)
+      setPayrollData(result.payroll)
+      setStartDate(result.payroll.startDate)
+      setEndDate(result.payroll.endDate)
+      setExpandedPayrollId(null)
+      setActiveTab('payroll')
+      requestAnimationFrame(() => document.getElementById('payroll-preview')?.scrollIntoView({ behavior: 'smooth', block: 'start' }))
+    } catch (error) {
+      setSavedPayrollsError(error.message || 'Gagal membuka rekap gaji tersimpan.')
+    } finally {
+      setSavedPayrollLoadingId(null)
     }
   }
 
@@ -282,6 +327,9 @@ export default function PayrollClient({ dropdownConfig = {} }) {
         </button>
         <button type="button" onClick={() => setActiveTab('payroll')} className={`px-4 py-3 text-sm font-semibold border-b-2 ${activeTab === 'payroll' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent'}`}>
           <span className="inline-flex items-center gap-2"><Wallet className="w-4 h-4" /> Rekap Gaji</span>
+        </button>
+        <button type="button" onClick={() => setActiveTab('history')} className={`px-4 py-3 text-sm font-semibold border-b-2 ${activeTab === 'history' ? 'text-primary border-primary' : 'text-foreground/60 border-transparent'}`}>
+          <span className="inline-flex items-center gap-2"><History className="w-4 h-4" /> Riwayat</span>
         </button>
       </div>
 
@@ -406,6 +454,47 @@ export default function PayrollClient({ dropdownConfig = {} }) {
             </section>
           )}
         </div>
+      ) : activeTab === 'history' ? (
+        <section className="glass-card overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[560px] text-left text-sm">
+              <thead className="bg-white/5 text-xs uppercase text-foreground/60">
+                <tr>
+                  <th className="px-4 py-3">Periode</th>
+                  <th className="px-3 py-3 text-center">Karyawan</th>
+                  <th className="px-3 py-3 text-right">Total Gaji</th>
+                  <th className="px-4 py-3 text-right">Aksi</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {savedPayrollsLoading ? (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-foreground/60"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Memuat rekap...</td></tr>
+                ) : savedPayrollsError ? (
+                  <tr><td colSpan={4} role="alert" className="px-4 py-6 text-center text-red-400">{savedPayrollsError}</td></tr>
+                ) : savedPayrolls.length ? savedPayrolls.map(payroll => (
+                  <tr key={payroll.id} className="hover:bg-white/[0.03]">
+                    <td className="px-4 py-3 font-medium text-foreground">{formatAttendanceWeek(payroll.startDate, payroll.endDate)}</td>
+                    <td className="px-3 py-3 text-center text-foreground/70">{payroll.employeeCount}</td>
+                    <td className="px-3 py-3 text-right font-semibold text-primary">{currency(payroll.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openSavedPayroll(payroll.id)}
+                        disabled={Boolean(savedPayrollLoadingId)}
+                        className="btn-secondary inline-flex h-8 items-center justify-center gap-1.5 whitespace-nowrap px-2.5 text-xs disabled:opacity-50"
+                      >
+                        {savedPayrollLoadingId === payroll.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Printer className="h-3.5 w-3.5" />}
+                        Lihat &amp; Cetak
+                      </button>
+                    </td>
+                  </tr>
+                )) : (
+                  <tr><td colSpan={4} className="px-4 py-8 text-center text-foreground/55">Belum ada rekap tersimpan.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </section>
       ) : (
         <>
           <section className="glass-card p-4">
@@ -415,11 +504,11 @@ export default function PayrollClient({ dropdownConfig = {} }) {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground/80">Tanggal Awal</label>
-                <CustomDatePicker value={startDate} onChange={setStartDate} />
+                <CustomDatePicker value={startDate} onChange={date => { setStartDate(date); setPayrollData(null) }} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground/80">Tanggal Akhir</label>
-                <CustomDatePicker value={endDate} onChange={setEndDate} />
+                <CustomDatePicker value={endDate} onChange={date => { setEndDate(date); setPayrollData(null) }} />
               </div>
               <button type="button" disabled={loading} onClick={handleGenerate} className="btn-primary w-full h-11 flex items-center justify-center gap-2 disabled:opacity-50">
                 {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
@@ -430,21 +519,23 @@ export default function PayrollClient({ dropdownConfig = {} }) {
           </section>
 
           {payrollData && (
-            <section className="space-y-4 animate-in fade-in slide-in-from-bottom-4">
+            <section id="payroll-preview" className="space-y-4 animate-in fade-in slide-in-from-bottom-4 scroll-mt-24">
               <div className="glass-card p-4 space-y-4">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <h3 className="font-bold text-primary">Rekap Payroll</h3>
+                    <h3 className="font-bold text-primary">Rekap Payroll {payrollData.isSaved && <span className="ml-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-1 text-xs font-medium text-emerald-400">Tersimpan · baca saja</span>}</h3>
                     <p className="text-sm text-foreground/60">Periode {formatAttendanceWeek(payrollData.startDate, payrollData.endDate)} · {payrollData.items.length} karyawan</p>
                   </div>
                   <div className="flex flex-wrap gap-2">
                     <button type="button" onClick={() => window.print()} className="btn-secondary h-10 px-4 text-sm inline-flex items-center justify-center gap-2">
                       <Printer className="h-4 w-4" /> Cetak Payroll
                     </button>
-                    <button type="button" disabled={saving} onClick={() => setSaveModalOpen(true)} className="btn-primary h-10 px-4 text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
-                      {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                      Simpan Rekap
-                    </button>
+                    {!payrollData.isSaved && (
+                      <button type="button" disabled={saving} onClick={() => setSaveModalOpen(true)} className="btn-primary h-10 px-4 text-sm inline-flex items-center justify-center gap-2 disabled:opacity-50">
+                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                        Simpan Rekap
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -537,7 +628,8 @@ export default function PayrollClient({ dropdownConfig = {} }) {
                                               type="number" min="0" step="1" inputMode="numeric"
                                               value={item[component.key] || 0}
                                               onChange={event => updatePayrollItem(item.employee_id, component.key, event.target.value)}
-                                              className="glass-input h-8 w-32 text-right text-xs"
+                                              disabled={payrollData.isSaved}
+                                              className="glass-input h-8 w-32 text-right text-xs disabled:cursor-not-allowed disabled:opacity-60"
                                             />
                                           </label>
                                         ))}
@@ -560,7 +652,8 @@ export default function PayrollClient({ dropdownConfig = {} }) {
                                               type="number" min="0" step="1" inputMode="numeric"
                                               value={item[component.key] || 0}
                                               onChange={event => updatePayrollItem(item.employee_id, component.key, event.target.value)}
-                                              className="glass-input h-8 w-32 text-right text-xs text-red-300"
+                                              disabled={payrollData.isSaved}
+                                              className="glass-input h-8 w-32 text-right text-xs text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
                                             />
                                           </label>
                                         ))}
@@ -721,7 +814,7 @@ export default function PayrollClient({ dropdownConfig = {} }) {
         }
       `}</style>
 
-      {saveModalOpen && payrollData && (
+      {saveModalOpen && payrollData && !payrollData.isSaved && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && setSaveModalOpen(false)}>
           <div className="glass-card w-full max-w-md p-6 flex flex-col gap-5 shadow-2xl border border-white/10">
             <div>
