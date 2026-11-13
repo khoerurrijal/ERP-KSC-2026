@@ -41,7 +41,7 @@ function withProductionColorPass(notes, colorPass) {
 }
 
 export async function saveProductionProgress(payload) {
-  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR', 'OPERATOR MESIN'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
     const { data: job, error: jobError } = await supabase
@@ -101,7 +101,7 @@ export async function saveProductionProgress(payload) {
 }
 
 export async function handleAutoStatusUpdate(itemId) {
-  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR', 'OPERATOR MESIN'], 'Akun Anda tidak memiliki akses produksi.')
 
   // Ambil data item dan invoice
   const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
