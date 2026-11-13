@@ -33,6 +33,7 @@ export async function saveEmployee(payload) {
           supervisor_id: payload.supervisor_id || null,
           gaji_harian: payload.gaji_harian || 0,
           uang_makan: payload.uang_makan || 0,
+          bonus_mingguan: payload.bonus_mingguan || 0,
           is_active: payload.is_active
         })
         .eq('id', payload.id)
@@ -92,6 +93,7 @@ export async function saveEmployee(payload) {
           supervisor_id: payload.supervisor_id || null,
           gaji_harian: payload.gaji_harian || 0,
           uang_makan: payload.uang_makan || 0,
+          bonus_mingguan: payload.bonus_mingguan || 0,
           is_active: payload.is_active
         }])
         .select('id')

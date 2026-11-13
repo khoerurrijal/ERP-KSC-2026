@@ -103,16 +103,22 @@ function LightSelect({ id, value, options, onChange, placeholder, ariaLabel, lab
     const rect = triggerRef.current?.getBoundingClientRect()
     if (!rect) return null
     const margin = 12
+    const viewport = window.visualViewport
+    const viewportTop = viewport?.offsetTop ?? 0
+    const viewportLeft = viewport?.offsetLeft ?? 0
+    const viewportWidth = viewport?.width ?? window.innerWidth
+    const viewportHeight = viewport?.height ?? window.innerHeight
+    const viewportBottom = viewportTop + viewportHeight
     const desiredHeight = Math.min(240, options.length * 44 + 8)
-    const spaceBelow = window.innerHeight - rect.bottom - margin
-    const spaceAbove = rect.top - margin
+    const spaceBelow = Math.max(0, viewportBottom - rect.bottom - margin)
+    const spaceAbove = Math.max(0, rect.top - viewportTop - margin)
     const placeAbove = spaceBelow < desiredHeight && spaceAbove > spaceBelow
     const availableSpace = placeAbove ? spaceAbove : spaceBelow
-    const maxHeight = Math.max(96, Math.min(desiredHeight, availableSpace))
-    const width = Math.min(rect.width, window.innerWidth - margin * 2)
+    const maxHeight = Math.max(0, Math.min(desiredHeight, availableSpace))
+    const width = Math.min(rect.width, Math.max(0, viewportWidth - margin * 2))
     return {
-      top: placeAbove ? Math.max(margin, rect.top - maxHeight - 4) : Math.min(rect.bottom + 4, window.innerHeight - maxHeight - margin),
-      left: Math.max(margin, Math.min(rect.left, window.innerWidth - width - margin)),
+      top: placeAbove ? Math.max(viewportTop + margin, rect.top - maxHeight - 4) : Math.min(rect.bottom + 4, viewportBottom - maxHeight - margin),
+      left: Math.max(viewportLeft + margin, Math.min(rect.left, viewportLeft + viewportWidth - width - margin)),
       width,
       maxHeight,
     }
@@ -140,10 +146,12 @@ function LightSelect({ id, value, options, onChange, placeholder, ariaLabel, lab
     window.addEventListener('resize', updatePosition)
     document.addEventListener('scroll', updatePosition, true)
     window.visualViewport?.addEventListener('resize', updatePosition)
+    window.visualViewport?.addEventListener('scroll', updatePosition)
     return () => {
       window.removeEventListener('resize', updatePosition)
       document.removeEventListener('scroll', updatePosition, true)
       window.visualViewport?.removeEventListener('resize', updatePosition)
+      window.visualViewport?.removeEventListener('scroll', updatePosition)
     }
   }, [getMenuPosition, open])
 

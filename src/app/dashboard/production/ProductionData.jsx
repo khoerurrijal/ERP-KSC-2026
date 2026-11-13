@@ -1,4 +1,10 @@
 import { createClient } from '@/utils/supabase/server'
+import {
+  getAutomaticProductionProgressQty,
+  isAutomaticProductionLog,
+  getStoredProductionColorPass,
+  reconcileProductionColorPasses
+} from '@/utils/productionColorPasses.mjs'
 import ProductionTable from '@/components/ProductionTable'
 import { handleAutoStatusUpdate } from './actions'
 
@@ -55,7 +61,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
       notes,
       sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name)),
       products (name, workshop_code),
-      production_logs (qty_processed)
+      production_logs (id, qty_processed, notes, processed_date, created_at)
     `)
     .order('id', { ascending: false })
 
@@ -121,7 +127,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   if (canSeeProductionAccumulation) {
     let productionLogsQuery = supabase
       .from('production_logs')
-      .select('id, job_id, employee_id, qty_processed, processed_date, created_at')
+      .select('id, job_id, employee_id, qty_processed, qty_defect, processed_date, created_at, notes')
       .order('created_at', { ascending: false })
       .limit(10000)
     if (isOperatorAccount) productionLogsQuery = productionLogsQuery.eq('employee_id', matchedOperator.id)
@@ -131,36 +137,69 @@ export default async function ProductionData({ mode = 'production', embedded = f
     const employeeIds = [...new Set((rawLogs || []).map(log => log.employee_id).filter(Boolean))]
     const [{ data: historyItems }, { data: historyEmployees }] = await Promise.all([
       jobIds.length
-        ? supabase.from('sales_items').select('id, product_code, order_type, sales_orders (customers (name)), products (name)').in('id', jobIds)
+        ? supabase.from('sales_items').select('id, product_code, order_type, qty, unit_multiplier, notes, sales_orders (invoice_number, customers (name)), products (name)').in('id', jobIds)
         : Promise.resolve({ data: [] }),
       employeeIds.length
         ? supabase.from('employees').select('id, full_name').in('id', employeeIds)
         : Promise.resolve({ data: [] })
     ])
 
+    const historyReconciliation = reconcileProductionColorPasses(historyItems || [], rawLogs || [])
     const itemById = new Map((historyItems || []).map(item => [item.id, item]))
     const employeeById = new Map((historyEmployees || []).map(employee => [employee.id, employee.full_name]))
-    productionHistory = (rawLogs || []).map(log => {
+    productionHistory = (rawLogs || []).flatMap(log => {
       const item = itemById.get(log.job_id)
-      return {
+      const isTwoColor = /2\s*warna|warna\s*ke-?2/i.test(item?.notes || '')
+      const effectiveQty = historyReconciliation.effectiveQtyByLogId.get(String(log.id)) ?? Number(log.qty_processed || 0)
+      if (isTwoColor && effectiveQty === 0) return []
+      return [{
         id: log.id,
+        job_id: log.job_id,
         employee_id: log.employee_id || 'unassigned',
         employee_name: employeeById.get(log.employee_id) || (log.employee_id ? 'Karyawan tidak diketahui' : 'Tanpa operator'),
-        qty_processed: Number(log.qty_processed || 0),
+        qty_processed: effectiveQty,
+        source_qty_processed: Number(log.qty_processed || 0),
+        qty_defect: Number(log.qty_defect || 0),
+        source_qty_defect: log.qty_defect ?? null,
         processed_date: log.processed_date,
         created_at: log.created_at,
+        notes: log.notes ?? null,
         product_name: item?.products?.name || item?.product_code || 'Item dihapus',
         customer_name: item?.sales_orders?.customers?.name || '-',
-        order_type: item?.order_type || '-'
-      }
+        invoice_number: item?.sales_orders?.invoice_number || '',
+        order_type: item?.order_type || '-',
+        is_two_color: isTwoColor,
+        color_pass: historyReconciliation.colorPassByLogId.get(String(log.id)) || null
+      }]
     })
   }
 
-  const productionJobs = (rawItems || []).map(item => ({
+  const itemProductionLogs = (rawItems || []).flatMap(item => (
+    (item.production_logs || []).map(log => ({ ...log, job_id: item.id }))
+  ))
+  const productionColorReconciliation = reconcileProductionColorPasses(rawItems || [], itemProductionLogs)
+
+  const productionJobs = (rawItems || []).map(item => {
+    const isTwoColor = /2\s*warna|warna\s*ke-?2/i.test(item.notes || '')
+    const qtyPerColorTarget = Number(item.qty || 0) * Number(item.unit_multiplier || 1)
+    const productionLogs = item.production_logs || []
+    const automaticColorLogs = isTwoColor
+      ? productionLogs.filter(log => isAutomaticProductionLog(log) || getStoredProductionColorPass(log.notes))
+      : productionLogs
+    const getPassQty = (pass) => automaticColorLogs.reduce((total, log) => (
+      total + (productionColorReconciliation.colorPassByLogId.get(String(log.id)) === pass
+        ? Number(productionColorReconciliation.effectiveQtyByLogId.get(String(log.id)) ?? log.qty_processed ?? 0)
+        : 0)
+    ), 0)
+
+    return ({
     id: item.id,
     so_id: item.sales_orders?.id,
     order_type: item.order_type,
-    qty_target: item.qty * (item.unit_multiplier || 1) * (/2\s*warna|warna\s*ke-?2/i.test(item.notes || '') ? 2 : 1),
+    qty_target: qtyPerColorTarget * (isTwoColor ? 2 : 1),
+    qty_per_color_target: qtyPerColorTarget,
+    qty_color_1: getPassQty(1),
+    qty_color_2: getPassQty(2),
     sales_order_items: {
       qty: item.qty,
       sales_orders: { 
@@ -186,13 +225,17 @@ export default async function ProductionData({ mode = 'production', embedded = f
       return targetDate.toISOString()
     })(),
     is_fast_track: (item.sales_orders?.notes || '').toLowerCase().includes('fast track') || (item.notes || '').toLowerCase().includes('fast_track') || (item.notes || '').toLowerCase().includes('fast track'),
-    is_two_color: /2\s*warna|warna\s*ke-?2/i.test(item.notes || ''),
+    is_two_color: isTwoColor,
     notes: item.notes,
     status: item.status || 'BARU MASUK',
     item_status: item.status || 'BARU MASUK',
     mockup_url: item.mockup_url,
-    qty_processed: (item.production_logs || []).reduce((acc, log) => acc + (log.qty_processed || 0), 0)
-  }))
+    qty_automatic_color_progress: getAutomaticProductionProgressQty(productionLogs),
+    qty_processed: isTwoColor
+      ? getPassQty(1) + getPassQty(2)
+      : productionLogs.reduce((acc, log) => acc + (log.qty_processed || 0), 0)
+  })
+  })
 
   return (
     <ProductionTable 

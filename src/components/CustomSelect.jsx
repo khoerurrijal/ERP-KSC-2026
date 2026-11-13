@@ -39,17 +39,28 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       const anchor = popoverRef.current?.getBoundingClientRect()
       if (!anchor) return
 
-      const width = Math.min(Math.max(anchor.width, 200), Math.max(240, window.innerWidth - 24))
+      const viewport = window.visualViewport
+      const viewportTop = viewport?.offsetTop ?? 0
+      const viewportLeft = viewport?.offsetLeft ?? 0
+      const viewportWidth = viewport?.width ?? window.innerWidth
+      const viewportHeight = viewport?.height ?? window.innerHeight
+      const horizontalSpace = Math.max(0, viewportWidth - 24)
+      const width = Math.min(Math.max(anchor.width, Math.min(200, horizontalSpace)), horizontalSpace)
       const estimatedHeight = searchable ? 300 : 260
-      const opensAbove = anchor.bottom + estimatedHeight > window.innerHeight && anchor.top > estimatedHeight
-      const left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12)
+      const spaceBelow = Math.max(0, viewportTop + viewportHeight - anchor.bottom - 12)
+      const spaceAbove = Math.max(0, anchor.top - viewportTop - 12)
+      const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
+      const availableHeight = Math.min(estimatedHeight, opensAbove ? spaceAbove : spaceBelow)
+      const left = Math.min(Math.max(viewportLeft + 12, anchor.left), viewportLeft + viewportWidth - width - 12)
 
       setMenuStyle({
         position: 'fixed',
         left,
         top: opensAbove ? anchor.top - 8 : anchor.bottom + 8,
         width,
-      zIndex: menuZIndex,
+        maxHeight: availableHeight,
+        overflowY: 'auto',
+        zIndex: menuZIndex,
         transform: opensAbove ? 'translateY(-100%)' : undefined
       })
     }
@@ -57,9 +68,13 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
     updateMenuPosition()
     window.addEventListener('resize', updateMenuPosition)
     window.addEventListener('scroll', updateMenuPosition, true)
+    window.visualViewport?.addEventListener('resize', updateMenuPosition)
+    window.visualViewport?.addEventListener('scroll', updateMenuPosition)
     return () => {
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
+      window.visualViewport?.removeEventListener('resize', updateMenuPosition)
+      window.visualViewport?.removeEventListener('scroll', updateMenuPosition)
     }
   }, [isOpen, menuPosition, searchable, menuZIndex])
 

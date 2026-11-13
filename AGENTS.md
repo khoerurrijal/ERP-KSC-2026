@@ -49,6 +49,13 @@
 - Setelah perubahan kritis wajib regression test minimal terhadap flow yang bersinggungan, lalu jalankan lint/build/diff-check yang relevan.
 - Setiap dirty change wajib dikategorikan sebelum commit/deploy; file eksperimen, temporary, dan migration yang belum disetujui tidak boleh masuk production.
 
+## LOCKED — koneksi database proyek KSC
+- Untuk semua operasi Supabase pada repo ini, gunakan akun lokal Supabase `KSC` melalui tool `mcp__sb_accounts`; jangan memilih proyek hanya berdasarkan koneksi Supabase umum.
+- Sebelum query atau perubahan apa pun, daftarkan akun lalu verifikasi proyek melalui akun `KSC`. Target yang benar adalah `ERP-KSC-2026` dengan project ref `lwzkhbxfuqfokiprhatv` dan status sehat/aktif.
+- Selalu teruskan label akun persis `KSC` pada operasi akun lokal. Jangan menjalankan query, migration, atau perubahan ke proyek `SELLIO OS` (`wittlxsovcjofkwjtwgo`) atau proyek lain yang belum terverifikasi sebagai target KSC.
+- Jika akun `KSC` atau target `ERP-KSC-2026` tidak tersedia atau tidak sehat/aktif, berhenti sebelum operasi database dan laporkan hambatannya.
+- Untuk migration remote, ikuti aturan di atas dan gunakan `supabase db query --linked --project-ref lwzkhbxfuqfokiprhatv --file database/<migration>.sql`; tetap dilarang memakai `supabase db push`.
+
 ## BELUM LOCKED — JANGAN DIUBAH OTOMATIS
 - Formula HPP histori PO belum final. Ada konflik implementasi antara 3 PO terakhir vs seluruh histori. Jangan mengubah HPP/harga live tanpa shadow audit dan keputusan Owner.
 - Rekomendasi teknis sementara untuk evaluasi HPP adalah weighted average maksimal 3 PO terbaru berdasarkan actual quantity, tetapi ini BUKAN rule production sampai disetujui setelah shadow comparison.

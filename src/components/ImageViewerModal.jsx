@@ -6,18 +6,18 @@ export default function ImageViewerModal({ isOpen, onClose, imageUrl }) {
 
   return (
     <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md animate-in fade-in duration-200" onMouseDown={event => event.target === event.currentTarget && onClose()}>
-      <div className="relative w-full max-w-4xl max-h-[90vh] flex flex-col items-center justify-center pointer-events-none">
+      <div className="relative w-full max-w-4xl max-h-[calc(100dvh-2rem)] flex flex-col items-center justify-center pointer-events-none">
         
         {/* Close Button */}
         <button 
           onClick={onClose}
-          className="absolute -top-12 right-0 md:-right-12 w-10 h-10 bg-white/10 text-white hover:bg-white/20 hover:text-red-400 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-xl pointer-events-auto z-10"
+          className="absolute top-2 right-2 md:-top-12 md:-right-12 w-10 h-10 bg-white/10 text-white hover:bg-white/20 hover:text-red-400 rounded-full flex items-center justify-center backdrop-blur-md transition-all shadow-xl pointer-events-auto z-10"
         >
           <X className="w-6 h-6" />
         </button>
         
         {/* Image Container */}
-        <div className="relative w-full h-[85vh] flex items-center justify-center pointer-events-auto">
+        <div className="relative w-full h-[85vh] max-h-[calc(100dvh-4rem)] flex items-center justify-center pointer-events-auto">
           <Image 
             src={imageUrl} 
             alt="Mockup Zoom" 

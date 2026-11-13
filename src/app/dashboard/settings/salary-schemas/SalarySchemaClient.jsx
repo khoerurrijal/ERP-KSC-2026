@@ -22,14 +22,12 @@ export default function SalarySchemaClient({ initialSchemas }) {
   const [formData, setFormData] = useState({
     id: '',
     role_name: '',
-    bonus_mingguan: 0,
     rate_borongan_sendiri: 0,
     rate_produksi_bawahan: 0,
     batas_qty_bonus_harian: 0,
     bonus_harian_dibawah_target: 0,
     batas_qty_target_harian: 0,
-    bonus_target_harian: 0,
-    fee_2_warna: 0
+    bonus_target_harian: 0
   })
 
   const handleEdit = (schema) => {
@@ -41,14 +39,12 @@ export default function SalarySchemaClient({ initialSchemas }) {
     setFormData({
       id: '',
       role_name: '',
-      bonus_mingguan: 0,
       rate_borongan_sendiri: 0,
       rate_produksi_bawahan: 0,
       batas_qty_bonus_harian: 0,
       bonus_harian_dibawah_target: 0,
       batas_qty_target_harian: 0,
-      bonus_target_harian: 0,
-      fee_2_warna: 0
+      bonus_target_harian: 0
     })
     setIsModalOpen(true)
   }
@@ -100,7 +96,6 @@ export default function SalarySchemaClient({ initialSchemas }) {
           <thead className="text-xs uppercase bg-white/5 text-foreground/60">
             <tr>
               <th className="px-4 py-3 rounded-tl-xl">Jabatan</th>
-              <th className="px-4 py-3">Bonus Mingguan</th>
               <th className="px-4 py-3">Borongan (Sendiri/Bawahan)</th>
               <th className="px-4 py-3">Bonus Harian & Lainnya</th>
               <th className="px-4 py-3 text-center rounded-tr-xl">Aksi</th>
@@ -110,9 +105,6 @@ export default function SalarySchemaClient({ initialSchemas }) {
             {schemas.map(schema => (
               <tr key={schema.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-3 font-bold text-primary">{schema.role_name}</td>
-                <td className="px-4 py-3 text-xs">
-                  {schema.bonus_mingguan > 0 ? `Rp ${schema.bonus_mingguan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
-                </td>
                 <td className="px-4 py-3 text-xs text-foreground/80">
                   {schema.rate_borongan_sendiri > 0 && <div>Sendiri: Rp {schema.rate_borongan_sendiri.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
                   {schema.rate_produksi_bawahan > 0 && <div>Bawahan: Rp {schema.rate_produksi_bawahan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
@@ -121,7 +113,7 @@ export default function SalarySchemaClient({ initialSchemas }) {
                 <td className="px-4 py-3 text-xs text-foreground/60">
                   {schema.bonus_harian_dibawah_target > 0 && <div>Bns Qty {'<'}{schema.batas_qty_bonus_harian}: Rp {schema.bonus_harian_dibawah_target.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
                   {schema.bonus_target_harian > 0 && <div>Bns Qty {'>'}={schema.batas_qty_target_harian}: Rp {schema.bonus_target_harian.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
-                  {schema.fee_2_warna > 0 && <div>Fee 2 Warna: Rp {schema.fee_2_warna.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</div>}
+                  {['operator', 'operator mesin'].includes(String(schema.role_name).toLowerCase()) && <div>Bonus tambahan 2 warna: Rp 10/pcs di luar borongan normal</div>}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-center gap-2">
@@ -137,7 +129,7 @@ export default function SalarySchemaClient({ initialSchemas }) {
             ))}
             {schemas.length === 0 && (
               <tr>
-                <td colSpan={7} className="text-center py-8 text-foreground/40">Belum ada skema gaji.</td>
+                <td colSpan={4} className="text-center py-8 text-foreground/40">Belum ada skema gaji.</td>
               </tr>
             )}
           </tbody>
@@ -146,7 +138,7 @@ export default function SalarySchemaClient({ initialSchemas }) {
 
       {isModalOpen && (
         <div className="fixed inset-0 z-[1000] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in" onMouseDown={event => event.target === event.currentTarget && setIsModalOpen(false)}>
-          <div className="bg-background border border-white/10 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto shadow-2xl">
+          <div className="bg-background border border-white/10 rounded-2xl w-full max-w-2xl max-h-[calc(100dvh-2rem)] overflow-y-auto overscroll-contain shadow-2xl">
             <div className="sticky top-0 bg-background/95 backdrop-blur-sm border-b border-white/10 px-6 py-4 flex justify-between items-center z-10">
               <h2 className="text-xl font-bold">{formData.id ? 'Edit' : 'Tambah'} Skema Gaji</h2>
               <button onClick={() => setIsModalOpen(false)} className="p-2 text-foreground/60 hover:text-white rounded-full hover:bg-white/10 transition-colors">
@@ -168,10 +160,6 @@ export default function SalarySchemaClient({ initialSchemas }) {
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-medium text-foreground/80">Bonus Full Seminggu (Rp)</label>
-                  <input type="text" value={formatRp(formData.bonus_mingguan)} onChange={e => setFormData({...formData, bonus_mingguan: parseRp(e.target.value)})} className="glass-input w-full" />
-                </div>
                 <div className="space-y-2">
                   <label className="text-xs font-medium text-foreground/80">Rate Borongan Sendiri (Rp/Pcs)</label>
                   <input type="text" value={formatRp(formData.rate_borongan_sendiri)} onChange={e => setFormData({...formData, rate_borongan_sendiri: parseRp(e.target.value)})} className="glass-input w-full" />
@@ -203,9 +191,8 @@ export default function SalarySchemaClient({ initialSchemas }) {
                   <input type="text" value={formatRp(formData.bonus_target_harian)} onChange={e => setFormData({...formData, bonus_target_harian: parseRp(e.target.value)})} className="glass-input w-full" />
                 </div>
 
-                <div className="space-y-2 md:col-span-2">
-                  <label className="text-xs font-medium text-foreground/80">Fee Sablon 2 Warna (Rp)</label>
-                  <input type="text" value={formatRp(formData.fee_2_warna)} onChange={e => setFormData({...formData, fee_2_warna: parseRp(e.target.value)})} className="glass-input w-full" />
+                <div className="space-y-2 md:col-span-2 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                  <p className="text-xs font-medium text-foreground/80">Semua qty mendapat borongan normal. Qty 2 warna mendapat bonus tambahan Rp 10 per pcs di luar borongan tersebut.</p>
                 </div>
               </div>
 

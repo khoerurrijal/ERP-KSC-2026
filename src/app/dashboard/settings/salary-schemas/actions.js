@@ -12,14 +12,12 @@ export async function saveSalarySchema(payload) {
         .from('salary_schemas')
         .update({
           role_name: payload.role_name,
-          bonus_mingguan: payload.bonus_mingguan || 0,
           rate_borongan_sendiri: payload.rate_borongan_sendiri || 0,
           rate_produksi_bawahan: payload.rate_produksi_bawahan || 0,
           batas_qty_bonus_harian: payload.batas_qty_bonus_harian || 0,
           bonus_harian_dibawah_target: payload.bonus_harian_dibawah_target || 0,
           batas_qty_target_harian: payload.batas_qty_target_harian || 0,
-          bonus_target_harian: payload.bonus_target_harian || 0,
-          fee_2_warna: payload.fee_2_warna || 0
+          bonus_target_harian: payload.bonus_target_harian || 0
         })
         .eq('id', payload.id)
       
@@ -29,14 +27,12 @@ export async function saveSalarySchema(payload) {
         .from('salary_schemas')
         .insert([{
           role_name: payload.role_name,
-          bonus_mingguan: payload.bonus_mingguan || 0,
           rate_borongan_sendiri: payload.rate_borongan_sendiri || 0,
           rate_produksi_bawahan: payload.rate_produksi_bawahan || 0,
           batas_qty_bonus_harian: payload.batas_qty_bonus_harian || 0,
           bonus_harian_dibawah_target: payload.bonus_harian_dibawah_target || 0,
           batas_qty_target_harian: payload.batas_qty_target_harian || 0,
-          bonus_target_harian: payload.bonus_target_harian || 0,
-          fee_2_warna: payload.fee_2_warna || 0
+          bonus_target_harian: payload.bonus_target_harian || 0
         }])
       
       if (error) throw error

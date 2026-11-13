@@ -290,6 +290,15 @@ html.dark body .liquid-glass-scene {
   background: transparent;
 }
 
+/* Let an open page dialog rise above the sticky header and fixed sidebar. */
+html body .liquid-glass-scene:has(main .fixed.inset-0) {
+  z-index: 60;
+}
+
+html body .liquid-glass-scene > main:has(.fixed.inset-0) {
+  z-index: 60 !important;
+}
+
 html.dark body .liquid-glass-underlay {
   position: fixed;
   inset: 0;
@@ -401,6 +410,25 @@ html body .fixed.inset-0 :is([role="dialog"], [class*="max-w-"]):not([class~="bg
   border-color: var(--border) !important;
   border-radius: var(--radius-dialog) !important;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18) !important;
+}
+
+/* Centered dialogs stay centered when they fit and become scrollable when they do not. */
+html body .fixed.inset-0.flex.items-center.justify-center:not(.flex-col) {
+  box-sizing: border-box;
+  align-items: flex-start !important;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: max(0.75rem, env(safe-area-inset-top)) max(0.75rem, env(safe-area-inset-bottom));
+}
+
+html body .fixed.inset-0.flex.items-center.justify-center:not(.flex-col) > :is([role="dialog"], [class*="max-w-"]):not([class~="bg-white"]) {
+  box-sizing: border-box;
+  margin-block: auto !important;
+  max-height: calc(100vh - 2rem) !important;
+  max-height: calc(100dvh - 2rem - env(safe-area-inset-top) - env(safe-area-inset-bottom)) !important;
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
 }
 
 /* Legacy bordered cards are brought onto the same solid 12px panel pattern. */

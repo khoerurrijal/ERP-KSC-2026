@@ -3,6 +3,10 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { createAdminNotification } from '@/lib/adminNotifications'
+import {
+  getNextProductionColorPass,
+  reconcileProductionColorPasses
+} from '@/utils/productionColorPasses.mjs'
 
 function getJakartaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -31,18 +35,55 @@ function getProductionProgressError(error) {
   return message
 }
 
+function withProductionColorPass(notes, colorPass) {
+  const cleanNotes = String(notes || '').replace(/\[\[WARNA_PASS:[12]\]\]/ig, '').trim()
+  return [colorPass ? `[[WARNA_PASS:${colorPass}]]` : '', cleanNotes].filter(Boolean).join(' ')
+}
+
 export async function saveProductionProgress(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
+    const { data: job, error: jobError } = await supabase
+      .from('sales_items')
+      .select('id, notes, qty, unit_multiplier, production_logs(id, qty_processed, notes, processed_date, created_at)')
+      .eq('id', payload.job_id)
+      .maybeSingle()
+    if (jobError) throw jobError
+    if (!job) throw new Error('Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.')
+
+    const isTwoColor = /2\s*warna|warna\s*ke-?2/i.test(job.notes || '')
+    const processedQty = Number(payload.qty_processed)
+    if (!Number.isSafeInteger(processedQty) || processedQty <= 0) {
+      throw new Error('Qty produksi harus berupa bilangan bulat lebih dari 0.')
+    }
+    let automaticColorPass = ''
+    const allTimeTotalQty = (job.production_logs || []).reduce((total, log) => (
+      total + Number(log.qty_processed || 0)
+    ), 0)
+    if (isTwoColor) {
+      const passTarget = Number(job.qty || 0) * Number(job.unit_multiplier || 1)
+      if (!Number.isFinite(passTarget) || passTarget <= 0) throw new Error('Target Qty produk 2 warna tidak valid.')
+      const reconciliation = reconcileProductionColorPasses([job], job.production_logs || [])
+      const passTotals = reconciliation.colorPassTotalsByJobId.get(String(job.id)) || { 1: 0, 2: 0 }
+      const nextPass = getNextProductionColorPass(passTotals[1], passTotals[2], passTarget)
+      if (!nextPass) throw new Error('Kedua tahap warna sudah mencapai Qty pesanan.')
+
+      automaticColorPass = String(nextPass)
+      const remainingQty = Math.max(0, passTarget - Number(passTotals[nextPass] || 0))
+      if (processedQty > remainingQty) {
+        throw new Error(`Qty melebihi sisa otomatis Warna ke-${automaticColorPass} (${remainingQty} pcs). Tahap berikutnya terbuka setelah target ini selesai.`)
+      }
+    }
+
     const { error } = await supabase.rpc('record_production_progress_guarded', {
       p_job_id: payload.job_id,
       p_employee_id: payload.employee_id,
       p_qty_processed: payload.qty_processed,
       p_qty_defect: payload.qty_defect || 0,
-      p_notes: payload.notes || '',
+      p_notes: withProductionColorPass(payload.notes, automaticColorPass),
       p_processed_date: getJakartaDateKey(),
-      p_expected_total_qty: payload.expected_total_qty,
+      p_expected_total_qty: allTimeTotalQty,
       p_correction_total: null
     })
 
@@ -399,5 +440,80 @@ export async function updateProductionLogQty(logId, newQty, processedDate, expec
   } catch (err) {
     console.error('Error updating production log:', err)
     return { success: false, error: err.message || 'Gagal menyimpan perubahan catatan produksi.' }
+  }
+}
+
+export async function deleteProductionLog(logId, expectedLog) {
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'], 'Hanya Admin/Owner yang dapat menghapus catatan produksi.')
+
+  try {
+    const expectedQty = Number(expectedLog?.qty_processed)
+    const expectedDefectRaw = expectedLog?.qty_defect ?? null
+    const expectedDefect = Number(expectedDefectRaw || 0)
+    const expectedDate = expectedLog?.processed_date || null
+    const expectedEmployee = String(expectedLog?.employee_id || '')
+    const expectedNotes = expectedLog?.notes ?? null
+    const expectedJobId = String(expectedLog?.job_id || '')
+
+    if (!logId || !expectedJobId || !Number.isSafeInteger(expectedQty) || !Number.isSafeInteger(expectedDefect)) {
+      throw new Error('Data catatan tidak lengkap. Muat ulang daftar produksi.')
+    }
+
+    const { data: currentLog, error: readError } = await supabase
+      .from('production_logs')
+      .select('id, job_id, qty_processed, qty_defect, processed_date, employee_id, notes')
+      .eq('id', logId)
+      .maybeSingle()
+
+    if (readError) throw readError
+    if (!currentLog) throw new Error('Catatan produksi sudah tidak tersedia. Muat ulang daftar.')
+    if (
+      String(currentLog.job_id) !== expectedJobId ||
+      Number(currentLog.qty_processed || 0) !== expectedQty ||
+      Number(currentLog.qty_defect || 0) !== expectedDefect ||
+      (currentLog.processed_date || null) !== expectedDate ||
+      String(currentLog.employee_id || '') !== expectedEmployee ||
+      (currentLog.notes ?? null) !== expectedNotes
+    ) {
+      throw new Error('Catatan ini sudah berubah. Muat ulang daftar sebelum menghapusnya.')
+    }
+
+    const { data: relatedItem, error: itemError } = await supabase
+      .from('sales_items')
+      .select('id')
+      .eq('id', expectedJobId)
+      .maybeSingle()
+    if (itemError) throw itemError
+    if (!relatedItem) throw new Error('Item pesanan terkait sudah tidak tersedia. Catatan tidak dihapus.')
+
+    let deleteQuery = supabase
+      .from('production_logs')
+      .delete()
+      .eq('id', logId)
+      .eq('job_id', expectedJobId)
+      .eq('qty_processed', expectedQty)
+    deleteQuery = expectedDefectRaw === null
+      ? deleteQuery.is('qty_defect', null)
+      : deleteQuery.eq('qty_defect', expectedDefect)
+    deleteQuery = expectedDate
+      ? deleteQuery.eq('processed_date', expectedDate)
+      : deleteQuery.is('processed_date', null)
+    deleteQuery = expectedEmployee
+      ? deleteQuery.eq('employee_id', expectedEmployee)
+      : deleteQuery.is('employee_id', null)
+    deleteQuery = expectedNotes === null
+      ? deleteQuery.is('notes', null)
+      : deleteQuery.eq('notes', expectedNotes)
+
+    const { data: deletedLog, error: deleteError } = await deleteQuery.select('id, job_id').maybeSingle()
+    if (deleteError) throw deleteError
+    if (!deletedLog) throw new Error('Catatan ini baru saja berubah. Muat ulang daftar sebelum menghapusnya.')
+
+    await handleAutoStatusUpdate(deletedLog.job_id)
+    revalidatePath('/dashboard/production')
+    return { success: true }
+  } catch (err) {
+    console.error('Error deleting production log:', err)
+    return { success: false, error: err.message || 'Gagal menghapus catatan produksi.' }
   }
 }

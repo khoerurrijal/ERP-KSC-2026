@@ -65,7 +65,7 @@ const MENU_GROUPS = [
     subItems: [
       { name: 'Buku Besar', path: '/transactions', icon: TrendingUp, accessKeys: ['finance.ledger.main', 'finance.ledger.virtual'] },
       { name: 'Kasbon & Pinjaman', path: '/finance/loans', icon: Wallet, accessKeys: ['finance.loans'] },
-      { name: 'Rekap Gaji', path: '/payroll', icon: Users, accessKeys: ['finance.payroll'] },
+      { name: 'Absen & Gaji', path: '/payroll', icon: Users, accessKeys: ['finance.payroll'] },
     ]
   },
   {

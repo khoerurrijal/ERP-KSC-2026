@@ -24,6 +24,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
     supervisor_id: '',
     gaji_harian: 0,
     uang_makan: 0,
+    bonus_mingguan: 0,
     is_active: true
   })
 
@@ -43,6 +44,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
       supervisor_id: emp.supervisor_id || '',
       gaji_harian: emp.gaji_harian || 0,
       uang_makan: emp.uang_makan || 0,
+      bonus_mingguan: emp.bonus_mingguan || 0,
       is_active: emp.is_active
     })
     setIsModalOpen(true)
@@ -58,6 +60,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
       supervisor_id: '',
       gaji_harian: 0,
       uang_makan: 0,
+      bonus_mingguan: 0,
       is_active: true
     })
     setIsModalOpen(true)
@@ -83,6 +86,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
             supervisor_id: formData.supervisor_id,
             gaji_harian: formData.gaji_harian,
             uang_makan: formData.uang_makan,
+            bonus_mingguan: formData.bonus_mingguan,
             is_active: formData.is_active,
             salary_schemas: selectedSchema
           } : s))
@@ -276,7 +280,7 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
               )}
 
               {formData.salary_schema_id && (
-                <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in fade-in slide-in-from-top-2">
                   <div className="space-y-2">
                     <label className="text-sm font-medium text-foreground/80">Gaji Pokok (Harian)</label>
                     <CurrencyInput
@@ -290,6 +294,14 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
                     <CurrencyInput
                       value={formData.uang_makan} 
                       onChange={e => setFormData({...formData, uang_makan: Number(e.target.value)})} 
+                      className="glass-input w-full"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground/80">Bonus Full Seminggu</label>
+                    <CurrencyInput
+                      value={formData.bonus_mingguan}
+                      onChange={e => setFormData({...formData, bonus_mingguan: Number(e.target.value)})}
                       className="glass-input w-full"
                     />
                   </div>

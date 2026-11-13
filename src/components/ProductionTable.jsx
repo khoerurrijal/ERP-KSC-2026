@@ -2,9 +2,9 @@
 
 import { Fragment, useState, useMemo, useEffect, useCallback, useRef } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Pencil } from 'lucide-react'
+import { Search, X, CheckCircle2, ChevronUp, ChevronDown, RefreshCw, Pencil, Trash2 } from 'lucide-react'
 
-import { saveProductionProgress, correctProductionProgress, updateProductionLogQty } from '@/app/dashboard/production/actions'
+import { saveProductionProgress, correctProductionProgress, updateProductionLogQty, deleteProductionLog } from '@/app/dashboard/production/actions'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import TrackingTimeline from '@/components/TrackingTimeline'
@@ -12,6 +12,7 @@ import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
+import { getNextProductionColorPass } from '@/utils/productionColorPasses.mjs'
 import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const getDisplayStatus = (st) => {
@@ -109,6 +110,9 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const [productionLogEmployeeDraft, setProductionLogEmployeeDraft] = useState('')
   const [productionLogEditError, setProductionLogEditError] = useState('')
   const [isSavingProductionLog, setIsSavingProductionLog] = useState(false)
+  const [deletingProductionLog, setDeletingProductionLog] = useState(null)
+  const [productionLogDeleteError, setProductionLogDeleteError] = useState('')
+  const [isDeletingProductionLog, setIsDeletingProductionLog] = useState(false)
 
   // Form State
   const [employeeId, setEmployeeId] = useState('')
@@ -136,8 +140,17 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const selectedJobRemainingQty = selectedJob
     ? Math.max(0, Number(selectedJob.qty_target || 0) - Number(selectedJob.qty_processed || 0))
     : 0
-  const qtySuggestions = [...new Set([500, 1000, 5000, selectedJobRemainingQty]
-    .map(qty => Math.min(qty, selectedJobRemainingQty))
+  const selectedColorTarget = Number(selectedJob?.qty_per_color_target || 0)
+  const automaticColorPass = selectedJob?.is_two_color
+    ? getNextProductionColorPass(selectedJob?.qty_color_1, selectedJob?.qty_color_2, selectedColorTarget)
+    : null
+  const selectedColorPassRemaining = selectedJob?.is_two_color
+    ? automaticColorPass
+      ? Math.max(0, selectedColorTarget - Number((automaticColorPass === 1 ? selectedJob?.qty_color_1 : selectedJob?.qty_color_2) || 0))
+      : 0
+    : selectedJobRemainingQty
+  const qtySuggestions = [...new Set([500, 1000, 5000, selectedColorPassRemaining]
+    .map(qty => Math.min(qty, selectedColorPassRemaining))
     .filter(qty => qty > 0))]
 
   const updateSearchParam = useCallback((value) => {
@@ -418,9 +431,54 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     }
   }
 
+  const openProductionLogDeleteConfirmation = (log) => {
+    if (!canEditProductionHistory) return
+    setDeletingProductionLog(log)
+    setProductionLogDeleteError('')
+  }
+
+  const handleDeleteProductionLog = async () => {
+    if (!deletingProductionLog || isDeletingProductionLog) return
+    setIsDeletingProductionLog(true)
+    setProductionLogDeleteError('')
+    try {
+      const result = await deleteProductionLog(deletingProductionLog.id, {
+        job_id: deletingProductionLog.job_id,
+        qty_processed: deletingProductionLog.source_qty_processed,
+        qty_defect: deletingProductionLog.source_qty_defect,
+        processed_date: deletingProductionLog.processed_date || null,
+        employee_id: deletingProductionLog.employee_id === 'unassigned' ? '' : String(deletingProductionLog.employee_id || ''),
+        notes: deletingProductionLog.notes
+      })
+      if (!result.success) {
+        setProductionLogDeleteError(result.error || 'Gagal menghapus catatan.')
+        return
+      }
+      setDeletingProductionLog(null)
+      router.refresh()
+    } catch (error) {
+      setProductionLogDeleteError(error.message || 'Terjadi kesalahan saat menghapus catatan.')
+    } finally {
+      setIsDeletingProductionLog(false)
+    }
+  }
+
   const handleSubmitQty = async () => {
     if (!employeeId || !qtyProcessed) {
       alert("Harap pilih Operator dan isi Qty yang dikerjakan.")
+      return
+    }
+
+    const submittedQty = Number(qtyProcessed)
+    if (!Number.isInteger(submittedQty) || submittedQty <= 0) {
+      alert('Qty harus berupa bilangan bulat lebih dari 0.')
+      return
+    }
+    if (submittedQty > (selectedJob.is_two_color ? selectedColorPassRemaining : selectedJobRemainingQty)) {
+      const remainingStage = selectedJob.is_two_color && automaticColorPass
+        ? `Warna ke-${automaticColorPass}`
+        : 'pesanan'
+      alert(`Qty melebihi sisa ${remainingStage} (${formatMobileQuantity(selectedJob.is_two_color ? selectedColorPassRemaining : selectedJobRemainingQty)} pcs).`)
       return
     }
 
@@ -429,7 +487,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       const res = await saveProductionProgress({
         job_id: selectedJob.id,
         employee_id: employeeId,
-        qty_processed: parseInt(qtyProcessed) || 0,
+        qty_processed: submittedQty,
         qty_defect: parseInt(qtyDefect) || 0,
         expected_total_qty: Number(selectedJob.qty_processed || 0),
         notes: notes
@@ -649,33 +707,53 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                                       const rowKey = log.id || `${expansionKey}-${log.processed_date}-${log.created_at}-${index}`
                                       const productionDate = getProductionDateValue(log)
                                       const productionTime = log.created_at ? new Date(log.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit', timeZone: 'Asia/Jakarta' }) : ''
-                                      const rowContent = <>
-                                        <span className="text-foreground/50">
-                                          {productionDate ? `${formatProductionDate(productionDate)}${productionTime ? `, ${productionTime}` : ''}` : '-'}
-                                        </span>
-                                        <span className="min-w-0 text-foreground/75">
-                                          <span className="font-semibold text-foreground">{log.product_name}</span>
-                                          <span className="block truncate text-foreground/45">{log.customer_name}</span>
-                                        </span>
-                                        <span className={`flex items-center gap-2 font-bold ${Number(log.qty_processed) < 0 ? 'text-red-400' : 'text-green-400'}`}>
-                                          {formatMobileQuantity(log.qty_processed)} pcs
-                                          {canEditProductionHistory && <Pencil aria-hidden="true" className="h-3 w-3 text-foreground/45" />}
-                                        </span>
-                                      </>
-                                      const rowClassName = `grid w-full grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-left text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3 ${canEditProductionHistory ? 'cursor-pointer transition-colors hover:border-primary/40 hover:bg-primary/[0.04] focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary/70' : ''}`
+                                      const rowClassName = 'grid grid-cols-1 gap-1 rounded-lg border border-white/5 bg-white/[0.03] px-3 py-2 text-xs sm:grid-cols-[150px_minmax(0,1fr)_auto] sm:items-center sm:gap-3'
 
-                                      return canEditProductionHistory ? (
-                                        <button
-                                          key={rowKey}
-                                          type="button"
-                                          onClick={() => openProductionLogEditor(log)}
-                                          aria-label={`Edit catatan produksi ${log.product_name}, ${formatMobileQuantity(log.qty_processed)} pcs`}
-                                          className={rowClassName}
-                                        >
-                                          {rowContent}
-                                        </button>
-                                      ) : (
-                                        <div key={rowKey} className={rowClassName}>{rowContent}</div>
+                                      return (
+                                        <div key={rowKey} className={rowClassName}>
+                                          <span className="text-foreground/50">
+                                            {productionDate ? `${formatProductionDate(productionDate)}${productionTime ? `, ${productionTime}` : ''}` : '-'}
+                                          </span>
+                                          <span className="min-w-0 text-foreground/75">
+                                            <span className="flex flex-wrap items-center gap-2">
+                                              <span className="font-semibold text-foreground">{log.product_name}</span>
+                                              {log.is_two_color && (
+                                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${log.color_pass ? 'border-amber-500/30 bg-amber-500/10 text-amber-400' : 'border-white/10 bg-white/5 text-foreground/50'}`}>
+                                                  {log.color_pass ? `Warna ke-${log.color_pass}` : 'Tahap warna belum ditandai'}
+                                                </span>
+                                              )}
+                                            </span>
+                                            <span className="block truncate text-foreground/45">{log.customer_name}</span>
+                                            {log.invoice_number && <span className="block truncate text-[10px] text-foreground/35">{log.invoice_number}</span>}
+                                          </span>
+                                          <span className="flex items-center justify-between gap-3 sm:justify-end">
+                                            <span className={`font-bold ${Number(log.qty_processed) < 0 ? 'text-red-400' : 'text-green-400'}`}>
+                                              {formatMobileQuantity(log.qty_processed)} pcs
+                                            </span>
+                                            {canEditProductionHistory && (
+                                              <span className="flex items-center gap-1">
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openProductionLogEditor(log)}
+                                                  aria-label={`Edit catatan ${log.product_name} ${log.invoice_number || ''}`}
+                                                  title="Edit catatan"
+                                                  className="rounded-md p-2 text-foreground/50 transition-colors hover:bg-white/10 hover:text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
+                                                >
+                                                  <Pencil aria-hidden="true" className="h-4 w-4" />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => openProductionLogDeleteConfirmation(log)}
+                                                  aria-label={`Hapus catatan ${log.product_name} ${log.invoice_number || ''}`}
+                                                  title="Hapus catatan"
+                                                  className="rounded-md p-2 text-red-400/70 transition-colors hover:bg-red-500/10 hover:text-red-400 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-400"
+                                                >
+                                                  <Trash2 aria-hidden="true" className="h-4 w-4" />
+                                                </button>
+                                              </span>
+                                            )}
+                                          </span>
+                                        </div>
                                       )
                                     })}
                                   </div>
@@ -702,6 +780,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-bold text-stone-900">{item.sales_order_items?.sales_orders?.customers?.name || 'Pelanggan'}</p>
+                  <p className="truncate text-[10px] text-stone-500">{item.sales_order_items?.sales_orders?.invoice_number || ''}</p>
                 </div>
                 <span className={`shrink-0 rounded-full border px-2 py-0.5 text-[10px] font-bold ${getStatusColor(item.item_status)}`}>{getDisplayStatus(item.item_status)}</span>
               </div>
@@ -709,12 +788,20 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 {item.mockup_url && <button type="button" onClick={() => setZoomImage(item.mockup_url)} className="relative h-11 w-11 shrink-0 overflow-hidden rounded-lg border border-stone-200" title="Lihat Mockup"><Image src={item.mockup_url} fill className="object-cover" alt="Mockup" sizes="44px" /></button>}
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-semibold text-stone-800">{item.sales_order_items?.products?.name || '-'}</p>
-                  <p className="text-xs text-stone-500">Target {formatMobileQuantity(item.qty_target)} {item.unit || 'pcs'}</p>
+                  <p className="text-xs text-stone-500">Target {formatMobileQuantity(item.is_two_color ? item.qty_per_color_target : item.qty_target)} {item.unit || 'pcs'}</p>
                   {item.notes && <p className="mt-0.5 truncate text-xs text-stone-500">{item.notes}</p>}
                 </div>
               </div>
               <div className="mt-2 flex items-center justify-between gap-2 border-t border-stone-100 pt-2 text-xs">
-                <p className="min-w-0 truncate"><span className="font-bold text-green-700">{formatMobileQuantity(item.qty_processed)} {item.unit || 'pcs'} selesai</span><span className="ml-1 text-orange-700">· Sisa {formatMobileQuantity(Math.max(0, item.qty_target - item.qty_processed))}</span></p>
+                {item.is_two_color ? (
+                  <p className="min-w-0 font-semibold text-amber-700">
+                    W1 {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)}
+                    <span className="mx-1 text-stone-400">·</span>
+                    W2 {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)}
+                  </p>
+                ) : (
+                  <p className="min-w-0 truncate"><span className="font-bold text-green-700">{formatMobileQuantity(item.qty_processed)} {item.unit || 'pcs'} selesai</span><span className="ml-1 text-orange-700">· Sisa {formatMobileQuantity(Math.max(0, item.qty_target - item.qty_processed))}</span></p>
+                )}
                 <p className={`shrink-0 font-semibold ${item.is_fast_track ? 'text-red-700' : 'text-blue-700'}`}>{item.target_date ? new Date(item.target_date).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' }) : '-'}{item.is_fast_track && <span className="ml-1 text-red-700" aria-label="Fast Track" title="Fast Track">⚡</span>}</p>
               </div>
               {item.order_type?.toUpperCase() === 'SABLON' && ['BARU MASUK', 'SIAP PROSES', 'PROSES'].includes(item.item_status?.toUpperCase()) && <button type="button" onClick={() => handleOpenModal(item)} className="mt-2 min-h-11 w-full rounded-lg bg-[#755615] px-4 py-2 text-sm font-bold text-white">Input Qty</button>}
@@ -750,7 +837,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 ) : paginatedProdJobs?.map((item) => (
                   <tr key={item.id} className="hover:bg-white/5 transition-colors">
                     <td className="px-4 py-3 font-medium text-purple-400">
-                      {item.sales_order_items?.sales_orders?.customers?.name || '-'}
+                      <div>{item.sales_order_items?.sales_orders?.customers?.name || '-'}</div>
+                      {item.sales_order_items?.sales_orders?.invoice_number && <div className="mt-0.5 text-[10px] font-normal text-foreground/40">{item.sales_order_items.sales_orders.invoice_number}</div>}
                     </td>
                     <td className="px-4 py-3">
                       {item.mockup_url ? (
@@ -764,11 +852,27 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                     <td className="px-4 py-3">
                       <p className="font-medium text-foreground/90">{item.sales_order_items?.products?.name || '-'}</p>
                       {item.notes && <p className="text-[10px] text-foreground/60 italic mt-0.5 whitespace-pre-line">{item.notes}</p>}
-                      <p className="text-xs text-foreground/60 mt-1">{item.qty_target} {item.unit || 'pcs'}</p>
+                      <p className="text-xs text-foreground/60 mt-1">{formatMobileQuantity(item.is_two_color ? item.qty_per_color_target : item.qty_target)} {item.unit || 'pcs'}</p>
+                      {item.is_two_color && (
+                        <p className="mt-1 whitespace-nowrap text-[10px] font-medium text-amber-400">
+                          W1 {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)}
+                          <span className="mx-1 text-foreground/35">·</span>
+                          W2 {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)}
+                        </p>
+                      )}
                     </td>
                     <td className="px-4 py-3">
-                      <p className="font-bold text-green-400">{item.qty_processed} pcs</p>
-                      <p className="text-xs text-orange-400">Kurang: {Math.max(0, item.qty_target - item.qty_processed)} pcs</p>
+                      {item.is_two_color ? (
+                        <div className="space-y-1 whitespace-nowrap text-xs font-semibold text-amber-400">
+                          <p>Warna 1: {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
+                          <p>Warna 2: {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
+                        </div>
+                      ) : (
+                        <>
+                          <p className="font-bold text-green-400">{item.qty_processed} pcs</p>
+                          <p className="text-xs text-orange-400">Kurang: {Math.max(0, item.qty_target - item.qty_processed)} pcs</p>
+                        </>
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col gap-1">
@@ -784,9 +888,6 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                         </div>
                         {item.is_fast_track && (
                           <span className="text-[10px] font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded-full w-fit">FAST TRACK</span>
-                        )}
-                        {item.is_two_color && (
-                          <span className="text-[10px] font-bold text-yellow-500 bg-yellow-500/10 px-2 py-0.5 rounded-full w-fit">2 WARNA</span>
                         )}
                       </div>
                     </td>
@@ -853,6 +954,21 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 <p className="text-foreground/80">Produk: <span className="font-bold text-foreground">{selectedJob.sales_order_items?.products?.product_name || selectedJob.sales_order_items?.products?.name}</span></p>
               </div>
 
+              {selectedJob.is_two_color && (
+                <div className="rounded-xl border border-primary/20 bg-primary/5 px-3 py-2 text-xs">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-foreground/70">
+                      Warna 1 <span className="font-semibold text-foreground">{formatMobileQuantity(Math.min(Number(selectedJob.qty_color_1 || 0), selectedColorTarget))}/{formatMobileQuantity(selectedColorTarget)}</span>
+                      <span className="mx-2 text-foreground/35">·</span>
+                      Warna 2 <span className="font-semibold text-foreground">{formatMobileQuantity(Math.min(Number(selectedJob.qty_color_2 || 0), selectedColorTarget))}/{formatMobileQuantity(selectedColorTarget)}</span>
+                    </p>
+                    <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-1 font-bold text-primary">
+                      Input otomatis: {automaticColorPass ? `Warna ${automaticColorPass}` : 'Selesai'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground/80 mb-1 block">Nama Operator <span className="text-red-400">*</span></label>
                 <CustomSelect 
@@ -871,10 +987,11 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 <input 
                   type="number" 
                   min="1"
-                  max={selectedJobRemainingQty}
+                  max={selectedJob.is_two_color ? selectedColorPassRemaining : selectedJobRemainingQty}
                   value={qtyProcessed} 
                   onChange={e => setQtyProcessed(e.target.value)} 
                   placeholder="Berapa pcs?"
+                  disabled={(selectedJob.is_two_color ? selectedColorPassRemaining : selectedJobRemainingQty) === 0}
                   className="glass-input w-full" 
                 />
                 {qtySuggestions.length > 0 && <div className="space-y-2">
@@ -887,7 +1004,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                         onClick={() => setQtyProcessed(String(qty))}
                         className="min-h-10 rounded-lg border border-primary/20 bg-primary/5 px-3 text-xs font-semibold text-primary hover:bg-primary/10"
                       >
-                        {qty === selectedJobRemainingQty ? `Sisa ${qty.toLocaleString('id-ID')} pcs` : `${qty.toLocaleString('id-ID')} pcs`}
+                        {qty === selectedColorPassRemaining ? `Sisa ${qty.toLocaleString('id-ID')} pcs` : `${qty.toLocaleString('id-ID')} pcs`}
                       </button>
                     ))}
                   </div>
@@ -942,6 +1059,11 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                 <p className="font-semibold">{editingProductionLog.product_name}</p>
                 <p className="mt-1 text-foreground/55">{editingProductionLog.customer_name} · {productionLogEmployeeDraft ? operators.find(operator => String(operator.id) === productionLogEmployeeDraft)?.full_name || editingProductionLog.employee_name : 'Tanpa operator'}</p>
                 <p className="mt-1 text-xs text-foreground/45">{formatProductionDate(productionLogDateDraft)}</p>
+                {editingProductionLog.is_two_color && (
+                  <p className="mt-2 text-xs font-semibold text-primary">
+                    Tahap otomatis: Warna ke-{editingProductionLog.color_pass || '-'}
+                  </p>
+                )}
               </div>
               <label className="block space-y-2 text-sm font-medium">
                 <span>Operator</span>
@@ -978,6 +1100,39 @@ export default function ProductionTable({ productionJobs, productionHistory = []
               <button type="button" onClick={() => setEditingProductionLog(null)} disabled={isSavingProductionLog} className="btn-secondary h-10 px-4 text-sm disabled:opacity-50">Batal</button>
               <button type="button" onClick={handleSaveProductionLog} disabled={isSavingProductionLog} className="btn-primary flex h-10 items-center gap-2 px-4 text-sm disabled:opacity-50">
                 <CheckCircle2 className="h-4 w-4" /> {isSavingProductionLog ? 'Menyimpan...' : 'Simpan perubahan'}
+              </button>
+            </div>
+          </section>
+        </div>
+      )}
+
+      {deletingProductionLog && canEditProductionHistory && (
+        <div className="fixed inset-0 z-[1001] flex items-center justify-center bg-black/70 p-4 backdrop-blur-sm" onMouseDown={event => event.target === event.currentTarget && !isDeletingProductionLog && setDeletingProductionLog(null)}>
+          <section role="alertdialog" aria-modal="true" aria-labelledby="production-log-delete-title" aria-describedby="production-log-delete-description" className="w-full max-w-md overflow-hidden rounded-2xl border border-red-500/25 bg-background shadow-2xl">
+            <div className="flex items-center justify-between border-b border-white/10 px-5 py-4">
+              <h3 id="production-log-delete-title" className="font-bold text-red-400">Hapus catatan produksi?</h3>
+              <button type="button" onClick={() => !isDeletingProductionLog && setDeletingProductionLog(null)} aria-label="Tutup" className="text-foreground/50 hover:text-foreground disabled:opacity-50" disabled={isDeletingProductionLog}>
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="space-y-3 p-5 text-sm">
+              <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                <p className="font-semibold">{deletingProductionLog.product_name}</p>
+                <p className="mt-1 text-foreground/60">{deletingProductionLog.customer_name}{deletingProductionLog.invoice_number ? ` · ${deletingProductionLog.invoice_number}` : ''}</p>
+                <p className="mt-1 text-foreground/60">{formatProductionDate(getProductionDateValue(deletingProductionLog))} · {deletingProductionLog.employee_name}</p>
+                {deletingProductionLog.is_two_color && <p className="mt-1 font-medium text-amber-400">Warna ke-{deletingProductionLog.color_pass || 'belum ditandai'}</p>}
+                <p className="mt-2 font-semibold text-green-400">Qty pada akumulasi: {formatMobileQuantity(deletingProductionLog.qty_processed)} pcs</p>
+                {Number(deletingProductionLog.source_qty_processed) !== Number(deletingProductionLog.qty_processed) && (
+                  <p className="mt-1 text-xs text-foreground/55">Qty input tersimpan: {formatMobileQuantity(deletingProductionLog.source_qty_processed)} pcs</p>
+                )}
+              </div>
+              <p id="production-log-delete-description" className="text-foreground/65">Hanya catatan ini yang dihapus. Sistem akan membalik mutasi stok dari catatan tersebut.</p>
+              {productionLogDeleteError && <p role="alert" className="text-sm text-red-400">{productionLogDeleteError}</p>}
+            </div>
+            <div className="flex justify-end gap-2 border-t border-white/10 bg-white/[0.03] px-5 py-4">
+              <button type="button" onClick={() => setDeletingProductionLog(null)} disabled={isDeletingProductionLog} className="btn-secondary h-10 px-4 text-sm disabled:opacity-50">Batal</button>
+              <button type="button" onClick={handleDeleteProductionLog} disabled={isDeletingProductionLog} className="inline-flex h-10 items-center gap-2 rounded-lg border border-red-500/40 bg-red-500 px-4 text-sm font-semibold text-white transition-colors hover:bg-red-600 disabled:opacity-50">
+                <Trash2 className="h-4 w-4" /> {isDeletingProductionLog ? 'Menghapus...' : 'Hapus catatan'}
               </button>
             </div>
           </section>

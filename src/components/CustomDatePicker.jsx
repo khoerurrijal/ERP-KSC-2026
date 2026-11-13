@@ -75,13 +75,18 @@ export default function CustomDatePicker({ value, onChange, className = "", endV
       const anchor = popoverRef.current?.getBoundingClientRect()
       if (!anchor) return
 
-      const width = Math.min(288, window.innerWidth - 24)
+      const viewport = window.visualViewport
+      const viewportTop = viewport?.offsetTop ?? 0
+      const viewportLeft = viewport?.offsetLeft ?? 0
+      const viewportWidth = viewport?.width ?? window.innerWidth
+      const viewportHeight = viewport?.height ?? window.innerHeight
+      const width = Math.min(288, Math.max(0, viewportWidth - 24))
       const estimatedHeight = isRange ? 420 : 340
-      const spaceBelow = Math.max(0, window.innerHeight - anchor.bottom - 20)
-      const spaceAbove = Math.max(0, anchor.top - 20)
+      const spaceBelow = Math.max(0, viewportTop + viewportHeight - anchor.bottom - 20)
+      const spaceAbove = Math.max(0, anchor.top - viewportTop - 20)
       const opensAbove = spaceBelow < estimatedHeight && spaceAbove > spaceBelow
       const availableHeight = Math.min(estimatedHeight, opensAbove ? spaceAbove : spaceBelow)
-      const left = Math.min(Math.max(12, anchor.left), window.innerWidth - width - 12)
+      const left = Math.min(Math.max(viewportLeft + 12, anchor.left), viewportLeft + viewportWidth - width - 12)
 
       setMenuStyle({
         position: 'fixed',
@@ -98,9 +103,13 @@ export default function CustomDatePicker({ value, onChange, className = "", endV
     updateMenuPosition()
     window.addEventListener('resize', updateMenuPosition)
     window.addEventListener('scroll', updateMenuPosition, true)
+    window.visualViewport?.addEventListener('resize', updateMenuPosition)
+    window.visualViewport?.addEventListener('scroll', updateMenuPosition)
     return () => {
       window.removeEventListener('resize', updateMenuPosition)
       window.removeEventListener('scroll', updateMenuPosition, true)
+      window.visualViewport?.removeEventListener('resize', updateMenuPosition)
+      window.visualViewport?.removeEventListener('scroll', updateMenuPosition)
     }
   }, [isOpen, isRange, menuZIndex])
 

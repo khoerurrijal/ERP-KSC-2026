@@ -1,0 +1,6 @@
+BEGIN;
+
+ALTER TABLE public.payroll_items
+  ADD COLUMN IF NOT EXISTS kasbon_amount NUMERIC NOT NULL DEFAULT 0;
+
+COMMIT;
