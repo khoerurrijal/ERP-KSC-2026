@@ -252,10 +252,18 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
               
               <div className="space-y-4">
                 {items.map((item, idx) => {
-                  const targetQty = item.qty * (item.unit_multiplier || 1)
+                  const progress = item.production_progress || {
+                    isTwoColor: Boolean(item.is_two_color),
+                    targetPerColor: item.qty * (item.unit_multiplier || 1),
+                    qtyColorOne: 0,
+                    qtyColorTwo: 0,
+                    qtyActivity: 0,
+                    qtyPhysicalCompleted: 0
+                  }
+                  const targetQty = progress.targetPerColor
                   const itemLogs = logs.filter(l => l.job_id === item.id)
-                  const completedQty = itemLogs.reduce((sum, l) => sum + Number(l.qty_processed || 0), 0)
-                  const itemStatus = (item.status || 'BARU MASUK').toUpperCase()
+                  const completedQty = progress.qtyPhysicalCompleted
+                  const itemStatus = (item.display_status || item.status || 'BARU MASUK').toUpperCase()
                   const isPolos = item.order_type?.toUpperCase() === 'POLOS'
                   
                   const isExpanded = expandedItems.includes(item.id)
@@ -358,22 +366,29 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                                       {/* Production Logs details */}
                                       {step.key === 'PROSES' && (state === 'active' || state === 'passed') && (
                                         <div className="mt-2 space-y-2">
-                                          {itemLogs.filter(l => l.qty_processed > 0).map((log, lIdx) => (
-                                            <div key={lIdx} className="flex flex-col gap-0.5 bg-black/20 rounded border border-white/5 px-2.5 py-1.5 w-fit">
+                                          {itemLogs.filter(l => Number(l.effective_qty ?? l.qty_processed) > 0).map((log, lIdx) => (
+                                            <div key={log.id || lIdx} className="flex flex-col gap-0.5 bg-black/20 rounded border border-white/5 px-2.5 py-1.5 w-fit">
                                               <div className="flex items-center gap-1.5">
                                                 <CheckCircle2 className="w-3 h-3 text-green-400 shrink-0" />
                                                 <span className="text-[10px] text-foreground/50">{new Date(log.created_at).toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })}</span>
                                               </div>
                                               <p className="text-xs pl-5">
-                                                <span className="font-semibold text-white">Disablon {Number(log.qty_processed).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs</span>
+                                                <span className="font-semibold text-white">
+                                                  {progress.isTwoColor && log.color_pass ? `Cetak W${log.color_pass}` : 'Disablon'} {Number(log.effective_qty ?? log.qty_processed).toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs
+                                                </span>
                                                 <span className="text-foreground/60"> oleh {getEmployeeName(log.employee_id)}</span>
                                               </p>
                                             </div>
                                           ))}
                                           {state === 'active' && completedQty < targetQty && (
                                             <div className="mt-2">
+                                              {progress.isTwoColor && (
+                                                <p className="mb-1 text-[10px] text-foreground/60">
+                                                  Aktivitas cetak — W1 {progress.qtyColorOne.toLocaleString('id-ID')} / {targetQty.toLocaleString('id-ID')}, W2 {progress.qtyColorTwo.toLocaleString('id-ID')} / {targetQty.toLocaleString('id-ID')}
+                                                </p>
+                                              )}
                                               <div className="flex justify-between text-[10px] text-foreground/50 mb-1">
-                                                <span>Progres Sablon</span>
+                                                <span>{progress.isTwoColor ? 'Barang fisik selesai' : 'Progres Sablon'}</span>
                                                 <span>{completedQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} / {targetQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} Pcs</span>
                                               </div>
                                               <div className="w-full bg-white/10 rounded-full h-1 overflow-hidden">

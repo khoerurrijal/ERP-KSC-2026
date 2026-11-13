@@ -1,8 +1,12 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  getProductionItemProgress,
+  getRecalculatedProductionStatus,
   getAutomaticProductionColorPass,
   getAutomaticProductionProgressQty,
+  isAutomaticProductionLog,
+  isProductionPassQtyWithinTarget,
   inferProductionColorPasses,
   reconcileProductionColorPasses
 } from '../src/utils/productionColorPasses.mjs'
@@ -96,4 +100,91 @@ test('production entered above one color order quantity is excluded from accumul
   assert.equal(result.effectiveQtyByLogId.get('over-w1'), 2000)
   assert.equal(result.effectiveQtyByLogId.get('later-w2'), 1000)
   assert.deepEqual(result.colorPassTotalsByJobId.get(item.id), { 1: 2000, 2: 1000 })
+})
+
+test('editing processed date does not change the automatic period or saved color stage', () => {
+  const editedLog = {
+    id: 'edited-date-w2',
+    job_id: job.id,
+    qty_processed: 100,
+    processed_date: '2026-10-31',
+    created_at: '2026-11-12 04:29:22.19236+00',
+    notes: '[[WARNA_PASS:2]]'
+  }
+  const result = reconcileProductionColorPasses([job], [editedLog])
+
+  assert.equal(isAutomaticProductionLog(editedLog), true)
+  assert.equal(result.colorPassByLogId.get(editedLog.id), 2)
+  assert.equal(result.colorPassTotalsByJobId.get(job.id)[2], 100)
+})
+
+test('two-color readiness requires both passes and counts physical goods only once', () => {
+  const item = { id: 'ready-two-color', notes: '2 warna', qty: 1000, unit_multiplier: 1 }
+  const logs = [
+    { id: 'w1', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 09:00:00.000000+00', notes: '[[WARNA_PASS:1]]' },
+    { id: 'w2', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 10:00:00.000000+00', notes: '[[WARNA_PASS:2]]' }
+  ]
+  const complete = getProductionItemProgress(item, logs)
+
+  assert.equal(complete.qtyActivity, 2000)
+  assert.equal(complete.qtyPhysicalCompleted, 1000)
+  assert.equal(complete.isComplete, true)
+  assert.equal(getRecalculatedProductionStatus(item, logs, { currentStatus: 'PROSES' }), 'SIAP KIRIM')
+})
+
+test('deleting or reducing W2 returns a complete W1 job to the W2 stage', () => {
+  const item = { id: 'delete-w2', notes: '2 warna', qty: 1000, unit_multiplier: 1 }
+  const logs = [
+    { id: 'w1', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 09:00:00.000000+00', notes: '[[WARNA_PASS:1]]' },
+    { id: 'w2', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 10:00:00.000000+00', notes: '[[WARNA_PASS:2]]' }
+  ]
+  const withoutW2 = logs.filter(log => log.id !== 'w2')
+  const reducedW2 = logs.map(log => log.id === 'w2' ? { ...log, qty_processed: 500 } : log)
+
+  for (const remaining of [withoutW2, reducedW2]) {
+    const progress = getProductionItemProgress(item, remaining)
+    assert.equal(progress.qtyColorOne, 1000)
+    assert.equal(progress.qtyColorTwo, remaining === withoutW2 ? 0 : 500)
+    assert.equal(progress.nextColorPass, 2)
+    assert.equal(getRecalculatedProductionStatus(item, remaining, { currentStatus: 'SIAP KIRIM', forceRecalculate: true }), 'PROSES')
+  }
+})
+
+test('deleting or reducing W1 returns the job to the W1 stage', () => {
+  const item = { id: 'delete-w1', notes: '2 warna', qty: 1000, unit_multiplier: 1 }
+  const logs = [
+    { id: 'w1', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 09:00:00.000000+00', notes: '[[WARNA_PASS:1]]' },
+    { id: 'w2', job_id: item.id, qty_processed: 1000, processed_date: '2026-11-11', created_at: '2026-11-11 10:00:00.000000+00', notes: '[[WARNA_PASS:2]]' }
+  ]
+  const withoutW1 = logs.filter(log => log.id !== 'w1')
+  const reducedW1 = logs.map(log => log.id === 'w1' ? { ...log, qty_processed: 500 } : log)
+
+  for (const remaining of [withoutW1, reducedW1]) {
+    const progress = getProductionItemProgress(item, remaining)
+    assert.equal(progress.qtyColorOne, remaining === withoutW1 ? 0 : 500)
+    assert.equal(progress.qtyColorTwo, 1000)
+    assert.equal(progress.nextColorPass, 1)
+    assert.equal(getRecalculatedProductionStatus(item, remaining, { currentStatus: 'SIAP KIRIM', forceRecalculate: true }), 'PROSES')
+  }
+})
+
+test('per-color input cannot exceed the remaining target', () => {
+  const item = { id: 'boundary', notes: '2 warna', qty: 1000, unit_multiplier: 1 }
+  const progress = getProductionItemProgress(item, [
+    { id: 'partial-w1', job_id: item.id, qty_processed: 500, processed_date: '2026-11-12', created_at: '2026-11-12 09:00:00.000000+00', notes: '[[WARNA_PASS:1]]' }
+  ])
+
+  assert.equal(isProductionPassQtyWithinTarget(500, progress.qtyColorOne, progress.targetPerColor), true)
+  assert.equal(isProductionPassQtyWithinTarget(501, progress.qtyColorOne, progress.targetPerColor), false)
+})
+
+test('one-color edit and delete recalculation preserve physical quantity semantics', () => {
+  const item = { id: 'one-color', notes: '1 warna', qty: 1000, unit_multiplier: 1 }
+  const full = [{ id: 'one-log', job_id: item.id, qty_processed: 1000 }]
+  const edited = [{ ...full[0], qty_processed: 500 }]
+
+  assert.equal(getProductionItemProgress(item, full).qtyPhysicalCompleted, 1000)
+  assert.equal(getRecalculatedProductionStatus(item, full, { currentStatus: 'PROSES', forceRecalculate: true }), 'SIAP KIRIM')
+  assert.equal(getRecalculatedProductionStatus(item, edited, { currentStatus: 'SIAP KIRIM', forceRecalculate: true }), 'PROSES')
+  assert.equal(getRecalculatedProductionStatus(item, [], { currentStatus: 'SIAP KIRIM', canProceed: true, forceRecalculate: true }), 'SIAP PROSES')
 })

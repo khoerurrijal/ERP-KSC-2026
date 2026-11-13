@@ -4,8 +4,9 @@ import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { createAdminNotification } from '@/lib/adminNotifications'
 import {
-  getNextProductionColorPass,
-  reconcileProductionColorPasses
+  getProductionItemProgress,
+  getRecalculatedProductionStatus,
+  isProductionPassQtyWithinTarget,
 } from '@/utils/productionColorPasses.mjs'
 
 function getJakartaDateKey(date = new Date()) {
@@ -29,6 +30,12 @@ function getProductionProgressError(error) {
   if (message.includes('PRODUCTION_JOB_NOT_FOUND')) {
     return 'Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.'
   }
+  if (message.includes('PRODUCTION_LOG_NOT_FOUND')) {
+    return 'Catatan produksi sudah berubah atau dihapus. Muat ulang daftar produksi.'
+  }
+  if (message.includes('PRODUCTION_STATUS_INVALID')) {
+    return 'Status hasil kalkulasi produksi tidak valid. Muat ulang daftar produksi.'
+  }
   if (message.includes('PGRST202')) {
     return 'Pengaman simpan belum tersedia di database. Hubungi Admin sebelum mencatat progress.'
   }
@@ -40,13 +47,110 @@ function withProductionColorPass(notes, colorPass) {
   return [colorPass ? `[[WARNA_PASS:${colorPass}]]` : '', cleanNotes].filter(Boolean).join(' ')
 }
 
+function getProductionLogSnapshot(logs = []) {
+  return [...logs]
+    .sort((a, b) => String(a.id) < String(b.id) ? -1 : String(a.id) > String(b.id) ? 1 : 0)
+    .map(log => ({
+      id: String(log.id),
+      qty_processed: Number(log.qty_processed || 0),
+      qty_defect: log.qty_defect == null ? null : Number(log.qty_defect),
+      notes: log.notes ?? null,
+      processed_date: log.processed_date || null,
+      employee_id: log.employee_id ? String(log.employee_id) : null
+    }))
+}
+
+function getOrderCanProceed(item) {
+  const so = item?.sales_orders || {}
+  const isPaid = so.payment_status === 'LUNAS' || so.payment_status === 'DP'
+  const customerName = so.customers?.name?.toLowerCase() || ''
+  const isMarketplace = Boolean(so.marketplace_receipt?.trim()) ||
+    ['shopee', 'tokopedia', 'tiktok', 'lazada'].some(name => customerName.includes(name))
+  return isPaid || isMarketplace
+}
+
+function getNextItemProductionStatus(item, logs, { forceRecalculate = false } = {}) {
+  const so = item?.sales_orders || {}
+  const canProceed = getOrderCanProceed(item)
+  const orderType = String(item?.order_type || '').toUpperCase()
+  const storedStatus = item?.status || 'BARU MASUK'
+  const oldStatus = String(storedStatus).toUpperCase()
+  const deliveredStatuses = ['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
+  let nextStatus = oldStatus
+
+  if (orderType === 'PRINTING' || ['DLL', 'LAINNYA', 'JASA'].includes(orderType)) {
+    return storedStatus
+  }
+
+  if (orderType === 'POLOS') {
+    if (!canProceed) nextStatus = 'BARU MASUK'
+    else if (!deliveredStatuses.includes(oldStatus)) nextStatus = 'SIAP KIRIM'
+  } else {
+    nextStatus = getRecalculatedProductionStatus(item, logs, {
+      canProceed,
+      currentStatus: oldStatus,
+      forceRecalculate
+    })
+  }
+
+  if ((nextStatus === 'DIKIRIM' || nextStatus === 'SUDAH DIAMBIL') && so.payment_status === 'LUNAS') {
+    nextStatus = 'SELESAI'
+  }
+  return String(nextStatus).toUpperCase() === oldStatus ? storedStatus : nextStatus
+}
+
+async function mutateProductionLogAtomically(supabase, {
+  jobId,
+  logId = null,
+  operation,
+  logs,
+  qtyProcessed = null,
+  qtyDefect = null,
+  notes = null,
+  processedDate = null,
+  employeeId = null,
+  nextStatus,
+  correctionTotal = null
+}) {
+  const { data, error } = await supabase.rpc('mutate_production_log_and_status', {
+    p_job_id: jobId,
+    p_log_id: logId,
+    p_operation: operation,
+    p_expected_logs: getProductionLogSnapshot(logs),
+    p_qty_processed: qtyProcessed,
+    p_qty_defect: qtyDefect,
+    p_notes: notes,
+    p_processed_date: processedDate,
+    p_employee_id: employeeId,
+    p_next_status: nextStatus,
+    p_correction_total: correctionTotal
+  })
+  if (error) throw error
+  return data
+}
+
+async function notifyProductionStatusChange(supabase, itemId, invoiceNumber, oldStatus, newStatus) {
+  if (!newStatus || oldStatus === newStatus || (oldStatus === 'BARU MASUK' && newStatus === 'SIAP PROSES')) return
+  try {
+    await createAdminNotification(supabase, {
+      notificationType: 'PRODUCTION_STATUS',
+      title: 'Status produksi berubah',
+      message: `${invoiceNumber || 'Pesanan'}: ${oldStatus} → ${newStatus}.`,
+      href: '/dashboard/production',
+      entityId: itemId
+    })
+  } catch (error) {
+    console.error('Production status notification failed:', error)
+  }
+}
+
 export async function saveProductionProgress(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR', 'OPERATOR MESIN'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
     const { data: job, error: jobError } = await supabase
       .from('sales_items')
-      .select('id, notes, qty, unit_multiplier, production_logs(id, qty_processed, notes, processed_date, created_at)')
+      .select('id, notes, qty, unit_multiplier, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
       .eq('id', payload.job_id)
       .maybeSingle()
     if (jobError) throw jobError
@@ -58,41 +162,54 @@ export async function saveProductionProgress(payload) {
       throw new Error('Qty produksi harus berupa bilangan bulat lebih dari 0.')
     }
     let automaticColorPass = ''
-    const allTimeTotalQty = (job.production_logs || []).reduce((total, log) => (
-      total + Number(log.qty_processed || 0)
-    ), 0)
+    const logs = job.production_logs || []
     if (isTwoColor) {
-      const passTarget = Number(job.qty || 0) * Number(job.unit_multiplier || 1)
+      const progress = getProductionItemProgress(job, logs)
+      const passTarget = progress.targetPerColor
       if (!Number.isFinite(passTarget) || passTarget <= 0) throw new Error('Target Qty produk 2 warna tidak valid.')
-      const reconciliation = reconcileProductionColorPasses([job], job.production_logs || [])
-      const passTotals = reconciliation.colorPassTotalsByJobId.get(String(job.id)) || { 1: 0, 2: 0 }
-      const nextPass = getNextProductionColorPass(passTotals[1], passTotals[2], passTarget)
+      const nextPass = progress.nextColorPass
       if (!nextPass) throw new Error('Kedua tahap warna sudah mencapai Qty pesanan.')
 
       automaticColorPass = String(nextPass)
-      const remainingQty = Math.max(0, passTarget - Number(passTotals[nextPass] || 0))
-      if (processedQty > remainingQty) {
+      const completedQty = nextPass === 1 ? progress.qtyColorOne : progress.qtyColorTwo
+      const remainingQty = Math.max(0, passTarget - completedQty)
+      if (!isProductionPassQtyWithinTarget(processedQty, completedQty, passTarget)) {
         throw new Error(`Qty melebihi sisa otomatis Warna ke-${automaticColorPass} (${remainingQty} pcs). Tahap berikutnya terbuka setelah target ini selesai.`)
       }
     }
 
-    const { error } = await supabase.rpc('record_production_progress_guarded', {
-      p_job_id: payload.job_id,
-      p_employee_id: payload.employee_id,
-      p_qty_processed: payload.qty_processed,
-      p_qty_defect: payload.qty_defect || 0,
-      p_notes: withProductionColorPass(payload.notes, automaticColorPass),
-      p_processed_date: getJakartaDateKey(),
-      p_expected_total_qty: allTimeTotalQty,
-      p_correction_total: null
+    const processedDate = getJakartaDateKey()
+    const logNotes = withProductionColorPass(payload.notes, automaticColorPass)
+    const projectedLogs = [
+      ...logs,
+      {
+        id: '__pending_production_log__',
+        job_id: job.id,
+        employee_id: payload.employee_id || null,
+        qty_processed: processedQty,
+        qty_defect: Number(payload.qty_defect || 0),
+        notes: logNotes,
+        processed_date: processedDate,
+        created_at: new Date().toISOString()
+      }
+    ]
+    const nextStatus = getNextItemProductionStatus(job, projectedLogs, { forceRecalculate: true })
+    const result = await mutateProductionLogAtomically(supabase, {
+      jobId: job.id,
+      operation: 'INSERT',
+      logs,
+      qtyProcessed: processedQty,
+      qtyDefect: Number(payload.qty_defect || 0),
+      notes: logNotes,
+      processedDate,
+      employeeId: payload.employee_id || null,
+      nextStatus
     })
-
-    if (error) throw error
-    
-    // We update the item status via the new centralized auto-status handler
-    await handleAutoStatusUpdate(payload.job_id);
+    await notifyProductionStatusChange(supabase, job.id, job.sales_orders?.invoice_number, result?.old_status, result?.new_status)
 
     revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/shipping')
+    revalidatePath('/track')
     return { success: true }
 } catch (err) {
     console.error('Error saving production log:', err)
@@ -100,108 +217,31 @@ export async function saveProductionProgress(payload) {
   }
 }
 
-export async function handleAutoStatusUpdate(itemId) {
+export async function handleAutoStatusUpdate(itemId, { forceRecalculate = false } = {}) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR', 'OPERATOR MESIN'], 'Akun Anda tidak memiliki akses produksi.')
 
   // Ambil data item dan invoice
-  const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
+  const { data: item, error: itemError } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
+  if (itemError) throw itemError
   if (!item) return;
 
   const so = item.sales_orders;
   if (!so) return;
+  const oldStatus = String(item.status || 'BARU MASUK').toUpperCase()
+  const { data: logs, error: logsError } = await supabase
+    .from('production_logs')
+    .select('id, job_id, employee_id, qty_processed, qty_defect, notes, processed_date, created_at')
+    .eq('job_id', itemId)
+  if (logsError) throw logsError
 
-  const isLunas = so.payment_status === 'LUNAS';
-  const isPaid = so.payment_status === 'LUNAS' || so.payment_status === 'DP';
-  
-  const customerName = so.customers?.name?.toLowerCase() || '';
-  const isMarketplace = (so.marketplace_receipt && so.marketplace_receipt.trim() !== '') || 
-                        customerName.includes('shopee') || 
-                        customerName.includes('tokopedia') || 
-                        customerName.includes('tiktok') || 
-                        customerName.includes('lazada');
-                        
-  const canProceed = isPaid || isMarketplace;
+  const newStatus = getNextItemProductionStatus(item, logs || [], { forceRecalculate })
 
-  // Hitung qty processed
-  const { data: logs } = await supabase.from('production_logs').select('qty_processed').eq('job_id', itemId)
-  const qtyProcessed = (logs || []).reduce((sum, log) => sum + (log.qty_processed || 0), 0)
-  
-  const ST_BARU_MASUK = 'BARU MASUK'
-  const ST_SIAP_PROSES = 'SIAP PROSES'
-  const ST_PROSES = 'PROSES'
-  const ST_SUDAH_JADI = 'SUDAH JADI'
-  const ST_SIAP_KIRIM = 'SIAP KIRIM'
-  const ST_DIKIRIM = 'DIKIRIM'
-  const ST_SUDAH_DIAMBIL = 'SUDAH DIAMBIL'
-  const ST_SELESAI = 'SELESAI'
-
-  let newStatus = item.status || ST_BARU_MASUK;
-  const oldStatus = newStatus;
-
-  // Hitung target sebenarnya (memperhitungkan unit_multiplier misal jika beli per dus)
-  const targetQty = item.qty * (item.unit_multiplier || 1) * (/2\s*warna|warna\s*ke-?2/i.test(item.notes || '') ? 2 : 1);
-
-  if (item.order_type?.toUpperCase() === 'PRINTING') {
-    // RULE UNTUK PRINTING: Bypass otomatisasi, admin yang atur di menu Sales Item Status.
-    // Tidak masuk antrean produksi dan tidak lompat otomatis.
-    newStatus = oldStatus;
-  } else if (item.order_type?.toUpperCase() === 'POLOS') {
-    // RULE UNTUK POLOS: Langsung siap kirim jika sudah DP/Lunas atau dari Marketplace
-    if (!canProceed) {
-      newStatus = ST_BARU_MASUK;
-    } else {
-      if (newStatus !== ST_DIKIRIM && newStatus !== ST_SUDAH_DIAMBIL && newStatus !== ST_SELESAI) {
-        newStatus = ST_SIAP_KIRIM;
-      }
-    }
-  } else if (['DLL', 'LAINNYA', 'JASA'].includes(item.order_type?.toUpperCase())) {
-    // Layanan non-produksi seperti desain/ongkir tidak mengikuti alur produksi.
-    newStatus = oldStatus;
-  } else {
-    // RULE UNTUK SABLON
-    // RULE 1: Jika Qty Dikerjakan > 0 tapi < Target
-    if (qtyProcessed > 0 && qtyProcessed < targetQty) {
-      newStatus = ST_PROSES;
-    }
-
-    // RULE 2: Jika Qty Dikerjakan == Target
-    if (qtyProcessed >= targetQty) {
-      if (newStatus !== ST_DIKIRIM && newStatus !== ST_SUDAH_DIAMBIL && newStatus !== ST_SELESAI) {
-        newStatus = ST_SIAP_KIRIM; // Otomatis lompat ke Siap Kirim (indikator Menunggu Lunas akan nyala di frontend kalau belum lunas)
-      }
-    } else if (qtyProcessed === 0) {
-      // Jika qty = 0 (bisa jadi direset oleh admin)
-      // Cek apakah ini data lama yang tidak punya log sama sekali tapi statusnya sudah selesai/dikirim
-      const hasNoLogs = !logs || logs.length === 0;
-      const isOldDataFinished = hasNoLogs && [ST_SUDAH_JADI, ST_SIAP_KIRIM, ST_DIKIRIM, ST_SUDAH_DIAMBIL, ST_SELESAI].includes(oldStatus);
-      
-      if (!isOldDataFinished) {
-        if (!canProceed) {
-          newStatus = ST_BARU_MASUK;
-        } else {
-          newStatus = ST_SIAP_PROSES;
-        }
-      }
-    }
+  if (String(newStatus).toUpperCase() !== oldStatus) {
+    const { error: statusError } = await supabase.from('sales_items').update({ status: newStatus }).eq('id', itemId)
+    if (statusError) throw statusError
+    await notifyProductionStatusChange(supabase, itemId, so.invoice_number, oldStatus, newStatus)
   }
-
-  // RULE 3: Finalisasi Fisik (Dikirim -> Selesai)
-  if ((newStatus === ST_DIKIRIM || newStatus === ST_SUDAH_DIAMBIL) && isLunas) {
-    newStatus = ST_SELESAI;
-  }
-
-  if (newStatus !== oldStatus) {
-    await supabase.from('sales_items').update({ status: newStatus }).eq('id', itemId);
-    if (oldStatus !== 'BARU MASUK' || newStatus !== 'SIAP PROSES') {
-      await createAdminNotification(supabase, {
-        notificationType: 'PRODUCTION_STATUS',
-        title: 'Status produksi berubah',
-        message: `${so.invoice_number || 'Pesanan'}: ${oldStatus} → ${newStatus}.`,
-        href: '/dashboard/production',
-        entityId: itemId
-      })
-    }
-  }
+  return { success: true, status: newStatus }
 }
 
 export async function updateSalesOrderStatus(itemId, status) {
@@ -332,30 +372,58 @@ export async function correctProductionProgress(jobId, newTotalQty, employeeId, 
 
   try {
     const correctedTotal = Number(newTotalQty)
-    let expectedTotal = Number(expectedTotalQty)
-    if (!Number.isFinite(expectedTotal)) {
-      const { data: logs, error: logsError } = await supabase.from('production_logs').select('qty_processed').eq('job_id', jobId)
-      if (logsError) throw logsError
-      expectedTotal = (logs || []).reduce((sum, item) => sum + Number(item.qty_processed || 0), 0)
+    if (!Number.isSafeInteger(correctedTotal) || correctedTotal < 0) {
+      throw new Error('Qty koreksi harus berupa bilangan bulat nol atau lebih.')
     }
-    const { error } = await supabase.rpc('record_production_progress_guarded', {
-      p_job_id: jobId,
-      p_employee_id: employeeId,
-      p_qty_processed: 0,
-      p_qty_defect: 0,
-      p_notes: 'Koreksi Qty oleh Admin',
-      p_processed_date: getJakartaDateKey(),
-      p_expected_total_qty: expectedTotal,
-      p_correction_total: correctedTotal
+    const { data: job, error: jobError } = await supabase
+      .from('sales_items')
+      .select('id, qty, unit_multiplier, notes, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
+      .eq('id', jobId)
+      .maybeSingle()
+    if (jobError) throw jobError
+    if (!job) throw new Error('Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.')
+
+    const logs = job.production_logs || []
+    const currentTotal = logs.reduce((sum, log) => sum + Number(log.qty_processed || 0), 0)
+    const expectedTotal = Number(expectedTotalQty)
+    const currentProgress = getProductionItemProgress(job, logs).qtyActivity
+    if (Number.isSafeInteger(expectedTotal) && currentProgress !== expectedTotal) {
+      throw new Error('Progress pekerjaan ini baru saja berubah. Muat ulang daftar sebelum mengoreksi lagi.')
+    }
+    const processedDate = getJakartaDateKey()
+    const correctionQty = correctedTotal - currentTotal
+    const projectedLogs = correctionQty === 0 ? logs : [
+      ...logs,
+      {
+        id: '__pending_production_correction__',
+        job_id: job.id,
+        employee_id: employeeId || null,
+        qty_processed: correctionQty,
+        qty_defect: 0,
+        notes: 'Koreksi Qty oleh Admin',
+        processed_date: processedDate,
+        created_at: new Date().toISOString()
+      }
+    ]
+    const nextStatus = getNextItemProductionStatus(job, projectedLogs, { forceRecalculate: true })
+    const result = await mutateProductionLogAtomically(supabase, {
+      jobId: job.id,
+      operation: 'CORRECT',
+      logs,
+      qtyProcessed: 0,
+      qtyDefect: 0,
+      notes: 'Koreksi Qty oleh Admin',
+      processedDate,
+      employeeId: employeeId || null,
+      nextStatus,
+      correctionTotal: correctedTotal
     })
+    await notifyProductionStatusChange(supabase, job.id, job.sales_orders?.invoice_number, result?.old_status, result?.new_status)
 
-    if (error) throw error
-
-    if (correctedTotal !== expectedTotal) {
-      await handleAutoStatusUpdate(jobId);
-    }
-    
     revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/shipping')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
     return { success: true }
   } catch (err) {
     console.error('Error correcting progress:', err)
@@ -397,7 +465,7 @@ export async function updateProductionLogQty(logId, newQty, processedDate, expec
       throw new Error('Operator catatan ini sudah berubah. Muat ulang daftar sebelum mengedit lagi.')
     }
 
-    const updateValues = { qty_processed: nextQty, processed_date: nextDate }
+    let nextEmployeeId = expectedEmployee || null
     if (nextEmployee !== expectedEmployee) {
       if (nextEmployee) {
         const { data: selectedEmployee, error: employeeError } = await supabase
@@ -414,28 +482,43 @@ export async function updateProductionLogQty(logId, newQty, processedDate, expec
           throw new Error('Pilih operator aktif yang valid.')
         }
       }
-      updateValues.employee_id = nextEmployee || null
+      nextEmployeeId = nextEmployee || null
     }
 
-    let updateQuery = supabase
+    const { data: item, error: itemError } = await supabase
+      .from('sales_items')
+      .select('id, qty, unit_multiplier, notes, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))')
+      .eq('id', currentLog.job_id)
+      .maybeSingle()
+    if (itemError) throw itemError
+    if (!item) throw new Error('Item pesanan terkait sudah tidak tersedia. Catatan tidak diedit.')
+
+    const { data: logs, error: logsError } = await supabase
       .from('production_logs')
-      .update(updateValues)
-      .eq('id', logId)
-      .eq('qty_processed', expected)
-    updateQuery = expectedDate
-      ? updateQuery.eq('processed_date', expectedDate)
-      : updateQuery.is('processed_date', null)
-    updateQuery = expectedEmployee
-      ? updateQuery.eq('employee_id', expectedEmployee)
-      : updateQuery.is('employee_id', null)
+      .select('id, job_id, employee_id, qty_processed, qty_defect, notes, processed_date, created_at')
+      .eq('job_id', currentLog.job_id)
+    if (logsError) throw logsError
+    const currentLogs = logs || []
+    const projectedLogs = currentLogs.map(log => String(log.id) === String(logId)
+      ? { ...log, qty_processed: nextQty, processed_date: nextDate, employee_id: nextEmployeeId }
+      : log)
+    const nextStatus = getNextItemProductionStatus(item, projectedLogs, { forceRecalculate: true })
+    const result = await mutateProductionLogAtomically(supabase, {
+      jobId: item.id,
+      logId,
+      operation: 'UPDATE',
+      logs: currentLogs,
+      qtyProcessed: nextQty,
+      processedDate: nextDate,
+      employeeId: nextEmployeeId,
+      nextStatus
+    })
+    await notifyProductionStatusChange(supabase, item.id, item.sales_orders?.invoice_number, result?.old_status, result?.new_status)
 
-    const { data: updatedLog, error: updateError } = await updateQuery.select('job_id').maybeSingle()
-
-    if (updateError) throw updateError
-    if (!updatedLog) throw new Error('Catatan ini baru saja berubah. Muat ulang daftar sebelum mengedit lagi.')
-
-    await handleAutoStatusUpdate(updatedLog.job_id)
     revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/shipping')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
     return { success: true }
   } catch (err) {
     console.error('Error updating production log:', err)
@@ -480,37 +563,36 @@ export async function deleteProductionLog(logId, expectedLog) {
 
     const { data: relatedItem, error: itemError } = await supabase
       .from('sales_items')
-      .select('id')
+      .select('id, qty, unit_multiplier, notes, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))')
       .eq('id', expectedJobId)
       .maybeSingle()
     if (itemError) throw itemError
     if (!relatedItem) throw new Error('Item pesanan terkait sudah tidak tersedia. Catatan tidak dihapus.')
 
-    let deleteQuery = supabase
+    const { data: logs, error: logsError } = await supabase
       .from('production_logs')
-      .delete()
-      .eq('id', logId)
+      .select('id, job_id, employee_id, qty_processed, qty_defect, notes, processed_date, created_at')
       .eq('job_id', expectedJobId)
-      .eq('qty_processed', expectedQty)
-    deleteQuery = expectedDefectRaw === null
-      ? deleteQuery.is('qty_defect', null)
-      : deleteQuery.eq('qty_defect', expectedDefect)
-    deleteQuery = expectedDate
-      ? deleteQuery.eq('processed_date', expectedDate)
-      : deleteQuery.is('processed_date', null)
-    deleteQuery = expectedEmployee
-      ? deleteQuery.eq('employee_id', expectedEmployee)
-      : deleteQuery.is('employee_id', null)
-    deleteQuery = expectedNotes === null
-      ? deleteQuery.is('notes', null)
-      : deleteQuery.eq('notes', expectedNotes)
+    if (logsError) throw logsError
+    const currentLogs = logs || []
+    const projectedLogs = currentLogs.filter(log => String(log.id) !== String(logId))
+    if (projectedLogs.length === currentLogs.length) {
+      throw new Error('Catatan ini baru saja berubah. Muat ulang daftar sebelum menghapusnya.')
+    }
+    const nextStatus = getNextItemProductionStatus(relatedItem, projectedLogs, { forceRecalculate: true })
+    const result = await mutateProductionLogAtomically(supabase, {
+      jobId: relatedItem.id,
+      logId,
+      operation: 'DELETE',
+      logs: currentLogs,
+      nextStatus
+    })
+    await notifyProductionStatusChange(supabase, relatedItem.id, relatedItem.sales_orders?.invoice_number, result?.old_status, result?.new_status)
 
-    const { data: deletedLog, error: deleteError } = await deleteQuery.select('id, job_id').maybeSingle()
-    if (deleteError) throw deleteError
-    if (!deletedLog) throw new Error('Catatan ini baru saja berubah. Muat ulang daftar sebelum menghapusnya.')
-
-    await handleAutoStatusUpdate(deletedLog.job_id)
     revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/shipping')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/track')
     return { success: true }
   } catch (err) {
     console.error('Error deleting production log:', err)

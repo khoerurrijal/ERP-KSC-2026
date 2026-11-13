@@ -12,7 +12,7 @@ import Image from 'next/image'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
-import { getNextProductionColorPass } from '@/utils/productionColorPasses.mjs'
+import { getNextProductionColorPass, isProductionPassQtyWithinTarget } from '@/utils/productionColorPasses.mjs'
 import { useRoleAccess } from '@/components/RoleAccessContext'
 
 const getDisplayStatus = (st) => {
@@ -475,7 +475,14 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       alert('Qty harus berupa bilangan bulat lebih dari 0.')
       return
     }
-    if (submittedQty > (selectedJob.is_two_color ? selectedColorPassRemaining : selectedJobRemainingQty)) {
+    const withinCurrentTarget = selectedJob.is_two_color
+      ? isProductionPassQtyWithinTarget(
+        submittedQty,
+        automaticColorPass === 1 ? selectedJob.qty_color_1 : selectedJob.qty_color_2,
+        selectedColorTarget
+      )
+      : submittedQty <= selectedJobRemainingQty
+    if (!withinCurrentTarget) {
       const remainingStage = selectedJob.is_two_color && automaticColorPass
         ? `Warna ke-${automaticColorPass}`
         : 'pesanan'
@@ -496,7 +503,24 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
       if (res.success) {
         alert(`Berhasil mencatat progress.`);
-        window.location.reload()
+        const isFinalTwoColorPass = selectedJob.is_two_color &&
+          automaticColorPass === 2 &&
+          submittedQty === selectedColorPassRemaining
+
+        if (selectedJob.is_two_color && !isFinalTwoColorPass) {
+          setSelectedJob(currentJob => currentJob ? ({
+            ...currentJob,
+            qty_color_1: Number(currentJob.qty_color_1 || 0) + (automaticColorPass === 1 ? submittedQty : 0),
+            qty_color_2: Number(currentJob.qty_color_2 || 0) + (automaticColorPass === 2 ? submittedQty : 0),
+            qty_processed: Number(currentJob.qty_processed || 0) + submittedQty
+          }) : currentJob)
+          setQtyProcessed('')
+          setQtyDefect('')
+          setNotes('')
+          router.refresh()
+        } else {
+          window.location.reload()
+        }
       } else {
         alert('Gagal mencatat: ' + res.error)
       }
@@ -795,11 +819,15 @@ export default function ProductionTable({ productionJobs, productionHistory = []
               </div>
               <div className="mt-2 flex items-center justify-between gap-2 border-t border-stone-100 pt-2 text-xs">
                 {item.is_two_color ? (
-                  <p className="min-w-0 font-semibold text-amber-700">
-                    W1 {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)}
-                    <span className="mx-1 text-stone-400">·</span>
-                    W2 {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)}
-                  </p>
+                  <div className="min-w-0">
+                    <p className="font-semibold text-amber-700">
+                      W1 {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)}
+                      <span className="mx-1 text-stone-400">·</span>
+                      W2 {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)}
+                    </p>
+                    <p className="mt-0.5 text-[10px] text-stone-500">Fisik selesai {formatMobileQuantity(item.qty_physical_completed)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
+                    {item.next_color_pass && <p className="text-[10px] font-semibold text-amber-700">Input berikutnya: Warna {item.next_color_pass}</p>}
+                  </div>
                 ) : (
                   <p className="min-w-0 truncate"><span className="font-bold text-green-700">{formatMobileQuantity(item.qty_processed)} {item.unit || 'pcs'} selesai</span><span className="ml-1 text-orange-700">· Sisa {formatMobileQuantity(Math.max(0, item.qty_target - item.qty_processed))}</span></p>
                 )}
@@ -867,6 +895,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
                         <div className="space-y-1 whitespace-nowrap text-xs font-semibold text-amber-400">
                           <p>Warna 1: {formatMobileQuantity(item.qty_color_1)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
                           <p>Warna 2: {formatMobileQuantity(item.qty_color_2)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
+                          <p className="pt-1 text-foreground/65">Fisik selesai: {formatMobileQuantity(item.qty_physical_completed)}/{formatMobileQuantity(item.qty_per_color_target)} pcs</p>
+                          {item.next_color_pass && <p className="text-primary">Input berikutnya: Warna {item.next_color_pass}</p>}
                         </div>
                       ) : (
                         <>

@@ -5,12 +5,16 @@ export function getStoredProductionColorPass(notes) {
   return Number(String(notes || '').match(/\[\[WARNA_PASS:([12])\]\]/i)?.[1]) || null
 }
 
-function getProductionColorPassFromNotes(notes) {
+export function getProductionColorPassFromNotes(notes) {
   const storedPass = getStoredProductionColorPass(notes)
   if (storedPass) return storedPass
 
   const match = String(notes || '').match(/\bwarna\s*(?:ke\s*)?-?\s*([12])\b|\bw([12])\b/i)
   return Number(match?.[1] || match?.[2]) || null
+}
+
+export function isTwoColorProductionJob(job) {
+  return Boolean(job?.is_two_color) || TWO_COLOR_NOTE_PATTERN.test(job?.notes || '')
 }
 
 export function getAutomaticProductionColorPass(progressQty, targetPerPass) {
@@ -30,6 +34,15 @@ export function getNextProductionColorPass(colorOneQty, colorTwoQty, targetPerPa
   return null
 }
 
+export function isProductionPassQtyWithinTarget(qty, completedQty, targetPerPass) {
+  const inputQty = Number(qty)
+  const completed = Number(completedQty || 0)
+  const target = Number(targetPerPass || 0)
+  return Number.isSafeInteger(inputQty) && inputQty > 0 &&
+    Number.isFinite(completed) && Number.isFinite(target) && target > 0 &&
+    inputQty <= Math.max(0, target - completed)
+}
+
 function getProductionLogTime(log) {
   const createdAt = Date.parse(log.created_at || '')
   if (Number.isFinite(createdAt)) return createdAt
@@ -38,16 +51,17 @@ function getProductionLogTime(log) {
 }
 
 function getProductionLogDateKey(log) {
-  const processedDate = String(log.processed_date || '').slice(0, 10)
-  if (/^\d{4}-\d{2}-\d{2}$/.test(processedDate)) return processedDate
-
   const createdAt = Date.parse(log.created_at || '')
-  if (!Number.isFinite(createdAt)) return ''
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
-  }).formatToParts(new Date(createdAt))
-  const part = type => parts.find(item => item.type === type)?.value
-  return `${part('year')}-${part('month')}-${part('day')}`
+  if (Number.isFinite(createdAt)) {
+    const parts = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Jakarta', year: 'numeric', month: '2-digit', day: '2-digit'
+    }).formatToParts(new Date(createdAt))
+    const part = type => parts.find(item => item.type === type)?.value
+    return `${part('year')}-${part('month')}-${part('day')}`
+  }
+
+  const processedDate = String(log.processed_date || '').slice(0, 10)
+  return /^\d{4}-\d{2}-\d{2}$/.test(processedDate) ? processedDate : ''
 }
 
 export function isAutomaticProductionLog(log) {
@@ -82,7 +96,7 @@ export function reconcileProductionColorPasses(jobs = [], logs = []) {
 
   for (const [jobId, jobLogs] of logsByJobId) {
     const job = jobsById.get(jobId)
-    if (!TWO_COLOR_NOTE_PATTERN.test(job.notes || '')) continue
+    if (!isTwoColorProductionJob(job)) continue
 
     const targetPerPass = Number(job.qty || 0) * Number(job.unit_multiplier || 1)
     if (!Number.isFinite(targetPerPass) || targetPerPass <= 0) {
@@ -180,6 +194,61 @@ export function reconcileProductionColorPasses(jobs = [], logs = []) {
   }
 
   return { effectiveQtyByLogId, colorPassByLogId, colorPassTotalsByJobId }
+}
+
+export function getProductionItemProgress(job, logs = []) {
+  const targetPerColor = Number(job?.qty || 0) * Number(job?.unit_multiplier || 1)
+  const jobLogs = (logs || []).map(log => ({
+    ...log,
+    job_id: log.job_id || job?.id
+  }))
+  const isTwoColor = isTwoColorProductionJob(job)
+
+  if (!isTwoColor) {
+    const qtyActivity = jobLogs.reduce((total, log) => total + Number(log.qty_processed || 0), 0)
+    return {
+      isTwoColor: false,
+      targetPerColor,
+      qtyColorOne: qtyActivity,
+      qtyColorTwo: 0,
+      qtyActivity,
+      qtyPhysicalCompleted: Math.max(0, qtyActivity),
+      nextColorPass: qtyActivity < targetPerColor ? 1 : null,
+      isComplete: qtyActivity >= targetPerColor
+    }
+  }
+
+  const reconciliation = reconcileProductionColorPasses([job], jobLogs)
+  const passTotals = reconciliation.colorPassTotalsByJobId.get(String(job.id)) || { 1: 0, 2: 0 }
+  const qtyColorOne = Math.max(0, Number(passTotals[1] || 0))
+  const qtyColorTwo = Math.max(0, Number(passTotals[2] || 0))
+  const qtyActivity = qtyColorOne + qtyColorTwo
+
+  return {
+    isTwoColor: true,
+    targetPerColor,
+    qtyColorOne,
+    qtyColorTwo,
+    qtyActivity,
+    qtyPhysicalCompleted: Math.min(qtyColorOne, qtyColorTwo),
+    nextColorPass: getNextProductionColorPass(qtyColorOne, qtyColorTwo, targetPerColor),
+    isComplete: targetPerColor > 0 && qtyColorOne >= targetPerColor && qtyColorTwo >= targetPerColor
+  }
+}
+
+export function getRecalculatedProductionStatus(job, logs = [], {
+  canProceed = true,
+  currentStatus = 'BARU MASUK',
+  forceRecalculate = false
+} = {}) {
+  const progress = getProductionItemProgress(job, logs)
+  const status = String(currentStatus || 'BARU MASUK').toUpperCase()
+  const deliveredStatuses = new Set(['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'])
+
+  if (progress.isComplete) return deliveredStatuses.has(status) ? status : 'SIAP KIRIM'
+  if (progress.qtyActivity > 0) return 'PROSES'
+  if (!forceRecalculate && !logs.length && deliveredStatuses.has(status)) return status
+  return canProceed ? 'SIAP PROSES' : 'BARU MASUK'
 }
 
 export function inferProductionColorPasses(jobs = [], logs = []) {

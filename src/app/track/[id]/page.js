@@ -1,4 +1,10 @@
 import { createAdminClient } from '@/utils/supabase/admin'
+import {
+  getProductionItemProgress,
+  getRecalculatedProductionStatus,
+  isTwoColorProductionJob,
+  reconcileProductionColorPasses
+} from '@/utils/productionColorPasses.mjs'
 import TrackClient from './TrackClient'
 
 export const dynamic = 'force-dynamic'
@@ -21,6 +27,7 @@ export default async function PublicTrackingPage({ params }) {
       total_amount,
       dp_amount,
       payment_status,
+      marketplace_receipt,
       customers (name, phone, address),
       sales_items (
         id,
@@ -31,6 +38,7 @@ export default async function PublicTrackingPage({ params }) {
         status,
         unit_multiplier,
         order_type,
+        notes,
         products (name)
       )
     `)
@@ -57,11 +65,43 @@ export default async function PublicTrackingPage({ params }) {
   if (itemIds.length > 0) {
     const { data } = await supabase
       .from('production_logs')
-      .select('job_id, employee_id, qty_processed, created_at')
+      .select('id, job_id, employee_id, qty_processed, notes, processed_date, created_at')
       .in('job_id', itemIds)
       .order('created_at', { ascending: false })
     if (data) logs = data
   }
+
+  const reconciliation = reconcileProductionColorPasses(order.sales_items || [], logs)
+  const trackedItems = (order.sales_items || []).map(item => {
+    const itemLogs = logs.filter(log => log.job_id === item.id)
+    const progress = getProductionItemProgress(item, itemLogs)
+    const customerName = order.customers?.name?.toLowerCase() || ''
+    const canProceed = ['LUNAS', 'DP'].includes(order.payment_status) ||
+      Boolean(order.marketplace_receipt?.trim()) ||
+      ['shopee', 'tokopedia', 'tiktok', 'lazada'].some(name => customerName.includes(name))
+    const { notes, ...publicItem } = item
+    return {
+      ...publicItem,
+      is_two_color: isTwoColorProductionJob(item),
+      production_progress: progress,
+      display_status: item.order_type?.toUpperCase() === 'SABLON'
+        ? getRecalculatedProductionStatus(item, itemLogs, {
+          canProceed,
+          currentStatus: item.status,
+          forceRecalculate: true
+        })
+        : item.status
+    }
+  })
+  const trackingLogs = logs.map(log => ({
+    id: log.id,
+    job_id: log.job_id,
+    employee_id: log.employee_id,
+    qty_processed: log.qty_processed,
+    effective_qty: reconciliation.effectiveQtyByLogId.get(String(log.id)) ?? Number(log.qty_processed || 0),
+    color_pass: reconciliation.colorPassByLogId.get(String(log.id)) || null,
+    created_at: log.created_at
+  }))
 
   // Find store config settings (banks, email, address, slogan, etc.)
   const { data: storeConfigData } = await supabase
@@ -73,8 +113,8 @@ export default async function PublicTrackingPage({ params }) {
 
   return (
     <TrackClient 
-      order={order} 
-      logs={logs || []} 
+      order={{ ...order, sales_items: trackedItems }}
+      logs={trackingLogs}
       settings={storeConfig || {}}
       storeConfig={storeConfig}
     />
