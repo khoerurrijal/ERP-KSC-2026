@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { allocateLoanDeductions, applyProductionReconciliationToPayrollLogs, calculatePayrollItems, calculatePayrollTotals, filterLoansAvailableForPayroll, getPayrollLedgerAmount, getPayrollWeekStart, hasMatchingPayrollProductionSnapshot } from './calculations.mjs'
 import { loadSavedPayrollSummaries, loadWeeklyAttendanceData } from './readData'
 import { reconcileProductionColorPasses } from '@/utils/productionColorPasses.mjs'
+import { buildLoanRepaymentTransactions } from './loanLedgerTransactions.mjs'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -435,15 +436,13 @@ export async function savePayroll(payload) {
         const isLoan = allocation.type === 'PINJAMAN'
         if (isLoan) {
           const empName = item.employee_name || 'Karyawan'
-          const { error: transactionError } = await supabase.from('transactions').insert([{
-            date: new Date().toISOString().split('T')[0],
-            reference: 'PINJAMAN',
-            description: `Potongan cicilan pinjaman - ${empName}`,
-            payment_method: 'CASH',
-            amount_out: 0,
-            amount_in: allocation.amount,
-            workshop_code: 'TABUNGAN'
-          }])
+          const repaymentDate = new Date().toISOString().split('T')[0]
+          const repaymentTransactions = buildLoanRepaymentTransactions({
+            amount: allocation.amount,
+            employeeName: empName,
+            date: repaymentDate
+          })
+          const { error: transactionError } = await supabase.from('transactions').insert(repaymentTransactions)
           if (transactionError) throw transactionError
         }
         appliedLoanDeductions.push({ id: loan.id, type: loan.type, amount: allocation.amount })
