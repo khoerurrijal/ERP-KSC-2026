@@ -74,7 +74,7 @@ const getPayrollPrintBreakdown = item => {
   }
 }
 
-export default function PayrollClient({ dropdownConfig = {} }) {
+export default function PayrollClient({ dropdownConfig = {}, initialAttendance = null, initialSavedPayrolls = null }) {
   const [activeTab, setActiveTab] = useState('attendance')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
@@ -82,23 +82,24 @@ export default function PayrollClient({ dropdownConfig = {} }) {
   const [saving, setSaving] = useState(false)
   const [payrollData, setPayrollData] = useState(null)
   const [expandedPayrollId, setExpandedPayrollId] = useState(null)
-  const [savedPayrolls, setSavedPayrolls] = useState([])
-  const [savedPayrollsLoading, setSavedPayrollsLoading] = useState(true)
+  const [savedPayrolls, setSavedPayrolls] = useState(() => initialSavedPayrolls?.payrolls || [])
+  const [savedPayrollsLoading, setSavedPayrollsLoading] = useState(() => !initialSavedPayrolls?.success)
   const [savedPayrollLoadingId, setSavedPayrollLoadingId] = useState(null)
-  const [savedPayrollsError, setSavedPayrollsError] = useState('')
+  const [savedPayrollsError, setSavedPayrollsError] = useState(() => initialSavedPayrolls?.success ? '' : initialSavedPayrolls?.error || '')
   const [savedPayrollsVersion, setSavedPayrollsVersion] = useState(0)
 
-  const [attendanceDate, setAttendanceDate] = useState(() => getPayrollWeekStart(todayKey()))
-  const [attendanceRows, setAttendanceRows] = useState([])
-  const [attendanceWeek, setAttendanceWeek] = useState(null)
-  const [attendanceLoaded, setAttendanceLoaded] = useState(false)
-  const [attendanceLoading, setAttendanceLoading] = useState(true)
+  const [attendanceDate, setAttendanceDate] = useState(() => initialAttendance?.weekStart || getPayrollWeekStart(todayKey()))
+  const [attendanceRows, setAttendanceRows] = useState(() => initialAttendance?.employees || [])
+  const [attendanceWeek, setAttendanceWeek] = useState(() => initialAttendance?.success ? initialAttendance : null)
+  const [attendanceLoaded, setAttendanceLoaded] = useState(() => Boolean(initialAttendance?.success))
+  const [attendanceLoading, setAttendanceLoading] = useState(() => !initialAttendance?.success)
   const [attendanceSaving, setAttendanceSaving] = useState(false)
   const [attendanceDirty, setAttendanceDirty] = useState(false)
   const [attendanceSaveMessage, setAttendanceSaveMessage] = useState('')
   const [attendanceNotice, setAttendanceNotice] = useState('')
   const [focusedLateInput, setFocusedLateInput] = useState(null)
   const attendanceDraftsRef = useRef(new Map())
+  const savedPayrollsLoadedRef = useRef(Boolean(initialSavedPayrolls?.success))
 
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [saveDesc, setSaveDesc] = useState('Gaji Karyawan')
@@ -115,8 +116,7 @@ export default function PayrollClient({ dropdownConfig = {} }) {
 
   const openAttendance = () => {
     setActiveTab('attendance')
-    setAttendanceLoaded(false)
-    setAttendanceLoading(true)
+    if (!attendanceLoaded) setAttendanceLoading(true)
   }
 
   const persistAttendance = async (referenceDate = attendanceDate, records = attendanceRows) => {
@@ -160,6 +160,7 @@ export default function PayrollClient({ dropdownConfig = {} }) {
 
   useEffect(() => {
     if (activeTab !== 'attendance') return undefined
+    if (attendanceLoaded && attendanceWeek?.weekStart === attendanceDate) return undefined
     let cancelled = false
     getWeeklyAttendance(attendanceDate)
       .then(result => {
@@ -179,23 +180,26 @@ export default function PayrollClient({ dropdownConfig = {} }) {
         if (!cancelled) setAttendanceLoading(false)
       })
     return () => { cancelled = true }
-  }, [activeTab, attendanceDate])
+  }, [activeTab, attendanceDate, attendanceLoaded, attendanceWeek?.weekStart])
 
   useEffect(() => {
     if (activeTab !== 'history') return undefined
     let cancelled = false
+    const showLoadingState = !savedPayrollsLoadedRef.current
+    if (showLoadingState) setSavedPayrollsLoading(true)
     getSavedPayrolls()
       .then(result => {
         if (cancelled) return
         if (!result.success) throw new Error(result.error)
+        savedPayrollsLoadedRef.current = true
         setSavedPayrollsError('')
         setSavedPayrolls(result.payrolls || [])
       })
       .catch(error => {
-        if (!cancelled) setSavedPayrollsError(error.message || 'Gagal memuat rekap gaji tersimpan.')
+        if (!cancelled && showLoadingState) setSavedPayrollsError(error.message || 'Gagal memuat rekap gaji tersimpan.')
       })
       .finally(() => {
-        if (!cancelled) setSavedPayrollsLoading(false)
+        if (!cancelled && showLoadingState) setSavedPayrollsLoading(false)
       })
     return () => { cancelled = true }
   }, [activeTab, savedPayrollsVersion])

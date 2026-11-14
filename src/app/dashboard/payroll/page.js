@@ -1,4 +1,4 @@
-import { createClient } from '@/utils/supabase/server'
+import { getPayrollInitialPageData } from './readData'
 import PayrollClient from './PayrollClient'
 
 export const metadata = {
@@ -6,9 +6,13 @@ export const metadata = {
 }
 
 export default async function PayrollPage() {
-  const supabase = await createClient()
-  const { data: settings } = await supabase.from('system_settings').select('*').eq('key', 'dropdown_config').single()
-  const dropdownConfig = settings?.value || {}
+  const { dropdownConfig, initialAttendance, initialSavedPayrolls } = await getPayrollInitialPageData()
 
-  return <PayrollClient dropdownConfig={dropdownConfig} />
+  return (
+    <PayrollClient
+      dropdownConfig={dropdownConfig}
+      initialAttendance={initialAttendance}
+      initialSavedPayrolls={initialSavedPayrolls}
+    />
+  )
 }

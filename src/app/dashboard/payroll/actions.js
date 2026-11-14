@@ -3,6 +3,7 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { allocateLoanDeductions, applyProductionReconciliationToPayrollLogs, calculatePayrollItems, calculatePayrollTotals, filterLoansAvailableForPayroll, getPayrollLedgerAmount, getPayrollWeekStart, hasMatchingPayrollProductionSnapshot } from './calculations.mjs'
+import { loadSavedPayrollSummaries, loadWeeklyAttendanceData } from './readData'
 import { reconcileProductionColorPasses } from '@/utils/productionColorPasses.mjs'
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -51,50 +52,7 @@ async function findOverlappingPayroll(supabase, startDate, endDate) {
 export async function getWeeklyAttendance(referenceDate) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
-    assertDate(referenceDate, 'Tanggal absensi')
-    const { weekStart, weekEnd, dates } = getWorkWeekDates(referenceDate)
-    const [employeeResult, attendanceResult, payrollResult] = await Promise.all([
-      supabase
-        .from('employees')
-        .select('id, full_name, salary_schemas(role_name)')
-        .eq('is_active', true)
-        .order('full_name', { ascending: true }),
-      supabase
-        .from('employee_attendance')
-        .select('employee_id, attendance_date, status, late_deduction')
-        .gte('attendance_date', weekStart)
-        .lte('attendance_date', weekEnd),
-      supabase
-        .from('payrolls')
-        .select('start_date, end_date')
-        .lte('start_date', weekEnd)
-        .gte('end_date', weekStart)
-    ])
-    if (employeeResult.error) throw employeeResult.error
-    if (attendanceResult.error) throw attendanceResult.error
-    if (payrollResult.error) throw payrollResult.error
-
-    const lockedDates = dates.filter(date => (payrollResult.data || []).some(payroll => payroll.start_date <= date && payroll.end_date >= date))
-    const byEmployeeDate = new Map((attendanceResult.data || []).map(record => [`${record.employee_id}:${record.attendance_date}`, record]))
-    return {
-      success: true,
-      weekStart,
-      weekEnd,
-      dates,
-      lockedDates,
-      employees: (employeeResult.data || []).filter(isAttendanceEligible).map(employee => {
-        const schema = Array.isArray(employee.salary_schemas)
-          ? employee.salary_schemas[0]
-          : employee.salary_schemas
-        return {
-          id: employee.id,
-          full_name: employee.full_name,
-          role_name: schema?.role_name || '-',
-          attendance: Object.fromEntries(dates.map(date => [date, byEmployeeDate.get(`${employee.id}:${date}`)?.status === 'Hadir'])),
-          lateDeduction: Object.fromEntries(dates.map(date => [date, Number(byEmployeeDate.get(`${employee.id}:${date}`)?.late_deduction || 0)]))
-        }
-      })
-    }
+    return { success: true, ...await loadWeeklyAttendanceData(supabase, referenceDate) }
   } catch (err) {
     console.error('Error loading weekly attendance:', err)
     return { success: false, error: err.message || 'Gagal memuat absensi mingguan.' }
@@ -273,39 +231,7 @@ export async function calculatePayroll(startDate, endDate) {
 export async function getSavedPayrolls() {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
-    const { data: payrolls, error: payrollError } = await supabase
-      .from('payrolls')
-      .select('id, start_date, end_date, total_amount, created_at')
-      .order('start_date', { ascending: false })
-      .order('created_at', { ascending: false })
-    if (payrollError) throw payrollError
-
-    const payrollIds = (payrolls || []).map(payroll => payroll.id)
-    if (!payrollIds.length) return { success: true, payrolls: [] }
-
-    const { data: items, error: itemsError } = await supabase
-      .from('payroll_items')
-      .select('payroll_id, employee_id')
-      .in('payroll_id', payrollIds)
-    if (itemsError) throw itemsError
-
-    const employeeCounts = new Map()
-    for (const item of items || []) {
-      const employeeIds = employeeCounts.get(item.payroll_id) || new Set()
-      employeeIds.add(item.employee_id)
-      employeeCounts.set(item.payroll_id, employeeIds)
-    }
-
-    return {
-      success: true,
-      payrolls: (payrolls || []).map(payroll => ({
-        id: payroll.id,
-        startDate: payroll.start_date,
-        endDate: payroll.end_date,
-        totalAmount: Number(payroll.total_amount || 0),
-        employeeCount: employeeCounts.get(payroll.id)?.size || 0
-      }))
-    }
+    return { success: true, payrolls: await loadSavedPayrollSummaries(supabase) }
   } catch (err) {
     console.error('Error loading saved payrolls:', err)
     return { success: false, error: err.message || 'Gagal memuat rekap gaji tersimpan.' }
@@ -319,35 +245,20 @@ export async function getSavedPayroll(payrollId) {
 
     const { data: payroll, error: payrollError } = await supabase
       .from('payrolls')
-      .select('id, start_date, end_date, total_amount')
+      .select('id, start_date, end_date, total_amount, payroll_items(*, employees(full_name, salary_schemas(role_name)))')
       .eq('id', payrollId)
       .maybeSingle()
     if (payrollError) throw payrollError
     if (!payroll) throw new Error('Rekap gaji tidak ditemukan.')
 
-    const { data: savedItems, error: itemsError } = await supabase
-      .from('payroll_items')
-      .select('*')
-      .eq('payroll_id', payroll.id)
-    if (itemsError) throw itemsError
+    const savedItems = payroll.payroll_items || []
     if (!savedItems?.length) throw new Error('Rincian karyawan pada rekap ini tidak ditemukan.')
-
-    const employeeIds = [...new Set(savedItems.map(item => item.employee_id).filter(Boolean))]
-    const employeesById = new Map()
-    if (employeeIds.length) {
-      const { data: employees, error: employeesError } = await supabase
-        .from('employees')
-        .select('id, full_name, salary_schemas(role_name)')
-        .in('id', employeeIds)
-      if (employeesError) throw employeesError
-      for (const employee of employees || []) employeesById.set(employee.id, employee)
-    }
 
     const items = savedItems.map(item => {
       const snapshot = item.calculation_snapshot || {}
       const production = snapshot.production || {}
       const attendance = snapshot.attendance || {}
-      const employee = employeesById.get(item.employee_id)
+      const employee = Array.isArray(item.employees) ? item.employees[0] : item.employees
       const schema = Array.isArray(employee?.salary_schemas)
         ? employee.salary_schemas[0]
         : employee?.salary_schemas
