@@ -20,6 +20,15 @@ function isMarketplaceOrder(order) {
   return marketplaceText.includes('marketplace') || isKnownPlatform || Boolean(normalizeMarketplaceReceipt(order.marketplace_receipt))
 }
 
+async function runInBatches(items, batchSize, task) {
+  for (let index = 0; index < items.length; index += batchSize) {
+    const batch = items.slice(index, index + batchSize)
+    const results = await Promise.allSettled(batch.map(task))
+    const failed = results.find(result => result.status === 'rejected')
+    if (failed) throw failed.reason
+  }
+}
+
 async function getQuickSettlementOrders(supabase, cutoffDate, platform = 'ALL') {
   if (!cutoffDate) throw new Error('Tanggal batas order wajib diisi.')
 
@@ -110,8 +119,9 @@ async function runMarketplaceSettlement(settlementData, paymentMethod, settlemen
     // Hanya proses pendingOrders — abaikan yang sudah LUNAS
     const pendingIds = new Set(pendingOrders.map(o => o.id))
     const activePencairan = settlementData.filter(d => pendingIds.has(d.orderId))
+    const settlementAmountByOrderId = new Map(activePencairan.map(item => [item.orderId, Number(item.amount)]))
     for (const order of pendingOrders) {
-      const amount = Number(activePencairan.find(item => item.orderId === order.id)?.amount || 0)
+      const amount = settlementAmountByOrderId.get(order.id) || 0
       if (!isValidSettlementAmount(amount, order.total_amount, allowAboveInvoice)) {
         throw new Error(`Nominal pencairan untuk ${order.invoice_number} tidak valid.`)
       }
@@ -150,9 +160,8 @@ async function runMarketplaceSettlement(settlementData, paymentMethod, settlemen
     const gudangProducts = []
     const globalProducts = []
 
-    for (const order of pendingOrders) {
-      const pencairanAmount = activePencairan.find(d => d.orderId === order.id)?.amount || 0
-
+    await runInBatches(pendingOrders, 10, async order => {
+      const pencairanAmount = settlementAmountByOrderId.get(order.id) || 0
       // Baca dp_amount aktual dari DB untuk menghindari overwrite yang salah
       const currentDbDp = Number(order.dp_amount || 0)
 
@@ -166,24 +175,32 @@ async function runMarketplaceSettlement(settlementData, paymentMethod, settlemen
         dp_amount: finalDp,
         marketplace_pencairan: pencairanAmount
       }).eq('id', order.id)
+    })
 
-      // Ambil items: gunakan beli_gudang/beli_global yang precomputed saat SO dibuat
-      const { data: soItems } = await supabase
+    const pendingOrderIds = pendingOrders.map(o => o.id)
+    const allSettledItems = []
+    for (let offset = 0; ; offset += 1000) {
+      const { data: itemPage } = await supabase
         .from('sales_items')
-        .select('beli_gudang, beli_global, royalty_fee, product_code, qty, unit, products(name)')
-        .eq('so_id', order.id)
+        .select('id, so_id, beli_gudang, beli_global, royalty_fee, product_code, qty, unit, products(name)')
+        .in('so_id', pendingOrderIds)
+        .order('id', { ascending: true })
+        .range(offset, offset + 999)
+      allSettledItems.push(...(itemPage || []))
+      if (!itemPage || itemPage.length < 1000) break
+    }
 
-      for (const item of (soItems || [])) {
-        const warehouseAmount = Number(item.beli_gudang || 0)
-        const globalAmount = Number(item.beli_global || 0)
-        const royaltyAmount = Number(item.royalty_fee || 0)
-        const productDetail = { name: item.products?.name || item.product_code, qty: item.qty, unit: item.unit }
-        totalHppGudang += warehouseAmount
-        totalHppGlobal += globalAmount
-        virtualRoyaltyGlobal += royaltyAmount
-        if (warehouseAmount > 0) gudangProducts.push(productDetail)
-        if (globalAmount > 0 || royaltyAmount > 0) globalProducts.push(productDetail)
-      }
+    // Ambil item dalam satu query, lalu tetap gunakan nilai HPP yang tersimpan pada SO.
+    for (const item of allSettledItems || []) {
+      const warehouseAmount = Number(item.beli_gudang || 0)
+      const globalAmount = Number(item.beli_global || 0)
+      const royaltyAmount = Number(item.royalty_fee || 0)
+      const productDetail = { name: item.products?.name || item.product_code, qty: item.qty, unit: item.unit }
+      totalHppGudang += warehouseAmount
+      totalHppGlobal += globalAmount
+      virtualRoyaltyGlobal += royaltyAmount
+      if (warehouseAmount > 0) gudangProducts.push(productDetail)
+      if (globalAmount > 0 || royaltyAmount > 0) globalProducts.push(productDetail)
     }
 
     // 4. Record HPP ke Gudang
@@ -236,16 +253,7 @@ async function runMarketplaceSettlement(settlementData, paymentMethod, settlemen
     }
 
     // 6. Trigger auto status update untuk semua items di pending orders
-    const pendingOrderIds = pendingOrders.map(o => o.id)
-    const { data: allSettledItems } = await supabase
-      .from('sales_items')
-      .select('id')
-      .in('so_id', pendingOrderIds)
-    if (allSettledItems) {
-      for (const item of allSettledItems) {
-        await handleAutoStatusUpdate(item.id)
-      }
-    }
+    await runInBatches(allSettledItems || [], 10, item => handleAutoStatusUpdate(item.id))
 
     revalidatePath('/dashboard/marketplace')
     revalidatePath('/dashboard/transactions')
