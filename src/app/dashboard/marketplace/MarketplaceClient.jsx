@@ -545,13 +545,20 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                             <td className="px-3 py-2 font-mono">{row.receipt || '-'}</td>
                             <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                             <td className="px-3 py-2">{row.customerName || '-'}</td>
-                            <td className={`px-3 py-2 font-bold ${row.status === 'COCOK' ? 'text-green-400' : row.status === 'SUDAH CAIR' ? 'text-amber-300' : 'text-red-400'}`}>{row.status}</td>
+                            <td className={`px-3 py-2 font-bold ${row.overTotal || row.status === 'SUDAH CAIR' ? 'text-amber-300' : row.status === 'COCOK' ? 'text-green-400' : 'text-red-400'}`}>
+                              {row.overTotal ? 'COCOK · NOMINAL > TAGIHAN' : row.status}
+                            </td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
                   </div>
-                  <p className="text-xs text-foreground/50">Hanya baris berstatus COCOK yang akan diproses. Baris bermasalah tetap aman dan tidak diubah.</p>
+                  {bulkPreview.summary.overTotalCount > 0 && (
+                    <p className="text-xs text-amber-300">
+                      {bulkPreview.summary.overTotalCount} nomor pesanan cocok unik meski nominal di atas tagihan; nominalnya tetap dihitung dan diproses sesuai pencairan.
+                    </p>
+                  )}
+                  <p className="text-xs text-foreground/50">Nomor pesanan yang cocok unik akan dihitung dan diproses sesuai nominal pencairan. Duplikat, nominal invalid, tidak ditemukan, dan sudah cair tetap dilewati.</p>
                 </div>
               )}
             </div>
