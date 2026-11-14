@@ -2,8 +2,8 @@
 
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
-import { allocateLoanDeductions, calculatePayrollItems, calculatePayrollTotals, filterLoansAvailableForPayroll, getPayrollLedgerAmount, getPayrollWeekStart } from './calculations.mjs'
-import { inferProductionColorPasses } from '@/utils/productionColorPasses.mjs'
+import { allocateLoanDeductions, applyProductionReconciliationToPayrollLogs, calculatePayrollItems, calculatePayrollTotals, filterLoansAvailableForPayroll, getPayrollLedgerAmount, getPayrollWeekStart, hasMatchingPayrollProductionSnapshot } from './calculations.mjs'
+import { reconcileProductionColorPasses } from '@/utils/productionColorPasses.mjs'
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -226,7 +226,10 @@ export async function calculatePayroll(startDate, endDate) {
 
     const jobIds = [...new Set((logResult.data || []).map(log => log.job_id).filter(Boolean))]
     let twoColorJobs = new Set()
-    let inferredColorPasses = new Map()
+    let productionColorReconciliation = {
+      effectiveQtyByLogId: new Map(),
+      colorPassByLogId: new Map()
+    }
     if (jobIds.length) {
       const { data: salesItems, error: salesItemsError } = await supabase
         .from('sales_items')
@@ -242,13 +245,12 @@ export async function calculatePayroll(startDate, endDate) {
         .select('id, job_id, qty_processed, processed_date, created_at, notes')
         .in('job_id', jobIds)
       if (allJobLogsError) throw allJobLogsError
-      inferredColorPasses = inferProductionColorPasses(twoColorItems, allJobLogs || [])
+      productionColorReconciliation = reconcileProductionColorPasses(twoColorItems, allJobLogs || [])
     }
 
-    const productionLogs = (logResult.data || []).map(log => ({
+    const productionLogs = applyProductionReconciliationToPayrollLogs(logResult.data || [], productionColorReconciliation).map(log => ({
       ...log,
-      is_two_color: twoColorJobs.has(log.job_id),
-      color_pass: inferredColorPasses.get(String(log.id)) || null
+      is_two_color: twoColorJobs.has(log.job_id)
     }))
     const payrollEmployees = (employeeResult.data || []).filter(isAttendanceEligible)
     const attendanceEmployeeIds = new Set(payrollEmployees.map(employee => employee.id))
@@ -409,6 +411,19 @@ export async function savePayroll(payload) {
     const overlappingPayroll = await findOverlappingPayroll(supabase, payload.startDate, payload.endDate)
     if (overlappingPayroll) {
       throw new Error(`Periode bertabrakan dengan rekap tersimpan ${overlappingPayroll.start_date} s/d ${overlappingPayroll.end_date}.`)
+    }
+
+    const currentCalculation = await calculatePayroll(payload.startDate, payload.endDate)
+    if (!currentCalculation.success) throw new Error(currentCalculation.error || 'Gagal memverifikasi ulang produksi.')
+    const currentItemsByEmployee = new Map(currentCalculation.items.map(item => [String(item.employee_id), item]))
+    const productionChanged = payload.items.some(item => (
+      !hasMatchingPayrollProductionSnapshot(
+        item.calculation_snapshot,
+        currentItemsByEmployee.get(String(item.employee_id))?.calculation_snapshot
+      )
+    ))
+    if (productionChanged) {
+      throw new Error('Catatan produksi berubah sejak preview dibuat. Hitung ulang rekap gaji sebelum menyimpan.')
     }
 
     // Validate all adjustments and current loan balances before writing any payroll rows.

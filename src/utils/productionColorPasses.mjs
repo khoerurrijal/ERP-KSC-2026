@@ -43,6 +43,24 @@ export function isProductionPassQtyWithinTarget(qty, completedQty, targetPerPass
     inputQty <= Math.max(0, target - completed)
 }
 
+export function isProductionProgressSnapshotCurrent(expected, actual, isTwoColor = false) {
+  const expectedActivity = Number(expected?.qtyActivity)
+  const actualActivity = Number(actual?.qtyActivity)
+  if (!Number.isSafeInteger(expectedActivity) || expectedActivity !== actualActivity) return false
+  if (!isTwoColor) return true
+
+  const expectedColorOne = Number(expected?.qtyColorOne)
+  const expectedColorTwo = Number(expected?.qtyColorTwo)
+  const actualColorOne = Number(actual?.qtyColorOne)
+  const actualColorTwo = Number(actual?.qtyColorTwo)
+  const expectedNextPass = expected?.nextColorPass == null ? null : Number(expected.nextColorPass)
+  const actualNextPass = actual?.nextColorPass == null ? null : Number(actual.nextColorPass)
+
+  return Number.isSafeInteger(expectedColorOne) && expectedColorOne === actualColorOne &&
+    Number.isSafeInteger(expectedColorTwo) && expectedColorTwo === actualColorTwo &&
+    expectedNextPass === actualNextPass
+}
+
 function getProductionLogTime(log) {
   const createdAt = Date.parse(log.created_at || '')
   if (Number.isFinite(createdAt)) return createdAt

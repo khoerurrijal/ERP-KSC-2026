@@ -7,6 +7,7 @@ import {
   getProductionItemProgress,
   getRecalculatedProductionStatus,
   isProductionPassQtyWithinTarget,
+  isProductionProgressSnapshotCurrent,
 } from '@/utils/productionColorPasses.mjs'
 
 function getJakartaDateKey(date = new Date()) {
@@ -163,8 +164,11 @@ export async function saveProductionProgress(payload) {
     }
     let automaticColorPass = ''
     const logs = job.production_logs || []
+    const progress = getProductionItemProgress(job, logs)
+    if (!isProductionProgressSnapshotCurrent(payload.expected_progress, progress, isTwoColor)) {
+      throw new Error('PRODUCTION_PROGRESS_CHANGED')
+    }
     if (isTwoColor) {
-      const progress = getProductionItemProgress(job, logs)
       const passTarget = progress.targetPerColor
       if (!Number.isFinite(passTarget) || passTarget <= 0) throw new Error('Target Qty produk 2 warna tidak valid.')
       const nextPass = progress.nextColorPass

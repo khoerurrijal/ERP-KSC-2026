@@ -121,6 +121,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   const [notes, setNotes] = useState('')
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [loading, setLoading] = useState(false)
+  const productionSubmitLockRef = useRef(false)
 
   // Mockup popup state
   const [mockupModal, setMockupModal] = useState({ isOpen: false, itemId: null, url: '' })
@@ -186,7 +187,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     let result = (productionJobs || []).filter(j => 
       (isSearching || (
         j.order_type?.toUpperCase() === 'SABLON' &&
-        ['PROSES', 'SIAP PROSES', 'BARU MASUK'].includes(j.item_status?.toUpperCase())
+        ['PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2', 'SIAP PROSES', 'BARU MASUK'].includes(j.item_status?.toUpperCase())
       )) &&
       (!isSearching ||
        matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
@@ -465,6 +466,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
   }
 
   const handleSubmitQty = async () => {
+    if (productionSubmitLockRef.current) return
     if (!employeeId || !qtyProcessed) {
       alert("Harap pilih Operator dan isi Qty yang dikerjakan.")
       return
@@ -490,6 +492,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
       return
     }
 
+    productionSubmitLockRef.current = true
     setLoading(true)
     try {
       const res = await saveProductionProgress({
@@ -497,7 +500,12 @@ export default function ProductionTable({ productionJobs, productionHistory = []
         employee_id: employeeId,
         qty_processed: submittedQty,
         qty_defect: parseInt(qtyDefect) || 0,
-        expected_total_qty: Number(selectedJob.qty_processed || 0),
+        expected_progress: {
+          qtyActivity: Number(selectedJob.qty_processed || 0),
+          qtyColorOne: Number(selectedJob.qty_color_1 || 0),
+          qtyColorTwo: Number(selectedJob.qty_color_2 || 0),
+          nextColorPass: selectedJob.next_color_pass ?? null
+        },
         notes: notes
       })
 
@@ -519,7 +527,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
           setNotes('')
           router.refresh()
         } else {
-          window.location.reload()
+          handleCloseModal()
+          router.refresh()
         }
       } else {
         alert('Gagal mencatat: ' + res.error)
@@ -527,6 +536,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     } catch (e) {
       alert('Terjadi kesalahan')
     } finally {
+      productionSubmitLockRef.current = false
       setLoading(false)
     }
   }

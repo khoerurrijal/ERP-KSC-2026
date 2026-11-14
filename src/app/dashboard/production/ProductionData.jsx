@@ -80,9 +80,13 @@ export default async function ProductionData({ mode = 'production', embedded = f
     ]
     productionItemsQuery = productionItemsQuery.or(searchFilters.join(','))
   } else if (mode === 'production') {
-    productionItemsQuery = productionItemsQuery.in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
+    productionItemsQuery = productionItemsQuery.in('status', [
+      'SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'
+    ])
   } else {
-    productionItemsQuery = productionItemsQuery.in('status', ['SIAP PROSES', 'PROSES', 'Proses'])
+    productionItemsQuery = productionItemsQuery.in('status', [
+      'SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'
+    ])
   }
   productionItemsQuery = productionItemsQuery.limit(search && mode === 'production' ? 50000 : 500)
 

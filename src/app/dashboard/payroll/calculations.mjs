@@ -36,6 +36,43 @@ export function getPayrollLedgerAmount(item) {
   return Number(item.total || 0) + Number(item.late_deduction || 0)
 }
 
+export function applyProductionReconciliationToPayrollLogs(productionLogs, reconciliation) {
+  const effectiveQtyByLogId = reconciliation?.effectiveQtyByLogId
+  const colorPassByLogId = reconciliation?.colorPassByLogId
+
+  return (productionLogs || []).map(log => {
+    const logId = String(log.id || '')
+    return {
+      ...log,
+      qty_processed: effectiveQtyByLogId?.get(logId) ?? Number(log.qty_processed || 0),
+      color_pass: colorPassByLogId?.get(logId) ?? log.color_pass ?? null
+    }
+  })
+}
+
+function normalizeDailyQuantities(quantities) {
+  return Object.entries(quantities || {})
+    .map(([day, qty]) => [day, Number(qty || 0)])
+    .sort(([dayA], [dayB]) => dayA.localeCompare(dayB))
+}
+
+export function hasMatchingPayrollProductionSnapshot(previewSnapshot, currentSnapshot) {
+  const preview = previewSnapshot?.production
+  const current = currentSnapshot?.production
+  if (!preview || !current) return false
+
+  const quantityFields = [
+    'qty', 'piecework_qty', 'two_color_qty', 'subordinate_qty', 'low_production_pay_top_up'
+  ]
+  if (!quantityFields.every(field => Number(preview[field] || 0) === Number(current[field] || 0))) return false
+
+  const previewLowProductionDates = [...(preview.low_production_pay_dates || [])].sort()
+  const currentLowProductionDates = [...(current.low_production_pay_dates || [])].sort()
+  return JSON.stringify(normalizeDailyQuantities(preview.daily_qty)) === JSON.stringify(normalizeDailyQuantities(current.daily_qty)) &&
+    JSON.stringify(normalizeDailyQuantities(preview.daily_two_color_qty)) === JSON.stringify(normalizeDailyQuantities(current.daily_two_color_qty)) &&
+    JSON.stringify(previewLowProductionDates) === JSON.stringify(currentLowProductionDates)
+}
+
 export function allocateLoanDeductions(loans, kasbonAmount, pinjamanAmount) {
   let kasbonRemaining = Number(kasbonAmount || 0)
   let pinjamanRemaining = Number(pinjamanAmount || 0)
