@@ -99,20 +99,31 @@ export default async function ProductionData({ mode = 'production', embedded = f
       .limit(500)
     : null
 
+  const newSablonItemsQuery = mode === 'production' && !search
+    ? supabase.from('sales_items')
+      .select(productionItemSelection)
+      .eq('order_type', 'SABLON')
+      .eq('status', 'BARU MASUK')
+      .order('id', { ascending: false })
+      .limit(500)
+    : null
+
   const [
     { data: settingsData },
     { data: operatorsData },
     { data: activeRawItems },
-    { data: staleReadyItems }
+    { data: staleReadyItems },
+    { data: newSablonItems }
   ] = await Promise.all([
     supabase.from('system_settings').select('value').eq('key', 'user_roles').single(),
     supabase.from('employees').select('id, full_name, salary_schemas(role_name)').eq('is_active', true),
     productionItemsQuery,
-    staleReadyItemsQuery || Promise.resolve({ data: [] })
+    staleReadyItemsQuery || Promise.resolve({ data: [] }),
+    newSablonItemsQuery || Promise.resolve({ data: [] })
   ])
 
   const rawItemsById = new Map()
-  for (const item of [...(activeRawItems || []), ...(staleReadyItems || [])]) rawItemsById.set(item.id, item)
+  for (const item of [...(activeRawItems || []), ...(staleReadyItems || []), ...(newSablonItems || [])]) rawItemsById.set(item.id, item)
   const rawItems = [...rawItemsById.values()]
 
   const userRoles = settingsData?.value || []
@@ -267,7 +278,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
     qty_raw_activity: rawActivityQty
   })
   }).filter(job => (
-    mode !== 'production' || search || ['SIAP PROSES', 'PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(String(job.item_status).toUpperCase())
+    mode !== 'production' || search || ['BARU MASUK', 'SIAP PROSES', 'PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(String(job.item_status).toUpperCase())
   ))
 
   return (
