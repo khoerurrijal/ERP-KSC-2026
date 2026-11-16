@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { Calendar, Check, CheckCircle2, ClipboardCheck, Calculator, ChevronDown, History, Loader2, Printer, Wallet } from 'lucide-react'
 import CustomDatePicker from '@/components/CustomDatePicker'
@@ -307,21 +307,25 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
     }
   }
 
-  const payrollSummary = payrollData?.items.reduce((summary, item) => ({
+  const payrollItems = payrollData?.items
+  const payrollSummary = useMemo(() => payrollItems?.reduce((summary, item) => ({
     ledger: summary.ledger + getPayrollLedgerAmount(item),
     deductions: summary.deductions + Number(item.total_deductions || 0),
     late: summary.late + Number(item.late_deduction || 0),
     net: summary.net + Number(item.total || 0)
-  }), { ledger: 0, deductions: 0, late: 0, net: 0 }) || { ledger: 0, deductions: 0, late: 0, net: 0 }
-  const payrollPages = []
-  for (let index = 0; index < (payrollData?.items.length || 0); index += 4) {
-    const items = payrollData.items.slice(index, index + 4)
-    const totals = items.reduce((sum, item) => ({
-      ledger: sum.ledger + getPayrollLedgerAmount(item),
-      net: sum.net + Number(item.total || 0)
-    }), { ledger: 0, net: 0 })
-    payrollPages.push({ items, totals })
-  }
+  }), { ledger: 0, deductions: 0, late: 0, net: 0 }) || { ledger: 0, deductions: 0, late: 0, net: 0 }, [payrollItems])
+  const payrollPages = useMemo(() => {
+    const pages = []
+    for (let index = 0; index < (payrollItems?.length || 0); index += 4) {
+      const items = payrollItems.slice(index, index + 4)
+      const totals = items.reduce((sum, item) => ({
+        ledger: sum.ledger + getPayrollLedgerAmount(item),
+        net: sum.net + Number(item.total || 0)
+      }), { ledger: 0, net: 0 })
+      pages.push({ items, totals })
+    }
+    return pages
+  }, [payrollItems])
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
@@ -574,7 +578,7 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
                     <tbody className="divide-y divide-white/10">
                       {payrollData.items.map(item => {
                         const expanded = expandedPayrollId === item.employee_id
-                        const dailyProductionEntries = getDailyProductionEntries(item)
+                        const dailyProductionEntries = expanded ? getDailyProductionEntries(item) : []
                         return (
                           <Fragment key={item.employee_id}>
                             <tr className={`transition-colors ${expanded ? 'bg-white/[0.04]' : 'hover:bg-white/[0.03]'}`}>

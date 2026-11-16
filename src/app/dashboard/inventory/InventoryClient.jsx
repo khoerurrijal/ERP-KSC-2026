@@ -118,11 +118,11 @@ export default function InventoryClient({
   }, [products])
 
   const filteredPipelineData = useMemo(() => {
+    const activeProductCodes = new Set(products.map(p => p.product_code))
+    const normalizedSearch = debouncedSearch.replace(/[(),"]/g, ' ').trim().toLowerCase()
     let result = pipelineData.filter(pipe => {
-      const isActive = products.some(p => p.product_code === pipe.product_code)
-      if (!isActive) return false
+      if (!activeProductCodes.has(pipe.product_code)) return false
 
-      const normalizedSearch = debouncedSearch.replace(/[(),"]/g, ' ').trim().toLowerCase()
       const matchSearch = matchesSearchText(pipe.product_name, normalizedSearch) ||
                           matchesSearchText(pipe.category, normalizedSearch)
       

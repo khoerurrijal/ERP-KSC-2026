@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useId, useRef, useState } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash2, ArrowLeft, Loader2, Save, X, Copy, Check, RotateCw } from 'lucide-react'
 import CustomSelect from '@/components/CustomSelect'
@@ -15,6 +15,7 @@ const isMarketplaceCustomerType = (type) => {
 function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disabled = false, allowCustom = false }) {
   const [isOpen, setIsOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(50)
   const fieldRef = useRef(null)
   const listboxId = useId()
   const selectedOption = options.find(option => String(option.value) === String(value) && option.value !== '')
@@ -30,17 +31,23 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
   const handleFocus = () => {
     if (disabled) return
     setQuery(selectedOption ? '' : allowCustom ? String(value || '') : '')
+    setVisibleCount(50)
     setIsOpen(true)
   }
 
   const handleInputChange = event => {
     const nextValue = event.target.value
     setQuery(nextValue)
+    setVisibleCount(50)
     if (allowCustom) onChange({ target: { value: nextValue } })
     setIsOpen(true)
   }
 
-  const filteredOptions = options.filter(option => String(option.label).toLowerCase().includes(query.trim().toLowerCase()))
+  const filteredOptions = useMemo(() => {
+    if (!isOpen || disabled) return []
+    const normalizedQuery = query.trim().toLowerCase()
+    return options.filter(option => String(option.label).toLowerCase().includes(normalizedQuery))
+  }, [options, query, isOpen, disabled])
   const inputValue = isOpen ? query : selectedOption?.label || (allowCustom ? String(value || '') : '')
 
   return (
@@ -62,7 +69,7 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
         <div id={listboxId} role="listbox" className="absolute left-0 right-0 top-full z-[1120] mt-1 max-h-52 overflow-y-auto rounded-xl border border-card-border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md">
           {filteredOptions.length === 0 ? (
             <div className="px-3 py-3 text-center text-xs text-foreground/40">Tidak ada hasil</div>
-          ) : filteredOptions.map(option => (
+          ) : filteredOptions.slice(0, visibleCount).map(option => (
             <button
               key={option.value || 'empty'}
               type="button"
@@ -74,6 +81,11 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
               <span className="whitespace-normal break-words">{option.label}</span>
             </button>
           ))}
+          {visibleCount < filteredOptions.length && (
+            <button type="button" onClick={() => setVisibleCount(count => count + 50)} className="w-full rounded-lg px-3 py-2 text-left text-sm text-primary hover:bg-foreground/10">
+              Tampilkan lebih banyak ({filteredOptions.length - visibleCount} tersisa)
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -269,19 +281,25 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
 
   // Derived state
-  const getCategoriesForItem = (orderType) => {
-    if (!orderType) return []
+  const customerOptions = useMemo(() => [
+    { value: '', label: 'Pilih Pelanggan...' },
+    ...localCustomers.map(c => ({ value: c.customer_code, label: `${c.name}${c.type ? ` — ${c.type}` : ''}` }))
+  ], [localCustomers])
+
+  // Quantity and price edits do not change which products are selectable.
+  const itemProductKeys = JSON.stringify(items.map(({ id, order_type, product_search }) => ({ id, order_type, product_search })))
+  const productOptionsByItem = useMemo(() => {
     const mapping = dropdownConfig.category_mapping || {}
-    const orderTypeUpper = orderType.toUpperCase()
-    if (mapping[orderTypeUpper] && mapping[orderTypeUpper].length > 0) {
-      return mapping[orderTypeUpper]
-    }
-    if (mapping[orderType] && mapping[orderType].length > 0) {
-      return mapping[orderType]
-    }
-    // Fallback: semua kategori
-    return [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
-  }
+    const fallbackCategories = [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
+    return new Map(JSON.parse(itemProductKeys).map(item => {
+      const type = item.order_type
+      const categories = !type ? [] : (mapping[type.toUpperCase()]?.length ? mapping[type.toUpperCase()] : mapping[type]?.length ? mapping[type] : fallbackCategories)
+      const options = products
+        .filter(p => categories.includes(p.category) && (p.is_active !== false || p.name === item.product_search))
+        .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
+      return [item.id, options]
+    }))
+  }, [products, dropdownConfig.category_mapping, itemProductKeys])
 
   const orderTypes = Array.from(new Set(dropdownConfig.order_type || ['SABLON', 'POLOS']))
 
@@ -522,10 +540,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         handleCustomerChange({ target: { value: e.target.value } })
                       }}
                       allowCustom
-                      options={[
-                        { value: '', label: 'Pilih Pelanggan...' },
-                        ...localCustomers.map(c => ({ value: c.customer_code, label: `${c.name}${c.type ? ` — ${c.type}` : ''}` }))
-                      ]}
+                      options={customerOptions}
                     />
                     <p className="text-[11px] text-foreground/40">
                       Pelanggan baru? <button type="button" onClick={() => { setNewCustomerName(customerId); setShowAddCustomer(true) }} className="text-primary hover:underline">Tambah Baru</button>
@@ -553,10 +568,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
                 <div className="space-y-1.5">
                   {items.map((item, index) => {
-                    const categoryOptions = getCategoriesForItem(item.order_type)
-                    const productOptions = products
-                      .filter(p => categoryOptions.includes(p.category) && (p.is_active !== false || p.name === item.product_search))
-                      .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
+                    const productOptions = productOptionsByItem.get(item.id) || []
                     const product = products.find(p => p.name === item.product_search)
                     let itemTotal = Number(item.qty) * Number(item.price)
                     if (item.isFastTrack) itemTotal += 100000 * Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
@@ -949,9 +961,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                       <SuggestField
                         value={item.product_search}
                         onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
-                        options={products
-                          .filter(p => getCategoriesForItem(item.order_type).includes(p.category) && (p.is_active !== false || p.name === item.product_search))
-                          .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))}
+                        options={productOptionsByItem.get(item.id) || []}
                         placeholder="Ketik produk atau kategori..."
                         disabled={!item.order_type}
                       />

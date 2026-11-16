@@ -8,9 +8,12 @@ import { createPortal } from 'react-dom'
 import { ChevronDown, Check, Search } from 'lucide-react'
 import { matchesSearchText } from '@/utils/search'
 
+const OPTIONS_PAGE_SIZE = 50
+
 export default function CustomSelect({ value, onChange, options, placeholder = "Pilih...", className = "", icon: Icon, searchable = false, disabled = false, menuPosition = "absolute", menuZIndex = 1100 }) {
   const [isOpen, setIsOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [visibleCount, setVisibleCount] = useState(OPTIONS_PAGE_SIZE)
   const popoverRef = useRef(null)
   const menuRef = useRef(null)
   const [menuStyle, setMenuStyle] = useState(null)
@@ -23,6 +26,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
       if (!clickedButton && !clickedMenu) {
         setIsOpen(false)
         setSearchQuery('')
+        setVisibleCount(OPTIONS_PAGE_SIZE)
       }
     }
     document.addEventListener("mousedown", handleClickOutside)
@@ -85,6 +89,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
     }
     setIsOpen(false)
     setSearchQuery('')
+    setVisibleCount(OPTIONS_PAGE_SIZE)
   }
 
   const selectedOption = options.find(opt => String(opt.value) === String(value))
@@ -94,13 +99,25 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
     if (!searchable || !searchQuery) return options
     return options.filter(opt => matchesSearchText(opt.label, searchQuery))
   }, [options, searchable, searchQuery])
+  const visibleOptions = filteredOptions.slice(0, visibleCount)
+
+  const handleSearch = (event) => {
+    setSearchQuery(event.target.value)
+    setVisibleCount(OPTIONS_PAGE_SIZE)
+  }
 
   return (
     <div className={`relative ${className}`} ref={popoverRef}>
       <button 
         type="button"
         disabled={disabled}
-        onClick={() => !disabled && setIsOpen(!isOpen)}
+        onClick={() => {
+          if (disabled) return
+          if (isOpen) {
+            setVisibleCount(OPTIONS_PAGE_SIZE)
+          }
+          setIsOpen(!isOpen)
+        }}
         className={`glass-input h-10 px-4 w-full flex items-center justify-between gap-2 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-primary/50 ${disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-foreground/5'}`}
       >
         <div className="flex items-center gap-2 truncate w-full">
@@ -120,7 +137,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
                 autoFocus
                 placeholder="Cari..."
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={handleSearch}
                 className="w-full bg-foreground/5 border border-card-border rounded-md h-8 pl-8 pr-3 text-xs text-foreground focus:outline-none focus:border-primary/50"
               />
             </div>
@@ -128,7 +145,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
           <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar flex-1">
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-4 text-xs text-center text-foreground/40">Tidak ada hasil</div>
-            ) : filteredOptions.map((opt) => {
+            ) : visibleOptions.map((opt) => {
               const isSelected = String(value) === String(opt.value)
               return (
                 <button
@@ -146,6 +163,11 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
                 </button>
               )
             })}
+            {visibleCount < filteredOptions.length && (
+              <button type="button" onClick={() => setVisibleCount(count => count + OPTIONS_PAGE_SIZE)} className="w-full px-3 py-2 text-sm text-primary text-left shrink-0 hover:bg-foreground/10 rounded-lg">
+                Tampilkan lebih banyak ({filteredOptions.length - visibleCount} tersisa)
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -160,7 +182,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
                 autoFocus
                 placeholder="Cari..." 
                 value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
+                onChange={handleSearch}
                 className="w-full bg-foreground/5 border border-card-border rounded-md h-8 pl-8 pr-3 text-xs text-foreground focus:outline-none focus:border-primary/50"
               />
             </div>
@@ -168,7 +190,7 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
           <div className="flex flex-col gap-1 overflow-y-auto custom-scrollbar flex-1">
             {filteredOptions.length === 0 ? (
               <div className="px-3 py-4 text-xs text-center text-foreground/40">Tidak ada hasil</div>
-            ) : filteredOptions.map((opt) => {
+            ) : visibleOptions.map((opt) => {
               const isSelected = String(value) === String(opt.value)
               return (
                 <button
@@ -186,6 +208,11 @@ export default function CustomSelect({ value, onChange, options, placeholder = "
                 </button>
               )
             })}
+            {visibleCount < filteredOptions.length && (
+              <button type="button" onClick={() => setVisibleCount(count => count + OPTIONS_PAGE_SIZE)} className="w-full px-3 py-2 text-sm text-primary text-left shrink-0 hover:bg-foreground/10 rounded-lg">
+                Tampilkan lebih banyak ({filteredOptions.length - visibleCount} tersisa)
+              </button>
+            )}
           </div>
         </div>,
         document.body

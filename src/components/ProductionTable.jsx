@@ -182,6 +182,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
 
   // TAB 2: Tracking Produksi (Input Qty by Operator)
   const filteredAndSortedJobs = useMemo(() => {
+    if (activeTab !== 'PRODUKSI') return []
     const normalizedSearch = searchQuery.replace(/[(),\"]/g, ' ').trim().toLowerCase()
     const isSearching = Boolean(normalizedSearch)
     let result = (productionJobs || []).filter(j => 
@@ -227,19 +228,19 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     })
 
     return result
-  }, [productionJobs, searchQuery, sortConfig])
+  }, [productionJobs, searchQuery, sortConfig, activeTab])
 
   // TAB 1: Tracking Sales Order (Visual Timeline)
   const normalizedSearch = searchQuery.replace(/[(),\"]/g, ' ').trim().toLowerCase()
   const isSearching = Boolean(normalizedSearch)
-  const trackingSoItems = (productionJobs || []).filter(j =>
+  const trackingSoItems = useMemo(() => activeTab !== 'SO' ? [] : (productionJobs || []).filter(j =>
     (isSearching || !['SELESAI', 'BATAL'].includes(j.item_status?.toUpperCase())) &&
     (!isSearching ||
       matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
       matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||
       matchesSearchText(stripGeneratedInvoiceNumbers(j.notes), normalizedSearch) ||
       matchesSearchText(j.item_status, normalizedSearch))
-  )
+  ), [productionJobs, isSearching, normalizedSearch, activeTab])
 
   const paginatedProdJobs = useMemo(() => {
     const start = (prodPage - 1) * pageSize
@@ -255,6 +256,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     ['Owner', 'Admin'].includes(userRole) || isOperatorAccount
   )
   const productionAccumulation = useMemo(() => {
+    if (activeTab !== 'AKUMULASI' || !canSeeAccumulationTab) return []
     const months = new Map()
     const matchingLogs = (productionHistory || []).filter(log =>
       getProductionDateValue(log) >= accumulationDateFrom &&
@@ -310,7 +312,7 @@ export default function ProductionTable({ productionJobs, productionHistory = []
           log_count: employeeGroups.reduce((total, group) => total + group.log_count, 0)
         }
       })
-  }, [productionHistory, normalizedSearch, accumulationDateFrom, accumulationDateTo, accumulationSort])
+  }, [productionHistory, normalizedSearch, accumulationDateFrom, accumulationDateTo, accumulationSort, activeTab, canSeeAccumulationTab])
 
   const handleAccumulationDateRangeChange = ({ start, end }) => {
     setAccumulationDateFrom(start)
