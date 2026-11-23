@@ -117,6 +117,7 @@ export async function runAuditScan(supabase) {
     const order = allOrderById.get(String(item.so_id))
     return !order || orderById.has(String(order.id))
   })
+  const itemsByOrderId = groupBy(items, item => item.so_id == null ? '' : String(item.so_id))
 
   const addToIssueGroup = (groups, key, row) => {
     if (!groups.has(key)) groups.set(key, [])
@@ -277,7 +278,7 @@ export async function runAuditScan(supabase) {
     const receipt = normalizeMarketplaceReceipt(order.marketplace_receipt)
     const payout = Number(order.marketplace_pencairan || 0)
     const total = Number(order.total_amount || 0)
-    const orderItems = items.filter(item => String(item.so_id) === String(order.id))
+    const orderItems = itemsByOrderId.get(String(order.id)) || []
     const activeMarketplaceOrder = isActiveMarketplaceOrder(order)
 
     if (orderItems.length === 0 && paymentStatus !== 'BATAL') {

@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { Suspense } from 'react'
 import { Clock, CheckCircle, AlertTriangle, Activity, ShoppingBag, Package, Wallet, Building2, AlertOctagon, FileText, ShieldCheck } from 'lucide-react'
 import Link from 'next/link'
 import PriceCalculator from '@/components/PriceCalculator'
@@ -8,6 +9,27 @@ import { redirect } from 'next/navigation'
 import { runAuditScan } from '@/app/dashboard/audit/audit'
 
 export const dynamic = 'force-dynamic'
+
+async function DashboardAuditSummary({ auditReportPromise }) {
+  const auditReport = await auditReportPromise
+
+  return (
+    <div className="glass-card p-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-3">
+        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
+          <ShieldCheck className="w-5 h-5" />
+        </div>
+        <div>
+          <p className="font-bold text-foreground">AI Audit Center</p>
+          <p className="text-xs text-foreground/60 mt-1">{auditReport.summary.total === 0 ? 'Belum ada temuan audit.' : `${auditReport.summary.total} temuan perlu diperiksa (${auditReport.summary.critical} kritis).`}</p>
+        </div>
+      </div>
+      <Link href="/audit" className="btn-primary h-9 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
+        Periksa Sistem
+      </Link>
+    </div>
+  )
+}
 
 export default async function DashboardPage({ searchParams }) {
   const resolvedParams = await searchParams
@@ -24,8 +46,8 @@ export default async function DashboardPage({ searchParams }) {
     redirect('/login')
   }
 
-  const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'user_roles').single()
-  const userRoles = settingsData?.value || []
+  const { data: settings } = await supabase.from('system_settings').select('*')
+  const userRoles = settings?.find(setting => setting.key === 'user_roles')?.value || []
   const userEmail = authUser.email?.toLowerCase() || ''
   
   const matchedUser = userRoles.find(u => {
@@ -41,15 +63,20 @@ export default async function DashboardPage({ searchParams }) {
 
   const user = { email: authUser.email, role: userRole }
 
-  // Fetch products for Kalkulator
-  const { data: products } = await supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name')
-  const { data: settings } = await supabase.from('system_settings').select('*')
+  // Load independent dashboard data together to avoid serial Supabase round trips.
+  const auditReportPromise = runAuditScan(supabase)
+  const [
+    { data: products },
+    { data: salesOrders },
+    { data: sablonItems }
+  ] = await Promise.all([
+    supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name'),
+    supabase.from('sales_orders').select('id, date, payment_status, marketplace_settlement_status, total_amount, dp_amount, customers(name, type)').limit(100000),
+    supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000)
+  ])
+
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
   const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
-
-  // Fetch orders for metrics
-  const { data: salesOrders } = await supabase.from('sales_orders').select('*, customers(name, type), sales_items(qty, unit_price, order_type)').limit(100000)
-  const auditReport = await runAuditScan(supabase)
 
   const rawOrders = salesOrders || []
   
@@ -78,13 +105,16 @@ export default async function DashboardPage({ searchParams }) {
   }).length
   
   // Calculate Jumlah Produksi Type Sablon (hanya bulan terpilih, ABAIKAN BATAL)
-  const totalSablonQty = thisMonthOrders.filter(o => o.payment_status !== 'BATAL').reduce((acc, order) => {
-    const sablonQty = order.sales_items?.filter(item => item.order_type === 'SABLON' && item.status !== 'BATAL').reduce((sum, item) => sum + item.qty, 0) || 0
-    return acc + sablonQty
+  const totalSablonQty = (sablonItems || []).reduce((total, item) => {
+    const order = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
+    return order?.date?.startsWith(selectedMonth)
+      && order.payment_status !== 'BATAL'
+      && item.status !== 'BATAL'
+      ? total + item.qty
+      : total
   }, 0)
 
   // Calculate Antrean Produksi (berdasarkan Item Sablon)
-  const { data: sablonItems } = await supabase.from('sales_items').select('status').eq('order_type', 'SABLON').limit(100000)
   const items = sablonItems || []
   const antreanMasuk = items.filter(i => !i.status || i.status === 'BARU MASUK').length
   const antreanProses = items.filter(i => i.status === 'PROSES').length
@@ -123,20 +153,9 @@ export default async function DashboardPage({ searchParams }) {
         </div>
       </div>
 
-      <div className="glass-card p-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
-            <ShieldCheck className="w-5 h-5" />
-          </div>
-          <div>
-            <p className="font-bold text-foreground">AI Audit Center</p>
-            <p className="text-xs text-foreground/60 mt-1">{auditReport.summary.total === 0 ? 'Belum ada temuan audit.' : `${auditReport.summary.total} temuan perlu diperiksa (${auditReport.summary.critical} kritis).`}</p>
-          </div>
-        </div>
-          <Link href="/audit" className="btn-primary h-9 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
-          Periksa Sistem
-        </Link>
-      </div>
+      <Suspense fallback={<div className="glass-card p-4 border border-primary/20 bg-primary/5 text-sm text-foreground/60" role="status">Memuat ringkasan audit...</div>}>
+        <DashboardAuditSummary auditReportPromise={auditReportPromise} />
+      </Suspense>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 items-start gap-4 mt-4">
         
