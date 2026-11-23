@@ -45,8 +45,11 @@ function SuggestField({ value, onChange, options, placeholder = 'Pilih...', disa
 
   const filteredOptions = useMemo(() => {
     if (!isOpen || disabled) return []
-    const normalizedQuery = query.trim().toLowerCase()
-    return options.filter(option => String(option.label).toLowerCase().includes(normalizedQuery))
+    const queryTerms = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+    return options.filter(option => {
+      const normalizedLabel = String(option.label).toLowerCase()
+      return queryTerms.every(term => normalizedLabel.includes(term))
+    })
   }, [options, query, isOpen, disabled])
   const inputValue = isOpen ? query : selectedOption?.label || (allowCustom ? String(value || '') : '')
 
@@ -287,7 +290,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   ], [localCustomers])
 
   // Quantity and price edits do not change which products are selectable.
-  const itemProductKeys = JSON.stringify(items.map(({ id, order_type, product_search }) => ({ id, order_type, product_search })))
+  const itemProductKeys = JSON.stringify(items.map(({ id, order_type, product_id }) => ({ id, order_type, product_id })))
   const productOptionsByItem = useMemo(() => {
     const mapping = dropdownConfig.category_mapping || {}
     const fallbackCategories = [...new Set(products.filter(p => p.is_active !== false).map(p => p.category).filter(Boolean))]
@@ -295,8 +298,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       const type = item.order_type
       const categories = !type ? [] : (mapping[type.toUpperCase()]?.length ? mapping[type.toUpperCase()] : mapping[type]?.length ? mapping[type] : fallbackCategories)
       const options = products
-        .filter(p => categories.includes(p.category) && (p.is_active !== false || p.name === item.product_search))
-        .map(p => ({ value: p.name, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
+        .filter(p => categories.includes(p.category) && (p.is_active !== false || p.product_code === item.product_id))
+        .map(p => ({ value: p.product_code, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
       return [item.id, options]
     }))
   }, [products, dropdownConfig.category_mapping, itemProductKeys])
@@ -349,16 +352,17 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         }
         // Auto-fill price and workshop_id if product changes
         if (field === 'product_search') {
-          updated.product_search = value
-          const selectedProduct = products.find(p => p.name === value)
+          const selectedProduct = products.find(p => p.product_code === value)
           if (selectedProduct) {
             updated.product_id = selectedProduct.product_code
+            updated.product_search = selectedProduct.name
             updated.category = selectedProduct.category || ''
             updated.workshop_id = selectedProduct.workshop_id || ''
             updated.unit = 'PCS'
             updated.unit_multiplier = 1
           } else {
             updated.product_id = ''
+            updated.product_search = ''
             updated.price = 0
             updated.workshop_id = ''
             updated.unit = 'PCS'
@@ -366,7 +370,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
           }
         } else if (field === 'unit') {
           updated.unit = value
-          const selectedProduct = products.find(p => p.name === updated.product_search)
+          const selectedProduct = products.find(p => p.product_code === updated.product_id)
           if (selectedProduct && selectedProduct.product_units) {
              const pu = selectedProduct.product_units.find(u => u.unit_name === value)
              updated.unit_multiplier = pu ? pu.multiplier : 1
@@ -376,7 +380,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         }
 
         if (['qty', 'product_search', 'order_type', 'category', 'unit', 'printingColors'].includes(field)) {
-          const selectedProduct = products.find(p => p.name === updated.product_search)
+          const selectedProduct = products.find(p => p.product_code === updated.product_id)
 
           // Auto adjust Qty based on minimum rules
           const minQty = getMinQty({
@@ -569,7 +573,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                 <div className="space-y-1.5">
                   {items.map((item, index) => {
                     const productOptions = productOptionsByItem.get(item.id) || []
-                    const product = products.find(p => p.name === item.product_search)
+                    const product = products.find(p => p.product_code === item.product_id)
                     let itemTotal = Number(item.qty) * Number(item.price)
                     if (item.isFastTrack) itemTotal += 100000 * Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
                     if (item.isTwoColor) itemTotal += 250 * Number(item.qty) * Number(item.unit_multiplier || 1)
@@ -608,7 +612,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                           <div className="space-y-1 sm:col-span-4">
                             <label className="block text-[10px] text-foreground/60">Cari Produk</label>
                             <SuggestField
-                              value={item.product_search}
+                              value={item.product_id}
                               onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
                               placeholder="Ketik produk atau kategori..."
                               options={productOptions}
@@ -959,7 +963,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <div className="space-y-2 md:col-span-3">
                       <label className="text-xs font-medium text-foreground/80">Cari Produk</label>
                       <SuggestField
-                        value={item.product_search}
+                        value={item.product_id}
                         onChange={e => handleItemChange(item.id, 'product_search', e.target.value)}
                         options={productOptionsByItem.get(item.id) || []}
                         placeholder="Ketik produk atau kategori..."
@@ -995,7 +999,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                         value={item.unit}
                         onChange={e => handleItemChange(item.id, 'unit', e.target.value)}
                         options={(() => {
-                          const p = products.find(prod => prod.name === item.product_search)
+                          const p = products.find(prod => prod.product_code === item.product_id)
                           const base = [{ value: 'PCS', label: 'PCS' }]
                           if (item.order_type?.toUpperCase() !== 'SABLON' && item.order_type?.toUpperCase() !== 'PRINTING' && p && p.product_units && p.product_units.length > 0) {
                             return [...base, ...p.product_units.map(u => ({ value: u.unit_name, label: u.unit_name }))]
