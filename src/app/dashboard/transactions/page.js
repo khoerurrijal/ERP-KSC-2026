@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import TransactionsClient from './TransactionsClient'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 
 export default async function TransactionsPage({ searchParams = {} }) {
   const supabase = await createClient()
@@ -27,9 +28,7 @@ export default async function TransactionsPage({ searchParams = {} }) {
 
     const uniqueOrderIds = [...new Set(relatedOrderIds)]
     const searchFilters = [
-      `description.ilike.%${search}%`,
-      `reference.ilike.%${search}%`,
-      `workshop_code.ilike.%${search}%`,
+      buildAllTermsSearchFilter(['description', 'reference', 'workshop_code'], search),
       ...(uniqueOrderIds.length ? [`so_id.in.(${uniqueOrderIds.join(',')})`] : [])
     ]
     transactionsQuery = transactionsQuery.or(searchFilters.join(','))

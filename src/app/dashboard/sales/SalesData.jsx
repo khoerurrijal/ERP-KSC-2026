@@ -1,5 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
-import { matchesSearchText } from '@/utils/search'
+import { buildAllTermsSearchFilter, matchesSearchText } from '@/utils/search'
 import SalesClient from './SalesClient'
 
 export default async function SalesData({ searchParams = {}, itemsOnly = false }) {
@@ -35,7 +35,9 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   if (safeSearch) {
     const [custRes, prodRes] = await Promise.all([
       supabase.from('customers').select('customer_code, name').or(`name.ilike.%${safeSearch}%,customer_code.ilike.%${safeSearch}%`).limit(50000),
-      supabase.from('products').select('product_code, name').or(`name.ilike.%${safeSearch}%,product_code.ilike.%${safeSearch}%`).limit(50000)
+      supabase.from('products').select('product_code, name').or(
+        buildAllTermsSearchFilter(['name', 'product_code'], safeSearch, { numericSubstringFields: ['product_code'] })
+      ).limit(50000)
     ])
 
     matchedCustCodes = (custRes.data || [])

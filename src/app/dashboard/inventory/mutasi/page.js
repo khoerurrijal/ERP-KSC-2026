@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import MutasiClient from './MutasiClient'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export default async function MutasiPage({ searchParams }) {
     .limit(50000)
 
   if (search) {
-    mutationsQuery = mutationsQuery.or(`reference.ilike.%${search}%,actor.ilike.%${search}%,product_name.ilike.%${search}%`)
+    mutationsQuery = mutationsQuery.or(buildAllTermsSearchFilter(['reference', 'actor', 'product_name'], search))
   } else {
     mutationsQuery = mutationsQuery
       .gte('mutation_date', `${selectedMonth}-01`)
@@ -54,7 +55,7 @@ export default async function MutasiPage({ searchParams }) {
     const { data: matchedProducts } = await supabase
       .from('products')
       .select('product_code')
-      .ilike('name', `%${searchTerm}%`)
+      .or(buildAllTermsSearchFilter(['name', 'product_code'], searchTerm, { numericSubstringFields: ['product_code'] }))
     const matchedProductCodes = (matchedProducts || []).map(product => product.product_code).filter(Boolean)
     const searchFilters = [
       `reference_number.ilike.%${search}%`,

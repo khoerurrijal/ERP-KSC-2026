@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import InventoryClient from './InventoryClient'
-import { numericTokenPattern } from '@/utils/search'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 
 // Komponen server ini di-render di dalam Suspense boundary di page.js
 // sehingga UI halaman bisa langsung tampil, dan data dimuat secara streaming
@@ -27,10 +27,11 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
   }
 
   if (search) {
-    const numericPattern = numericTokenPattern(search)
-    query = query.or(numericPattern
-      ? `name.imatch."${numericPattern}",category.imatch."${numericPattern}"`
-      : `name.ilike.%${search}%,category.ilike.%${search}%`)
+    query = query.or(buildAllTermsSearchFilter(
+      ['name', 'category', 'product_code'],
+      search,
+      { numericSubstringFields: ['product_code'] }
+    ))
   }
 
   if (!search && category) {
@@ -53,10 +54,7 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     .from('product_pipeline_view')
     .select('*')
   if (search && activeTab === 'pipeline') {
-    const numericPattern = numericTokenPattern(search)
-    pipelineQuery = pipelineQuery.or(numericPattern
-      ? `product_name.imatch."${numericPattern}",category.imatch."${numericPattern}"`
-      : `product_name.ilike.%${search}%,category.ilike.%${search}%`)
+    pipelineQuery = pipelineQuery.or(buildAllTermsSearchFilter(['product_name', 'category'], search))
   }
   pipelineQuery = pipelineQuery.limit(search && activeTab === 'pipeline' ? 1000 : 200)
 

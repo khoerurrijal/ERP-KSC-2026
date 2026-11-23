@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import PurchasesClient from './PurchasesClient'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 
 export default async function PurchasesPage({ searchParams }) {
   const supabase = await createClient()
@@ -42,13 +43,14 @@ export default async function PurchasesPage({ searchParams }) {
 
   if (search) {
     const [matchedProductsResult, matchedOrdersResult] = await Promise.all([
-      supabase.from('products').select('product_code').ilike('name', `%${searchTerm}%`).limit(50000),
+      supabase.from('products').select('product_code').or(
+        buildAllTermsSearchFilter(['name', 'product_code'], searchTerm, { numericSubstringFields: ['product_code'] })
+      ).limit(50000),
       supabase.from('purchase_orders').select('id').or(`po_number.ilike.%${search}%,supplier.ilike.%${search}%`).limit(50000)
     ])
     const matchedProductCodes = (matchedProductsResult.data || []).map(product => product.product_code).filter(Boolean)
     const itemSearchFilters = [
-      `item_name.ilike.%${search}%`,
-      `product_code.ilike.%${search}%`,
+      buildAllTermsSearchFilter(['item_name', 'product_code'], search, { numericSubstringFields: ['product_code'] }),
       ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : [])
     ]
     const { data: directlyMatchedItems } = await supabase

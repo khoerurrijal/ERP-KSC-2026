@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 import {
   getAutomaticProductionProgressQty,
   getProductionItemProgress,
@@ -36,7 +37,9 @@ export default async function ProductionData({ mode = 'production', embedded = f
   if (search && mode === 'production') {
     const [customersResult, productsResult] = await Promise.all([
       supabase.from('customers').select('customer_code').or(`name.ilike.%${search}%,customer_code.ilike.%${search}%`),
-      supabase.from('products').select('product_code').or(`name.ilike.%${search}%,product_code.ilike.%${search}%`)
+      supabase.from('products').select('product_code').or(
+        buildAllTermsSearchFilter(['name', 'product_code'], search, { numericSubstringFields: ['product_code'] })
+      )
     ])
     matchedProductCodes = (productsResult.data || []).map(product => product.product_code).filter(Boolean)
 

@@ -1,6 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import ProductsClient from './ProductsClient'
-import { numericTokenPattern } from '@/utils/search'
+import { buildAllTermsSearchFilter } from '@/utils/search'
 
 export default async function ProductsPage({ searchParams }) {
   const supabase = await createClient()
@@ -12,7 +12,7 @@ export default async function ProductsPage({ searchParams }) {
     const { data: matchingWorkshops } = await supabase
       .from('workshops')
       .select('code')
-      .ilike('name', `%${search}%`)
+      .or(buildAllTermsSearchFilter(['name'], search))
     matchedWorkshopCodes = (matchingWorkshops || []).map(workshop => workshop.code).filter(Boolean)
   }
 
@@ -22,10 +22,11 @@ export default async function ProductsPage({ searchParams }) {
     .order('created_at', { ascending: false })
 
   if (search) {
-    const numericPattern = numericTokenPattern(search)
-    const searchFilters = numericPattern
-      ? [`name.imatch."${numericPattern}"`, `category.imatch."${numericPattern}"`, `product_code.ilike.%${search}%`]
-      : [`name.ilike.%${search}%`, `category.ilike.%${search}%`, `product_code.ilike.%${search}%`]
+    const searchFilters = [buildAllTermsSearchFilter(
+      ['name', 'category', 'product_code'],
+      search,
+      { numericSubstringFields: ['product_code'] }
+    )]
     if (matchedWorkshopCodes.length) searchFilters.push(`workshop_code.in.(${matchedWorkshopCodes.join(',')})`)
     productsQuery = productsQuery.or(searchFilters.join(','))
   }
