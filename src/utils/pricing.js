@@ -73,6 +73,7 @@ export function calculateItemPrice({
       if (qtyInt >= 30000 && tierMatrix["30000"] > 0) currentPrintingFee = tierMatrix["30000"];
       else if (qtyInt >= 10000 && tierMatrix["10000"] > 0) currentPrintingFee = tierMatrix["10000"];
       else if (qtyInt >= 5000 && tierMatrix["5000"] > 0) currentPrintingFee = tierMatrix["5000"];
+      else if (qtyInt >= 3000 && tierMatrix["3000"] > 0) currentPrintingFee = tierMatrix["3000"];
       else currentPrintingFee = tierMatrix["5000"] || 0; // fallback
     }
     

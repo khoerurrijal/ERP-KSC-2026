@@ -54,8 +54,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
     "CUP PET": { "1": 0, "10": 0, "100": 0, "500": 400, "1000": 250, "5000": 220, "10000": 200 }
   }
   const defaultPrintingMatrix = {
-    "3 Warna": { "5000": 0, "10000": 0, "30000": 0 },
-    "4 Warna": { "5000": 0, "10000": 0, "30000": 0 }
+    "3 Warna": { "3000": 0, "5000": 0, "10000": 0, "30000": 0 },
+    "4 Warna": { "3000": 0, "5000": 0, "10000": 0, "30000": 0 }
   }
   const dbPricelist = initialSettings.pricelist_config || {}
   const [pricelist, setPricelist] = useState({
@@ -741,7 +741,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                     <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
                         <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Varian Warna</th>
-                        {['5000', '10000', '30000'].map(tier => (
+                        {['3000', '5000', '10000', '30000'].map(tier => (
                           <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
                             &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
                           </th>
@@ -752,7 +752,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                       {Object.keys(pricelist.printing_matrix || {}).map((category) => (
                         <tr key={category} className="hover:bg-white/5 transition-colors">
                           <td className="px-4 py-4 font-bold text-blue-400 whitespace-nowrap">{category}</td>
-                          {['5000', '10000', '30000'].map(tier => (
+                          {['3000', '5000', '10000', '30000'].map(tier => (
                             <td key={tier} className="px-2 py-3 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <span className="text-[10px] text-foreground/40 font-mono">Rp</span>

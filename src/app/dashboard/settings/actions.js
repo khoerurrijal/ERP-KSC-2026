@@ -75,6 +75,7 @@ export async function getSettings() {
     printMatrixData.forEach(row => {
       if (!row.category) return
       printing_matrix[row.category] = {
+        "3000": Number(row["3000"] || 0),
         "5000": Number(row["5000"] || 0),
         "10000": Number(row["10000"] || 0),
         "30000": Number(row["30000"] || 0)
@@ -282,6 +283,7 @@ export async function updatePricelistConfig(newConfig) {
     for (const [category, tiers] of Object.entries(printMatrixObj)) {
       const payload = {
         category,
+        "3000": Number(tiers["3000"] || 0),
         "5000": Number(tiers["5000"] || 0),
         "10000": Number(tiers["10000"] || 0),
         "30000": Number(tiers["30000"] || 0),
