@@ -7,6 +7,7 @@ import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
 import { createAdminNotification } from '@/lib/adminNotifications'
 import { formatVirtualProductDescription } from '@/utils/virtualTransactionDescription'
+import { isKingInternalCustomerType, isKingInternalOrder, KING_INTERNAL_PURCHASE_MARKER } from '@/utils/kingInternalPurchase.mjs'
 import {
   isLegacyFastTrackCode,
   isLegacySalesAddonCode,
@@ -16,6 +17,8 @@ import {
 export async function createSalesOrder(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   let createdSoId = null
+  let createdKingInternal = false
+  let createdKingItemIds = []
 
   try {
     const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt, sourceRequestId, designService } = payload
@@ -23,15 +26,23 @@ export async function createSalesOrder(payload) {
     if (!customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
       throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
     }
+    const { data: cust, error: customerError } = await supabase
+      .from('customers')
+      .select('name, type')
+      .eq('customer_code', customerId)
+      .single()
+    if (customerError || !cust) throw new Error('Pelanggan tidak ditemukan.')
+    const isKingInternal = isKingInternalCustomerType(cust.type)
+    createdKingInternal = isKingInternal
     if (items.some(item => isLegacySalesAddonCode(item.product_id))) {
       throw new Error('Fast Track dan 2 Warna dipilih dari checklist pada item SABLON, bukan sebagai baris produk tambahan.')
     }
-    const normalizedDpAmount = Number(dpAmount || 0)
-    if (!Number.isFinite(normalizedDpAmount) || normalizedDpAmount < 0) {
+    const requestedDpAmount = Number(dpAmount || 0)
+    if (!Number.isFinite(requestedDpAmount) || requestedDpAmount < 0) {
       throw new Error('Nominal DP tidak valid.')
     }
-    const normalizedPaymentAccount = String(paymentAccount || '').trim()
-    if (normalizedDpAmount > 0 && !normalizedPaymentAccount) {
+    const normalizedPaymentAccount = isKingInternal ? 'Virtual' : String(paymentAccount || '').trim()
+    if (!isKingInternal && requestedDpAmount > 0 && !normalizedPaymentAccount) {
       throw new Error('Metode pembayaran wajib dipilih saat mencatat DP.')
     }
     for (const item of items) {
@@ -40,6 +51,41 @@ export async function createSalesOrder(payload) {
       const multiplier = Number(item.unit_multiplier || 1)
       if (!item.product_id || !Number.isFinite(qty) || qty <= 0 || !Number.isFinite(price) || price < 0 || !Number.isFinite(multiplier) || multiplier <= 0) {
         throw new Error('Detail item pesanan tidak valid.')
+      }
+    }
+    if (isKingInternal && (designService || items.some(item => item.isFastTrack || item.isTwoColor))) {
+      throw new Error('Pembelian internal KING hanya mencatat barang dan harga barang, tanpa jasa atau add-on produksi.')
+    }
+
+    const internalProducts = new Map()
+    if (isKingInternal) {
+      const quantitiesByProduct = new Map()
+      for (const item of items) {
+        const code = String(item.product_id || '').trim()
+        const demand = Number(item.qty) * Number(item.unit_multiplier || 1)
+        if (!Number.isSafeInteger(demand) || demand <= 0) {
+          throw new Error('Qty pembelian KING harus menghasilkan jumlah stok bulat yang valid.')
+        }
+        quantitiesByProduct.set(code, (quantitiesByProduct.get(code) || 0) + demand)
+      }
+
+      for (const [code, demand] of quantitiesByProduct) {
+        const { data: product, error: productError } = await supabase
+          .from('products')
+          .select('product_code, name, category, workshop_code, base_price, stock_qty, physical_stock, is_active')
+          .eq('product_code', code)
+          .single()
+        if (productError || !product) throw new Error(`Produk ${code} tidak ditemukan.`)
+        if (!['GUDANG', 'GLOBAL'].includes(String(product.workshop_code || '').trim().toUpperCase())) {
+          throw new Error(`${product.name} bukan stok GUDANG/GLOBAL, jadi tidak bisa dibeli lewat SO internal KING.`)
+        }
+        if (product.is_active === false || ['JASA', 'JASA LAYANAN'].includes(String(product.category || '').trim().toUpperCase())) {
+          throw new Error(`${product.name} bukan barang stok aktif.`)
+        }
+        if (Number(product.stock_qty || 0) < demand || Number(product.physical_stock || 0) < demand) {
+          throw new Error(`Stok tersedia atau fisik ${product.name} tidak cukup untuk pembelian ini.`)
+        }
+        internalProducts.set(code, product)
       }
     }
 
@@ -51,22 +97,20 @@ export async function createSalesOrder(payload) {
     // Calculate grand total
     const grandTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price);
-      if (item.isFastTrack) {
+      if (!isKingInternal && item.isFastTrack) {
         const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000);
         itemTotal += 100000 * qtyFastTrack;
       }
-      if (item.isTwoColor) {
+      if (!isKingInternal && item.isTwoColor) {
         const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1);
         itemTotal += 250 * actualQty;
       }
       return sum + itemTotal;
-    }, 0) + (designService ? 50000 : 0)
-    if (normalizedDpAmount > grandTotal) throw new Error('DP tidak boleh melebihi total pesanan.')
-    const paymentStatus = normalizedDpAmount >= grandTotal ? 'LUNAS' : (normalizedDpAmount > 0 ? 'DP' : 'BELUM LUNAS')
-
-    // Get customer name
-    const { data: cust } = await supabase.from('customers').select('name').eq('customer_code', customerId).single()
-    const customerName = cust ? cust.name : customerId
+    }, 0) + (!isKingInternal && designService ? 50000 : 0)
+    if (!isKingInternal && requestedDpAmount > grandTotal) throw new Error('DP tidak boleh melebihi total pesanan.')
+    const normalizedDpAmount = isKingInternal ? grandTotal : requestedDpAmount
+    const paymentStatus = isKingInternal ? 'LUNAS' : (normalizedDpAmount >= grandTotal ? 'LUNAS' : (normalizedDpAmount > 0 ? 'DP' : 'BELUM LUNAS'))
+    const customerName = cust.name || customerId
 
     // Get profit margins from settings
     const { data: settings } = await supabase.from('system_settings').select('value').eq('key', 'pricelist_config').single();
@@ -82,13 +126,15 @@ export async function createSalesOrder(payload) {
     const globalProducts = []
     
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single();
+      const { data: product } = isKingInternal
+        ? { data: internalProducts.get(String(item.product_id || '').trim()) }
+        : await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single();
 
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
       
       const snapshot = calculateCostSnapshot({
         product,
-        orderType: item.order_type,
+        orderType: isKingInternal ? 'POLOS' : item.order_type,
         qty: item.qty,
         unitMultiplier: item.unit_multiplier,
         dynamicHPP,
@@ -117,18 +163,20 @@ export async function createSalesOrder(payload) {
     // 1. Insert Sales Order
     const salesOrderData = {
       invoice_number: invoiceNumber,
-      marketplace_receipt: marketplaceReceipt || null,
+      marketplace_receipt: isKingInternal ? null : marketplaceReceipt || null,
       date: orderDate,
       customer_code: customerId,
       notes: notes,
       total_amount: grandTotal,
       dp_amount: normalizedDpAmount,
-      payment_method: normalizedPaymentAccount || null,
+      payment_method: isKingInternal ? null : normalizedPaymentAccount || null,
       payment_status: paymentStatus,
     }
     if (sourceRequestId) salesOrderData.source_request_id = sourceRequestId
 
-    const orderNotes = [notes, designService ? 'Jasa Desain Logo: Rp 50.000' : ''].filter(Boolean).join('\n')
+    const orderNotes = isKingInternal
+      ? [KING_INTERNAL_PURCHASE_MARKER, notes].filter(Boolean).join('\n')
+      : [notes, designService ? 'Jasa Desain Logo: Rp 50.000' : ''].filter(Boolean).join('\n')
     salesOrderData.notes = orderNotes
 
     const { data: so, error: soError } = await supabase
@@ -143,12 +191,14 @@ export async function createSalesOrder(payload) {
     // 2. Process Items
     const soItems = [];
     for (const item of items) {
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
+      const { data: product } = isKingInternal
+        ? { data: internalProducts.get(String(item.product_id || '').trim()) }
+        : await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
       const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
 
       const snapshot = calculateCostSnapshot({
         product,
-        orderType: item.order_type,
+        orderType: isKingInternal ? 'POLOS' : item.order_type,
         qty: item.qty,
         unitMultiplier: item.unit_multiplier,
         dynamicHPP,
@@ -161,17 +211,17 @@ export async function createSalesOrder(payload) {
       // Tidak lagi dicampur ke itemBeliGlobal
 
       let itemNotes = '';
-      if (item.isFastTrack) itemNotes += '🔥 Fast Track\n';
-      if (item.isTwoColor) itemNotes += '🎨 2 Warna\n';
+      if (!isKingInternal && item.isFastTrack) itemNotes += '🔥 Fast Track\n';
+      if (!isKingInternal && item.isTwoColor) itemNotes += '🎨 2 Warna\n';
       if (item.order_type?.toUpperCase() === 'PRINTING') {
         itemNotes += `🎨 Varian: ${item.printingColors || '3 Warna'}\n`;
       }
 
       soItems.push({
         so_id: so.id,
-        order_type: item.order_type,
+        order_type: isKingInternal ? 'POLOS' : item.order_type,
         product_code: item.product_id,
-        status: 'BARU MASUK',
+        status: isKingInternal ? 'SELESAI' : 'BARU MASUK',
         mockup_url: item.mockup_url,
         qty: Number(item.qty),
         unit: item.unit || 'PCS',
@@ -189,9 +239,27 @@ export async function createSalesOrder(payload) {
     const { error: itemsError } = await supabase.from('sales_items').insert(soItems)
     if (itemsError) throw new Error('Gagal menyimpan item pesanan.')
 
-    // 3. Transactions Splitting Logic (If any payment is made)
-    // We record the incoming cash to KING
-    if (normalizedDpAmount > 0) {
+    if (isKingInternal) {
+      const { data: insertedItems, error: insertedItemsError } = await supabase
+        .from('sales_items')
+        .select('id')
+        .eq('so_id', so.id)
+      if (insertedItemsError || insertedItems?.length !== soItems.length) {
+        throw new Error('Mutasi stok pembelian KING tidak dapat diverifikasi.')
+      }
+      createdKingItemIds = insertedItems.map(item => item.id)
+      const { data: stockMutations, error: mutationRefError } = await supabase
+        .from('stock_mutations')
+        .update({ reference_number: 'PEMBELIAN INTERNAL KING' })
+        .in('reference_id', createdKingItemIds)
+        .select('id')
+      if (mutationRefError || stockMutations?.length !== insertedItems.length) {
+        throw new Error('Jejak mutasi stok pembelian KING tidak lengkap.')
+      }
+    }
+
+    // 3. Consumer payments create bank/cash income. KING purchases are internal expenses.
+    if (!isKingInternal && normalizedDpAmount > 0) {
       const { error: paymentError } = await supabase.from('transactions').insert({
         date: orderDate,
         reference: 'PENJUALAN',
@@ -206,7 +274,7 @@ export async function createSalesOrder(payload) {
     }
 
     // If fully paid, we distribute the HPP to Gudang & Global + Virtual Royalty
-    if (paymentStatus === 'LUNAS') {
+    if (!isKingInternal && paymentStatus === 'LUNAS') {
       // Record HPP to Gudang
       if (totalHppGudang > 0) {
         const { error: hppInError } = await supabase.from('transactions').insert({
@@ -258,8 +326,23 @@ export async function createSalesOrder(payload) {
       }
     }
 
+    if (isKingInternal && grandTotal > 0) {
+      const productNames = items.map(item => internalProducts.get(String(item.product_id || '').trim())?.name).filter(Boolean)
+      const { error: internalPurchaseError } = await supabase.from('transactions').insert({
+        date: orderDate,
+        reference: 'PEMBELIAN INTERNAL KING',
+        description: `Pembelian internal KING: ${productNames.join(', ')}`,
+        payment_method: 'Virtual',
+        amount_in: 0,
+        amount_out: grandTotal,
+        workshop_code: 'KING',
+        so_id: so.id
+      })
+      if (internalPurchaseError) throw new Error('Gagal mencatat pengeluaran virtual KING: ' + internalPurchaseError.message)
+    }
+
     const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', so.id);
-    if (soItemsForStatus) {
+    if (!isKingInternal && soItemsForStatus) {
       for (const item of soItemsForStatus) {
         await handleAutoStatusUpdate(item.id);
       }
@@ -270,13 +353,18 @@ export async function createSalesOrder(payload) {
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard')
     
-    return { success: true, invoice_number: invoiceNumber }
+    return isKingInternal ? { success: true } : { success: true, invoice_number: invoiceNumber }
 
   } catch (error) {
     if (createdSoId) {
       try {
         await supabase.from('transactions').delete().eq('so_id', createdSoId)
         await supabase.from('sales_orders').delete().eq('id', createdSoId)
+        if (createdKingInternal && createdKingItemIds.length) {
+          await supabase.from('stock_mutations')
+            .update({ reference_number: 'PEMBATALAN PEMBELIAN INTERNAL KING' })
+            .in('reference_id', createdKingItemIds)
+        }
       } catch (rollbackError) {
         console.error('Create Sales Order rollback error:', rollbackError)
       }
@@ -295,8 +383,9 @@ export async function addSalesPayment(soId, paymentData) {
     if (!Number.isFinite(normalizedPaymentAmount) || normalizedPaymentAmount <= 0) {
       throw new Error('Nominal pembayaran harus lebih dari 0.')
     }
-    const { data: so, error: soError } = await supabase.from('sales_orders').select('*, customers(name)').eq('id', soId).single()
+    const { data: so, error: soError } = await supabase.from('sales_orders').select('*, customers(name, type)').eq('id', soId).single()
     if (soError) throw soError
+    if (isKingInternalOrder(so)) throw new Error('Pembelian internal KING tidak menerima pembayaran pelanggan.')
 
     const currentPaid = Number(so.dp_amount || 0)
     const totalAmount = Number(so.total_amount || 0)
@@ -411,6 +500,21 @@ export async function updateSalesOrder(soId, payload) {
 
     if (!soId || !customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
       throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
+    }
+    const { data: existingOrderForType, error: existingSoError } = await supabase
+      .from('sales_orders')
+      .select('notes, customers(type)')
+      .eq('id', soId)
+      .single()
+    if (existingSoError || !existingOrderForType) throw new Error('Pesanan tidak ditemukan.')
+    const { data: targetCustomer, error: targetCustomerError } = await supabase
+      .from('customers')
+      .select('type')
+      .eq('customer_code', customerId)
+      .single()
+    if (targetCustomerError || !targetCustomer) throw new Error('Pelanggan tidak ditemukan.')
+    if (isKingInternalOrder(existingOrderForType) || isKingInternalCustomerType(targetCustomer.type)) {
+      throw new Error('Pembelian internal KING tidak dapat diubah lewat edit SO. Batalkan hanya jika barang benar-benar dikembalikan ke stok asal.')
     }
     for (const item of items) {
       const qty = Number(item.qty)
@@ -632,11 +736,12 @@ export async function updateSalesItemStatus(itemId, newStatus) {
     if (!itemId || typeof newStatus !== 'string' || !newStatus.trim()) throw new Error('Status item tidak valid.')
     const { data: item, error: fetchErr } = await supabase
       .from('sales_items')
-      .select('*, products(name), sales_orders(invoice_number, payment_status)')
+      .select('*, products(name), sales_orders(invoice_number, payment_status, notes, customers(type))')
       .eq('id', itemId)
       .single()
     
     if (fetchErr || !item) throw new Error("Item tidak ditemukan")
+    if (isKingInternalOrder(item.sales_orders)) throw new Error('Pembelian internal KING sudah selesai dan tidak masuk status produksi.')
 
     if (['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) && !isSablonProductionItem(item)) {
       throw new Error('Item layanan tidak memiliki status produksi.')
@@ -688,11 +793,32 @@ export async function cancelSalesOrder(soId) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
 
   try {
+    const { data: order, error: orderError } = await supabase
+      .from('sales_orders')
+      .select('notes, customers(type)')
+      .eq('id', soId)
+      .single()
+    if (orderError || !order) throw new Error('Pesanan tidak ditemukan.')
+    const isKingInternal = isKingInternalOrder(order)
+    const { data: existingItems, error: existingItemsError } = await supabase
+      .from('sales_items')
+      .select('id')
+      .eq('so_id', soId)
+    if (existingItemsError) throw existingItemsError
+
     // 1. Ubah status semua item menjadi BATAL
     const { error: itemsErr } = await supabase.from('sales_items')
       .update({ status: 'BATAL' })
       .eq('so_id', soId)
     if (itemsErr) throw new Error(itemsErr.message)
+
+    if (isKingInternal && existingItems?.length) {
+      const { error: mutationRefError } = await supabase
+        .from('stock_mutations')
+        .update({ reference_number: 'PEMBATALAN PEMBELIAN INTERNAL KING' })
+        .in('reference_id', existingItems.map(item => item.id))
+      if (mutationRefError) console.error('Gagal memberi label mutasi pembatalan KING:', mutationRefError)
+    }
 
     // 2. Ubah status pembayaran invoice menjadi BATAL
     const { error: soErr } = await supabase.from('sales_orders')

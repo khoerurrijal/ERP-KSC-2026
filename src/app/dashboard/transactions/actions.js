@@ -3,6 +3,7 @@
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { createClient } from '@/utils/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export async function getMarketplaceSettlementDetails(transactionId) {
   const supabase = await createClient()
@@ -72,7 +73,7 @@ export async function createManualTransaction(payload) {
 
   try {
     const { date, type, reference, workshop_code, payment_method, amount, description } = payload
-    
+
     // Validasi
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new Error("Nominal transaksi harus lebih dari 0")
@@ -110,6 +111,16 @@ export async function updateTransaction(id, payload) {
 
   try {
     const { date, type, reference, workshop_code, payment_method, amount, description } = payload
+
+    const { data: currentTransaction, error: currentTransactionError } = await supabase
+      .from('transactions')
+      .select('sales_orders(notes, customers(type))')
+      .eq('id', id)
+      .maybeSingle()
+    if (currentTransactionError) throw currentTransactionError
+    if (isKingInternalOrder(currentTransaction?.sales_orders)) {
+      throw new Error('Transaksi pembelian internal KING dikelola dari Sales Order.')
+    }
     
     if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) {
       throw new Error("Nominal transaksi harus lebih dari 0")
@@ -144,6 +155,15 @@ export async function updateTransaction(id, payload) {
 export async function deleteTransaction(id) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
+    const { data: currentTransaction, error: currentTransactionError } = await supabase
+      .from('transactions')
+      .select('sales_orders(notes, customers(type))')
+      .eq('id', id)
+      .maybeSingle()
+    if (currentTransactionError) throw currentTransactionError
+    if (isKingInternalOrder(currentTransaction?.sales_orders)) {
+      throw new Error('Transaksi pembelian internal KING dikelola dari Sales Order.')
+    }
     const { error } = await supabase.from('transactions').delete().eq('id', id)
     if (error) throw error
     revalidatePath('/dashboard/transactions')

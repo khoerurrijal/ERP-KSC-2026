@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import InvoiceClient from './InvoiceClient'
 import { notFound } from 'next/navigation'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,7 @@ export default async function InvoicePage({ params }) {
     console.error('Error fetching invoice:', error)
     notFound()
   }
+  if (isKingInternalOrder(order)) notFound()
 
   const { data: settings } = await supabase
     .from('system_settings')

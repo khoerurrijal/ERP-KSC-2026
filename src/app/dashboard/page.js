@@ -7,6 +7,7 @@ import StockSearchWidget from '@/components/StockSearchWidget'
 import MonthFilter from '@/components/MonthFilter'
 import { redirect } from 'next/navigation'
 import { runAuditScan } from '@/app/dashboard/audit/audit'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,7 +72,7 @@ export default async function DashboardPage({ searchParams }) {
     { data: sablonItems }
   ] = await Promise.all([
     supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name'),
-    supabase.from('sales_orders').select('id, date, payment_status, marketplace_settlement_status, marketplace_receipt, total_amount, dp_amount, customers(name, type)').limit(100000),
+    supabase.from('sales_orders').select('id, date, notes, payment_status, marketplace_settlement_status, marketplace_receipt, total_amount, dp_amount, customers(name, type)').limit(100000),
     supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000)
   ])
 
@@ -81,6 +82,7 @@ export default async function DashboardPage({ searchParams }) {
   const rawOrders = salesOrders || []
   const getOpenBalance = order => (Number(order.total_amount) || 0) - (Number(order.dp_amount) || 0)
   const isOutstandingOrder = order => {
+    if (isKingInternalOrder(order)) return false
     const paymentStatus = String(order.payment_status || '').trim().toUpperCase()
     const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').trim().toUpperCase()
     const hasMarketplaceReceipt = Boolean(String(order.marketplace_receipt || '').trim())
@@ -93,7 +95,7 @@ export default async function DashboardPage({ searchParams }) {
   
   // LOGIC FILTER
   // Omset: HANYA transaksi yang terjadi di bulan terpilih.
-  const thisMonthOrders = rawOrders.filter(o => o.date && o.date.startsWith(selectedMonth))
+  const thisMonthOrders = rawOrders.filter(o => !isKingInternalOrder(o) && o.date && o.date.startsWith(selectedMonth))
   
   // SO Lunas: Selesai bulan ini
   const soLunas = thisMonthOrders.filter(o => o.payment_status === 'LUNAS').length

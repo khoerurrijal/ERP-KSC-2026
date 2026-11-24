@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import ReportClient from './ReportClient'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,7 @@ export default async function ReportPage({ searchParams }) {
   // Fetch sales items to compute Pemakaian Gudang & Global dynamically
   const { data: salesItems } = await supabase
     .from('sales_items')
-    .select('order_type, hpp_price, total_price, qty, unit_multiplier, beli_gudang, beli_global, royalty_fee, products(category), sales_orders!inner(date, payment_status)')
+    .select('order_type, hpp_price, total_price, qty, unit_multiplier, beli_gudang, beli_global, royalty_fee, products(category), sales_orders!inner(date, payment_status, notes, customers(type))')
     .gte('sales_orders.date', `${selectedMonth}-01`)
     .lte('sales_orders.date', maxDate)
     .neq('status', 'BATAL')
@@ -139,6 +140,7 @@ export default async function ReportPage({ searchParams }) {
 
   if (salesItems) {
     salesItems.forEach(item => {
+      if (isKingInternalOrder(item.sales_orders)) return
       // Hanya menghitung HPP ke saldo buku jika Lunas
       if (item.sales_orders.payment_status === 'LUNAS') {
         summary.king.pemakaian_gudang += Number(item.beli_gudang || 0)

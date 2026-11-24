@@ -1,3 +1,5 @@
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
+
 const DELIVERY_STATUSES = new Set(['DIKIRIM', 'SUDAH DIAMBIL'])
 const TRACKED_ORDER_TYPES = new Set(['SABLON', 'POLOS', 'PRINTING'])
 const MANUAL_SERVICE_ORDER_TYPES = new Set(['DLL', 'JASA', 'LAINNYA'])
@@ -47,7 +49,7 @@ export async function runAuditScan(supabase) {
   const [ordersResult, itemsResult, transactionsResult, settingsResult] = await Promise.all([
     supabase
       .from('sales_orders')
-      .select('id, invoice_number, date, total_amount, dp_amount, payment_status, marketplace_receipt, marketplace_pencairan, is_legacy_import, customers(name, type)')
+      .select('id, invoice_number, date, notes, total_amount, dp_amount, payment_status, marketplace_receipt, marketplace_pencairan, is_legacy_import, customers(name, type)')
       .order('date', { ascending: false })
       .limit(5000),
     supabase
@@ -110,7 +112,8 @@ export async function runAuditScan(supabase) {
   const allOrderById = new Map(orders.map(order => [String(order.id), order]))
   const auditedOrders = orders.filter(order => {
     const paymentStatus = normalizeText(order.payment_status)
-    return !(isMarketplaceOrder(order) && (order.is_legacy_import === true || paymentStatus === 'LUNAS' || paymentStatus === 'BATAL'))
+    return !isKingInternalOrder(order)
+      && !(isMarketplaceOrder(order) && (order.is_legacy_import === true || paymentStatus === 'LUNAS' || paymentStatus === 'BATAL'))
   })
   const orderById = new Map(auditedOrders.map(order => [String(order.id), order]))
   const auditedItems = items.filter(item => {

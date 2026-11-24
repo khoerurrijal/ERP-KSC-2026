@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import PublicInvoiceClient from './PublicInvoiceClient'
 import { notFound } from 'next/navigation'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -17,7 +18,8 @@ export default async function PublicInvoicePage({ params }) {
       total_amount,
       dp_amount,
       payment_status,
-      customers (name, phone, address),
+      notes,
+      customers (name, phone, address, type),
       sales_items (product_code, qty, unit_price, total_price, order_type, products (name, category))
     `)
     .eq('invoice_number', invoice_number)
@@ -27,6 +29,7 @@ export default async function PublicInvoicePage({ params }) {
     console.error('Error fetching public invoice:', error)
     notFound()
   }
+  if (isKingInternalOrder(order)) notFound()
 
   const { data: settings } = await supabase
     .from('system_settings')

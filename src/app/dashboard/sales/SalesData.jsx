@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/server'
 import { buildAllTermsSearchFilter, matchesSearchText } from '@/utils/search'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 import SalesClient from './SalesClient'
 
 export default async function SalesData({ searchParams = {}, itemsOnly = false }) {
@@ -62,7 +63,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   // 2. Summary KPI Query untuk bulan terpilih
   let summaryQuery = supabase
     .from('sales_orders')
-    .select('total_amount, dp_amount, payment_status, date')
+    .select('total_amount, dp_amount, payment_status, date, notes, customers(type)')
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
     .neq('payment_status', 'BATAL')
 
@@ -70,7 +71,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   // batal, dan yang sudah lunas dikeluarkan dari perhitungannya.
   const piutangQuery = supabase
     .from('sales_orders')
-    .select('total_amount, dp_amount, payment_status')
+    .select('total_amount, dp_amount, payment_status, notes, customers(type)')
     .or('marketplace_receipt.is.null,marketplace_receipt.eq.""')
     .neq('payment_status', 'BATAL')
 
@@ -137,7 +138,7 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
     .from('sales_items')
     .select(`
       id, qty, unit_price, total_price, status, mockup_url, order_type, unit_multiplier, product_code, notes,
-      sales_orders!inner(invoice_number, date, payment_status, marketplace_receipt, customers(name)),
+      sales_orders!inner(invoice_number, date, notes, payment_status, marketplace_receipt, customers(name, type)),
       products(name)
     `)
 
@@ -178,9 +179,11 @@ export default async function SalesData({ searchParams = {}, itemsOnly = false }
   const piutangOrders = piutangResult.data || []
 
   // Calculate Omset & Piutang accurately from summary dataset
-  const serverTotalOmset = summaryOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+  const serverTotalOmset = summaryOrders
+    .filter(order => !isKingInternalOrder(order))
+    .reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
   const serverTotalPiutang = piutangOrders
-    .filter(o => o.payment_status !== 'LUNAS')
+    .filter(o => o.payment_status !== 'LUNAS' && !isKingInternalOrder(o))
     .reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
 
   return (

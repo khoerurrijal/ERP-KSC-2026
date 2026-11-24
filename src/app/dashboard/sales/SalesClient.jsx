@@ -15,6 +15,7 @@ import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import SalesOrderWizard from '@/components/SalesOrderWizard'
@@ -206,8 +207,11 @@ export default function SalesClient({
     }
   }
 
-  const handleCancelSalesOrder = async (soId, invoiceNumber) => {
-    const confirm = window.confirm(`Peringatan: Anda akan membatalkan pesanan ${invoiceNumber}. Ini akan mengembalikan stok tersedia dan menghapus riwayat pembayaran. Lanjutkan?`);
+  const handleCancelSalesOrder = async (soId, customerName, isKingInternal) => {
+    const confirmMessage = isKingInternal
+      ? `Batalkan pembelian internal KING untuk ${customerName}? Pastikan barang benar-benar dikembalikan ke stok asal. Saldo virtual KING dan mutasi stok akan dibalik.`
+      : `Batalkan pesanan ${customerName}? Stok akan dikembalikan dan riwayat pembayaran dikeluarkan dari buku besar.`
+    const confirm = window.confirm(confirmMessage);
     if (!confirm) return;
 
     setUpdatingItem(soId);
@@ -217,7 +221,7 @@ export default function SalesClient({
     if (!success) {
       alert(error || 'Gagal membatalkan pesanan');
     } else {
-      alert(`Pesanan ${invoiceNumber} berhasil dibatalkan.`);
+      alert(`Pesanan ${customerName} berhasil dibatalkan.`);
       setSalesOrderDrawer(null)
       router.refresh()
     }
@@ -263,6 +267,7 @@ export default function SalesClient({
       const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
       const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
       const prod = Array.isArray(item.products) ? item.products[0] : item.products
+      if (isKingInternalOrder(so)) return false
       if (['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) && !isSablonProductionItem({ ...item, products: prod })) return false
 
       const customerName = cust?.name || ''
@@ -336,12 +341,12 @@ export default function SalesClient({
 
   const totalOmset = useMemo(() => {
     if (serverTotalOmset !== undefined) return serverTotalOmset
-    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
+    return salesOrders.filter(o => !isKingInternalOrder(o) && (!filterMonth || o.date?.substring(0, 7) === filterMonth)).reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
   }, [serverTotalOmset, salesOrders, filterMonth])
 
   const totalPiutang = useMemo(() => {
     if (serverTotalPiutang !== undefined) return serverTotalPiutang
-    return salesOrders.filter(o => !filterMonth || o.date?.substring(0, 7) === filterMonth).reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
+    return salesOrders.filter(o => !isKingInternalOrder(o) && o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL' && (!filterMonth || o.date?.substring(0, 7) === filterMonth)).reduce((sum, o) => sum + Math.max(0, Number(o.total_amount || 0) - Number(o.dp_amount || 0)), 0)
   }, [serverTotalPiutang, salesOrders, filterMonth])
 
   const renderSortIcon = (key, config) => {
@@ -512,6 +517,7 @@ export default function SalesClient({
                       <td className="px-4 py-3 text-foreground/90">{new Date(item.date).toLocaleDateString('id-ID')}</td>
                       <td className="px-4 py-3 text-foreground/90 font-medium">
                         {item.customers?.name}
+                        {isKingInternalOrder(item) && <span className="ml-2 rounded-full bg-primary/10 px-2 py-0.5 text-[9px] font-bold text-primary">PEMBELIAN INTERNAL</span>}
                       </td>
                       <td className="px-4 py-3 font-semibold text-green-400">Rp {Number(item.total_amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                       <td className="px-4 py-3">
@@ -521,7 +527,7 @@ export default function SalesClient({
                       </td>
                       <td className="px-4 py-3 text-right">
                         <div className="flex items-center justify-end gap-2">
-                          {item.payment_status !== 'BATAL' && (
+                          {item.payment_status !== 'BATAL' && item.payment_status !== 'LUNAS' && !isKingInternalOrder(item) && (
                             <button onClick={(event) => { event.stopPropagation(); handleEditClick(item) }} className="flex items-center gap-1 rounded-full bg-green-500 px-3 py-1.5 text-[11px] font-bold text-black transition-colors hover:bg-green-400">
                               <Clock className="w-3 h-3" /> Pelunasan
                             </button>

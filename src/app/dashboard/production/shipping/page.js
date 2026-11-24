@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 import ShippingConfirmationClient from './ShippingConfirmationClient'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export default async function ShippingConfirmationPage({ embedded = false } = {}
       qty,
       unit,
       notes,
-      sales_orders (id, invoice_number, date, payment_status, customers (name)),
+      sales_orders (id, invoice_number, date, notes, payment_status, customers (name, type)),
       products (name, category)
     `)
     .order('so_id', { ascending: false })
@@ -60,7 +61,7 @@ export default async function ShippingConfirmationPage({ embedded = false } = {}
     if (LEGACY_SERVICE_CODES.has(code) || !canBeDelivered || status === 'BATAL') continue
 
     const order = normalizeRelation(item.sales_orders)
-    if (!order?.id) continue
+    if (!order?.id || isKingInternalOrder(order)) continue
 
     if (!grouped.has(order.id)) {
       const customer = normalizeRelation(order.customers)

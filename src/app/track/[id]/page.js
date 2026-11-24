@@ -6,6 +6,7 @@ import {
   reconcileProductionColorPasses
 } from '@/utils/productionColorPasses.mjs'
 import TrackClient from './TrackClient'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,8 +28,9 @@ export default async function PublicTrackingPage({ params }) {
       total_amount,
       dp_amount,
       payment_status,
+      notes,
       marketplace_receipt,
-      customers (name, phone, address),
+      customers (name, phone, address, type),
       sales_items (
         id,
         product_code,
@@ -54,6 +56,16 @@ export default async function PublicTrackingPage({ params }) {
           <a href="/order" className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-5 py-3 font-semibold text-black hover:bg-yellow-400 transition-colors">
             Kembali ke halaman order
           </a>
+        </div>
+      </div>
+    )
+  }
+  if (isKingInternalOrder(order)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-black text-white p-8">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">Pesanan internal</h1>
+          <p className="text-gray-400">Pembelian internal KING tidak memiliki halaman tracking konsumen.</p>
         </div>
       </div>
     )

@@ -11,6 +11,7 @@ import {
   isLegacySalesAddonCode,
   isLegacyTwoColorCode
 } from '@/utils/legacySalesAddons.mjs'
+import { isKingInternalCustomerType, stripKingInternalPurchaseMarker } from '@/utils/kingInternalPurchase.mjs'
 
 const isMarketplaceCustomerType = (type) => {
   const normalizedType = String(type || '').toUpperCase()
@@ -127,14 +128,21 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [customerId, setCustomerId] = useState(initialData?.customer_code || '')
   const [isMarketplace, setIsMarketplace] = useState(initialData?.marketplace_receipt ? true : false)
   const [marketplaceReceipt, setMarketplaceReceipt] = useState(initialData?.marketplace_receipt || '')
-  const [notes, setNotes] = useState(initialData?.notes || '')
+  const [notes, setNotes] = useState(stripKingInternalPurchaseMarker(initialData?.notes || ''))
 
   const handleCustomerChange = (e) => {
     const val = e.target.value
     setCustomerId(val)
     const cust = localCustomers.find(c => c.customer_code === val || c.name === val)
     const ctype = (cust?.type || '').toUpperCase()
-    if (cust && isMarketplaceCustomerType(ctype)) {
+    if (cust && isKingInternalCustomerType(ctype)) {
+      setIsMarketplace(false)
+      setMarketplaceReceipt('')
+      setDpAmount(0)
+      setPaymentAccount('')
+      setDesignService(false)
+      setItems(currentItems => currentItems.map(item => ({ ...item, order_type: 'POLOS', isFastTrack: false, isTwoColor: false })))
+    } else if (cust && isMarketplaceCustomerType(ctype)) {
       setIsMarketplace(true)
       setDpAmount(0)
     } else {
@@ -184,7 +192,15 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     setNewCustomerName('')
 
     const ctype = (res.customer?.type || newCustomerType || '').toUpperCase()
-    if (isMarketplaceCustomerType(ctype)) {
+    if (isKingInternalCustomerType(ctype)) {
+      setIsMarketplace(false)
+      setMarketplaceReceipt('')
+      setDpAmount(0)
+      setPaymentAccount('')
+      setDesignService(false)
+      setItems(currentItems => currentItems.map(item => ({ ...item, order_type: 'POLOS', isFastTrack: false, isTwoColor: false })))
+      setCurrentTab(2)
+    } else if (isMarketplaceCustomerType(ctype)) {
       setIsMarketplace(true)
       setDpAmount(0)
     } else {
@@ -239,6 +255,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   const [dpAmount, setDpAmount] = useState(Number(initialData?.dp_amount || 0))
   const [paymentAccount, setPaymentAccount] = useState(initialData?.payment_method || '')
   const [designService, setDesignService] = useState(Boolean(initialData?.designService))
+  const selectedCustomer = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
+  const selectedCustomerType = String(selectedCustomer?.type || '').trim().toUpperCase()
+  const isKingInternal = selectedCustomerType === 'KING'
   const [copiedTrackingLink, setCopiedTrackingLink] = useState(false)
   const [showReorderConfirm, setShowReorderConfirm] = useState(false)
 
@@ -324,36 +343,45 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       const type = item.order_type
       const categories = !type ? [] : (mapping[type.toUpperCase()]?.length ? mapping[type.toUpperCase()] : mapping[type]?.length ? mapping[type] : fallbackCategories)
       const options = products
-        .filter(p => (
-          categories.includes(p.category) &&
-          (p.is_active !== false || p.product_code === item.product_id) &&
-          (!isLegacySalesAddonCode(p.product_code) || p.product_code === item.product_id)
-        ))
-        .map(p => ({ value: p.product_code, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
+        .filter(p => isKingInternal
+          ? ['GUDANG', 'GLOBAL'].includes(String(p.workshop_code || '').trim().toUpperCase())
+            && !['JASA', 'JASA LAYANAN'].includes(String(p.category || '').trim().toUpperCase())
+            && (p.is_active !== false || p.product_code === item.product_id)
+            && (!isLegacySalesAddonCode(p.product_code) || p.product_code === item.product_id)
+          : categories.includes(p.category) &&
+            (p.is_active !== false || p.product_code === item.product_id) &&
+            (!isLegacySalesAddonCode(p.product_code) || p.product_code === item.product_id)
+        )
+        .map(p => ({
+          value: p.product_code,
+          label: isKingInternal
+            ? `${p.name} — ${String(p.workshop_code || '').toUpperCase()} — tersedia ${Number(p.stock_qty || 0).toLocaleString('id-ID')} pcs`
+            : `${p.name}${p.category ? ` — ${p.category}` : ''}`
+        }))
       return [item.id, options]
     }))
-  }, [products, dropdownConfig.category_mapping, itemProductKeys])
+  }, [products, dropdownConfig.category_mapping, itemProductKeys, isKingInternal])
 
-  const orderTypes = Array.from(new Set(dropdownConfig.order_type || ['SABLON', 'POLOS']))
+  const orderTypes = isKingInternal ? ['POLOS'] : Array.from(new Set(dropdownConfig.order_type || ['SABLON', 'POLOS']))
 
   const calculateTotal = () => {
     const itemTotal = items.reduce((sum, item) => {
       let itemTotal = Number(item.qty) * Number(item.price)
-      if (item.isFastTrack) {
+      if (!isKingInternal && item.isFastTrack) {
         const qtyFastTrack = Math.ceil(Number(item.qty) * Number(item.unit_multiplier || 1) / 1000)
         itemTotal += 100000 * qtyFastTrack
       }
-      if (item.isTwoColor) {
+      if (!isKingInternal && item.isTwoColor) {
         const actualQty = Number(item.qty) * Number(item.unit_multiplier || 1)
         itemTotal += 250 * actualQty
       }
       return sum + itemTotal
     }, 0)
-    return itemTotal + (designService ? 50000 : 0)
+    return itemTotal + (!isKingInternal && designService ? 50000 : 0)
   }
 
-    const grandTotal = calculateTotal()
-  const remaining = grandTotal - dpAmount
+  const grandTotal = calculateTotal()
+  const remaining = isKingInternal ? 0 : grandTotal - dpAmount
 
   const handleAddItem = () => {
     setItems([...items, { id: `${itemIdPrefix}-${nextItemId.current++}`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }])
@@ -451,6 +479,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
   const handleSubmit = async () => {
     if (!customerId) return setError("Pilih pelanggan terlebih dahulu.")
+    if (requestId && isKingInternal) return setError('Pembelian internal KING dibuat lewat Sales Order baru, bukan dari request konsumen.')
     const customerExists = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
     if (!customerExists && customerId.trim() !== '') {
       setNewCustomerName(customerId)
@@ -460,7 +489,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     if (items.some(i => !i.product_id || !i.order_type)) {
       return setError("Pastikan Jenis Pesanan dan Produk sudah dipilih.")
     }
-    if (!isExistingOrder && !isMarketplace && Number(dpAmount) > 0 && !String(paymentAccount || '').trim()) {
+    if (!isKingInternal && !isExistingOrder && !isMarketplace && Number(dpAmount) > 0 && !String(paymentAccount || '').trim()) {
       return setError("Pilih metode pembayaran sebelum menyimpan DP.")
     }
 
@@ -469,7 +498,6 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
     try {
 
-      const selectedCustomer = localCustomers.find(c => c.customer_code === customerId || c.name === customerId)
       if (!selectedCustomer) {
         setLoading(false)
         return setError("Pelanggan tidak ditemukan. Silakan tambahkan di menu Master Data terlebih dahulu.")
@@ -480,10 +508,10 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         orderDate,
         notes,
         items,
-        dpAmount,
-        paymentAccount,
-        marketplaceReceipt,
-        designService
+        dpAmount: isKingInternal ? grandTotal : dpAmount,
+        paymentAccount: isKingInternal ? 'Virtual' : paymentAccount,
+        marketplaceReceipt: isKingInternal ? '' : marketplaceReceipt,
+        designService: isKingInternal ? false : designService
       }
 
       let result;
@@ -537,7 +565,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                 <X className="h-5 w-5" />
               </button>
             </div>
-            {initialData?.id && !isReorder && (
+            {initialData?.id && !isReorder && !isKingInternal && (
               <div className="mt-2 flex items-center gap-2">
                 <button type="button" onClick={handleCopyTrackingLink} data-copied={copiedTrackingLink} className={`copy-link-shimmer flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 text-[11px] font-bold transition-colors ${copiedTrackingLink ? 'border-green-300 bg-green-500 text-white' : 'border-primary bg-primary text-primary-foreground hover:brightness-110'}`} title="Salin link tracking untuk dikirim ke konsumen">
                   <span className="relative z-10 inline-flex items-center gap-1.5">
@@ -602,6 +630,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <Plus className="h-3.5 w-3.5" /> Tambah Item
                   </button>
                 </div>
+
+                {isKingInternal && <p className="mb-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-foreground/70">Pembelian internal KING: pilih barang stok GUDANG/GLOBAL. Stok tersedia dan fisik dipotong saat disimpan.</p>}
 
                 <div className="space-y-1.5">
                   {items.map((item, index) => {
@@ -727,7 +757,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   })}
                 </div>
 
-                {requestId && (
+                {requestId && !isKingInternal && (
                   <label className="mt-2 flex cursor-pointer items-center gap-2 rounded-lg border border-white/10 bg-white/5 p-2.5">
                     <input type="checkbox" checked={designService} onChange={e => setDesignService(e.target.checked)} className="h-4 w-4 rounded border-gray-300 text-primary" />
                     <span className="text-xs font-medium text-foreground/80">Jasa Desain Logo (+Rp 50.000)</span>
@@ -747,7 +777,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                   </div>
                 </div>
 
-                {isExistingOrder ? (
+                {isKingInternal ? (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-foreground/70">
+                    Pesanan langsung lunas secara internal. Saldo virtual KING berkurang Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}; rekening BCA, Mandiri, dan Cash tidak berubah.
+                  </div>
+                ) : isExistingOrder ? (
                   <div className="grid grid-cols-2 gap-2 text-xs">
                     <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">DP tercatat</span><strong className="mt-0.5 block text-green-400">Rp {Number(dpAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
                     <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">Sisa tagihan</span><strong className={`mt-0.5 block ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
@@ -786,7 +820,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
           <footer className="flex flex-wrap items-center justify-between gap-2 border-t border-white/10 bg-background/95 px-3 py-2.5 backdrop-blur md:px-4">
             {initialData?.id && !isReorder && initialData.payment_status !== 'BATAL' && onCancel ? (
-              <button type="button" onClick={() => onCancel(initialData.id, initialData.invoice_number)} className="flex h-9 items-center whitespace-nowrap rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-bold text-red-300 transition-colors hover:bg-red-500/20">
+              <button type="button" onClick={() => onCancel(initialData.id, selectedCustomer?.name || 'pesanan', isKingInternal)} className="flex h-9 items-center whitespace-nowrap rounded-lg border border-red-500/30 bg-red-500/10 px-2.5 text-[11px] font-bold text-red-300 transition-colors hover:bg-red-500/20">
                 Batalkan Pesanan
               </button>
             ) : <span />}
@@ -959,6 +993,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                 <Plus className="w-4 h-4" /> Tambah Item
               </button>
             </div>
+            {isKingInternal && <p className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm text-foreground/70">Pembelian internal KING: hanya barang stok GUDANG/GLOBAL. Stok tersedia dan fisik dipotong saat disimpan.</p>}
 
             <div className="space-y-4">
               {items.map((item, index) => (
@@ -1144,7 +1179,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               ))}
             </div>
 
-            {requestId && (
+            {requestId && !isKingInternal && (
               <label className="flex items-center gap-3 p-3 rounded-xl border border-white/10 bg-white/5 cursor-pointer">
                 <input
                   type="checkbox"
@@ -1190,6 +1225,13 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
               </div>
             </div>
 
+            {isKingInternal ? (
+              <div className="mt-6 rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-foreground/75">
+                <p className="font-semibold text-primary">Pembelian internal KING</p>
+                <p className="mt-1">Saldo virtual KING berkurang Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}. Rekening BCA, Mandiri, dan Cash tidak berubah. Barang langsung dianggap selesai dan stok GUDANG/GLOBAL berkurang saat disimpan.</p>
+              </div>
+            ) : (
+              <>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div className="space-y-2">
                 <label className="text-sm font-medium text-foreground/80">Jumlah Uang Muka (DP) / Dibayar (Rp)</label>
@@ -1220,6 +1262,8 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                 </span>
               </div>
             </div>
+              </>
+            )}
 
             <div className="flex justify-between pt-8 border-t border-white/5">
               <button onClick={() => setCurrentTab(2)} className="btn-secondary flex items-center gap-2">

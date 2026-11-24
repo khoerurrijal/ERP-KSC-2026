@@ -12,6 +12,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 import { useRoleAccess } from '@/components/RoleAccessContext'
 
 function removeInvoiceNumber(value) {
@@ -465,8 +466,10 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                         {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                       </td>
                       <td className="px-4 py-3 text-right">
-                        {!isSettlement && <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>}
-                        <button onClick={event => { event.stopPropagation(); handleDeleteTransaction(trx.id) }} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
+                        {!isKingInternalOrder(trx.sales_orders) ? <>
+                          {!isSettlement && <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>}
+                          <button onClick={event => { event.stopPropagation(); handleDeleteTransaction(trx.id) }} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
+                        </> : <span className="text-[10px] text-foreground/45">Dikelola dari SO internal</span>}
                       </td>
                     </tr>
                     {isExpanded && (

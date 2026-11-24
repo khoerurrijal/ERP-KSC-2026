@@ -8,6 +8,7 @@ import {
 } from '@/utils/productionColorPasses.mjs'
 import ProductionTable from '@/components/ProductionTable'
 import { handleAutoStatusUpdate } from './actions'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export default async function ProductionData({ mode = 'production', embedded = false, searchParams = {} } = {}) {
   const supabase = await createClient()
@@ -16,7 +17,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   if (mode === 'status') {
     const { data: paidDeliveryItems, error: paidItemsError } = await supabase
       .from('sales_items')
-      .select('id, order_type, products(name), sales_orders!inner(payment_status)')
+      .select('id, order_type, products(name), sales_orders!inner(payment_status, notes, customers(type))')
       .in('sales_orders.payment_status', ['LUNAS', 'SETTLED_EXTERNAL'])
       .in('status', ['DIKIRIM', 'TERKIRIM', 'SUDAH DIAMBIL'])
       .in('order_type', ['SABLON', 'POLOS', 'PRINTING', 'DLL', 'JASA'])
@@ -24,7 +25,8 @@ export default async function ProductionData({ mode = 'production', embedded = f
 
     if (!paidItemsError && paidDeliveryItems?.length) {
       const itemsToFinalize = paidDeliveryItems.filter(item =>
-        !['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) || isSablonProductionItem(item)
+        !isKingInternalOrder(item.sales_orders) &&
+        (!['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) || isSablonProductionItem(item))
       )
       for (const item of itemsToFinalize) {
         await handleAutoStatusUpdate(item.id)
@@ -63,7 +65,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
       mockup_url,
       order_type,
       notes,
-      sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name)),
+      sales_orders (id, invoice_number, date, notes, payment_status, marketplace_receipt, customers (name, type)),
       products (name, workshop_code)
     `
   const productionItemSelection = `
@@ -131,7 +133,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
 
   const rawItemsById = new Map()
   for (const item of [...(activeRawItems || []), ...(staleReadyItems || []), ...(newSablonItems || [])]) rawItemsById.set(item.id, item)
-  const rawItems = [...rawItemsById.values()]
+  const rawItems = [...rawItemsById.values()].filter(item => !isKingInternalOrder(item.sales_orders))
 
   const userRoles = settingsData?.value || []
   let userRole = 'Operator'

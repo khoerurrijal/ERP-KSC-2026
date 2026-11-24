@@ -11,6 +11,7 @@ import {
   isProductionProgressSnapshotCurrent,
 } from '@/utils/productionColorPasses.mjs'
 import { isFullyPaidForDelivery, shouldCompleteDelivery } from '@/utils/deliveryStatus.mjs'
+import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 function getJakartaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -266,7 +267,8 @@ export async function updateSalesOrderStatus(itemId, status) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses produksi.')
 
   try {
-    const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status)').eq('id', itemId).single()
+    const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, notes, customers(type))').eq('id', itemId).single()
+    if (isKingInternalOrder(item?.sales_orders)) throw new Error('Pembelian internal KING langsung selesai dan tidak masuk status produksi.')
     const oldStatus = String(item?.status || 'BARU MASUK').toUpperCase()
     let finalStatus = status;
     const paymentStatus = item?.sales_orders?.payment_status
@@ -326,7 +328,7 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
     const requestedStatus = String(deliveryStatus).toUpperCase()
     const { data: items, error: itemsError } = await supabase
       .from('sales_items')
-      .select('id, status, order_type, product_code, sales_orders(invoice_number, payment_status), products(name, category)')
+      .select('id, status, order_type, product_code, sales_orders(invoice_number, payment_status, notes, customers(type)), products(name, category)')
       .eq('so_id', soId)
 
     if (itemsError) throw itemsError
@@ -335,7 +337,7 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
       const code = String(item.product_code || '').toUpperCase()
       const orderType = String(item.order_type || '').toUpperCase()
       const canBeDelivered = DELIVERY_ORDER_TYPES.has(orderType) || isSablonProductionItem(item)
-      return !LEGACY_SERVICE_CODES.has(code) && canBeDelivered && String(item.status || '').toUpperCase() !== 'BATAL'
+      return !isKingInternalOrder(item.sales_orders) && !LEGACY_SERVICE_CODES.has(code) && canBeDelivered && String(item.status || '').toUpperCase() !== 'BATAL'
     })
 
     if (deliveryItems.length === 0) {
