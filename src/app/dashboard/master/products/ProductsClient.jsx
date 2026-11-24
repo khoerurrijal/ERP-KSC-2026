@@ -10,6 +10,7 @@ import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './
 import CustomSelect from '@/components/CustomSelect'
 import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText } from '@/utils/search'
+import { isLegacySalesAddonCode } from '@/utils/legacySalesAddons.mjs'
 
 export default function ProductsClient({ products: initialProducts = [], error = null, workshops = [], initialSearch = '' }) {
   const router = useRouter()
@@ -151,7 +152,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     else setProducts(products.filter(p => p.id !== id))
   }
 
-  const filteredProducts = products.filter(p => 
+  const filteredProducts = products.filter(p => !isLegacySalesAddonCode(p.product_code)).filter(p =>
     matchesSearchText(p.name, searchQuery) ||
     matchesSearchText(p.product_code, searchQuery, { numericSubstring: true }) ||
     matchesSearchText(p.category, searchQuery) ||

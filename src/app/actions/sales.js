@@ -7,6 +7,11 @@ import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
 import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
 import { createAdminNotification } from '@/lib/adminNotifications'
 import { formatVirtualProductDescription } from '@/utils/virtualTransactionDescription'
+import {
+  isLegacyFastTrackCode,
+  isLegacySalesAddonCode,
+  isLegacyTwoColorCode
+} from '@/utils/legacySalesAddons.mjs'
 
 export async function createSalesOrder(payload) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
@@ -17,6 +22,9 @@ export async function createSalesOrder(payload) {
 
     if (!customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
       throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
+    }
+    if (items.some(item => isLegacySalesAddonCode(item.product_id))) {
+      throw new Error('Fast Track dan 2 Warna dipilih dari checklist pada item SABLON, bukan sebagai baris produk tambahan.')
     }
     const normalizedDpAmount = Number(dpAmount || 0)
     if (!Number.isFinite(normalizedDpAmount) || normalizedDpAmount < 0) {
@@ -444,9 +452,8 @@ export async function updateSalesOrder(soId, payload) {
     const globalProducts = []
     
     const preparedItems = []
-    const legacyAddonCodes = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WARNA', 'BIAYA-WARNA'])
-    const legacyAddons = items.filter(item => legacyAddonCodes.has(String(item.product_id || '').toUpperCase()))
-    const baseItems = items.filter(item => !legacyAddonCodes.has(String(item.product_id || '').toUpperCase()))
+    const legacyAddons = items.filter(item => isLegacySalesAddonCode(item.product_id))
+    const baseItems = items.filter(item => !isLegacySalesAddonCode(item.product_id))
     const legacyAppliesToItem = (addon, product) => {
       if (baseItems.length === 1) return true
       const productName = (product?.name || '').toLowerCase()
@@ -456,7 +463,7 @@ export async function updateSalesOrder(soId, payload) {
 
     for (const item of items) {
       const productCode = String(item.product_id || '').toUpperCase()
-      if (legacyAddonCodes.has(productCode)) continue
+      if (isLegacySalesAddonCode(productCode)) continue
 
       const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single()
       
@@ -488,8 +495,8 @@ export async function updateSalesOrder(soId, payload) {
       virtualRoyaltyGlobal += snapshot.royaltyFee
       if (usesGlobal) globalProducts.push(productDetail)
 
-      const legacyFastTrack = legacyAddons.some(addon => ['SRV-FAST-TRACK', 'FAST-TRACK'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
-      const legacyTwoColor = legacyAddons.some(addon => ['SRV-2-WARNA', 'BIAYA-WARNA'].includes(String(addon.product_id || '').toUpperCase()) && legacyAppliesToItem(addon, product))
+      const legacyFastTrack = legacyAddons.some(addon => isLegacyFastTrackCode(addon.product_id) && legacyAppliesToItem(addon, product))
+      const legacyTwoColor = legacyAddons.some(addon => isLegacyTwoColorCode(addon.product_id) && legacyAppliesToItem(addon, product))
       const isFastTrack = Boolean(item.isFastTrack) || legacyFastTrack
       const isTwoColor = Boolean(item.isTwoColor) || legacyTwoColor
 

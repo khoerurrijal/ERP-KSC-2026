@@ -6,6 +6,11 @@ import { ChevronRight, CheckCircle2, User, ShoppingCart, CreditCard, Plus, Trash
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import { approveCustomerOrderRequest } from '@/app/actions/orderRequests'
+import {
+  isLegacyFastTrackCode,
+  isLegacySalesAddonCode,
+  isLegacyTwoColorCode
+} from '@/utils/legacySalesAddons.mjs'
 
 const isMarketplaceCustomerType = (type) => {
   const normalizedType = String(type || '').toUpperCase()
@@ -190,22 +195,43 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
   }
 
   // Tab 2: Detail Pesanan
-  const [items, setItems] = useState(initialData?.items?.length > 0
-    ? initialData.items.map((i, idx) => ({
+  const initialOrderItems = initialData?.items || []
+  const initialBaseItems = initialOrderItems.filter(i => !isLegacySalesAddonCode(i.product_code))
+  const initialLegacyAddons = initialBaseItems.length > 0
+    ? initialOrderItems.filter(i => isLegacySalesAddonCode(i.product_code))
+    : []
+  const itemsToEdit = initialBaseItems.length > 0 ? initialBaseItems : initialOrderItems
+  const [items, setItems] = useState(itemsToEdit.length > 0
+    ? itemsToEdit.map((i, idx) => {
+      const product = products.find(p => p.product_code === i.product_code)
+      const legacyAppliesToItem = (addon) => {
+        if (initialBaseItems.length === 1) return true
+        const productName = String(product?.name || '').toLowerCase()
+        return Boolean(productName && String(addon.notes || '').toLowerCase().includes(productName))
+      }
+      const legacyFastTrack = initialLegacyAddons.some(addon =>
+        isLegacyFastTrackCode(addon.product_code) && legacyAppliesToItem(addon)
+      )
+      const legacyTwoColor = initialLegacyAddons.some(addon =>
+        isLegacyTwoColorCode(addon.product_code) && legacyAppliesToItem(addon)
+      )
+
+      return ({
         id: i.id || `${itemIdPrefix}-${idx}`,
         order_type: i.order_type || '',
-        category: products.find(p => p.product_code === i.product_code)?.category || '',
+        category: product?.category || '',
         product_id: i.product_code || '',
-        product_search: products.find(p => p.product_code === i.product_code)?.name || '',
-        workshop_id: workshops.find(w => w.code === products.find(p => p.product_code === i.product_code)?.workshop_code)?.id || '',
+        product_search: product?.name || '',
+        workshop_id: workshops.find(w => w.code === product?.workshop_code)?.id || '',
         qty: i.qty || 1,
         unit: i.unit || 'PCS',
         unit_multiplier: i.unit_multiplier || 1,
         price: i.unit_price || 0,
-        isFastTrack: Boolean(i.is_fast_track || /fast\s*track/i.test(i.notes || '')),
-        isTwoColor: /2\s*warna|warna\s*ke-?2/i.test(i.notes || ''),
+        isFastTrack: Boolean(i.is_fast_track || /fast\s*track/i.test(i.notes || '') || legacyFastTrack),
+        isTwoColor: /2\s*warna|warna\s*ke-?2/i.test(i.notes || '') || legacyTwoColor,
         notes: i.notes || ''
-      }))
+      })
+    })
     : [{ id: `${itemIdPrefix}-initial`, order_type: '', category: '', product_id: '', product_search: '', workshop_id: '', qty: 1, unit: 'PCS', unit_multiplier: 1, price: 0 }]
   )
 
@@ -298,7 +324,11 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
       const type = item.order_type
       const categories = !type ? [] : (mapping[type.toUpperCase()]?.length ? mapping[type.toUpperCase()] : mapping[type]?.length ? mapping[type] : fallbackCategories)
       const options = products
-        .filter(p => categories.includes(p.category) && (p.is_active !== false || p.product_code === item.product_id))
+        .filter(p => (
+          categories.includes(p.category) &&
+          (p.is_active !== false || p.product_code === item.product_id) &&
+          (!isLegacySalesAddonCode(p.product_code) || p.product_code === item.product_id)
+        ))
         .map(p => ({ value: p.product_code, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
       return [item.id, options]
     }))
