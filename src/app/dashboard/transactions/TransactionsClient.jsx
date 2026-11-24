@@ -3,10 +3,10 @@
 /* Pagination reset effects intentionally mirror filter changes. */
 /* eslint-disable react-hooks/set-state-in-effect */
 
-import { useState, useMemo, useEffect } from 'react'
+import { Fragment, useState, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
-import { createManualTransaction, updateTransaction, deleteTransaction } from './actions'
+import { createManualTransaction, updateTransaction, deleteTransaction, getMarketplaceSettlementDetails } from './actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
@@ -33,6 +33,8 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [showFilters, setShowFilters] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [expandedSettlementId, setExpandedSettlementId] = useState(null)
+  const [settlementDetails, setSettlementDetails] = useState({})
   
   // Tabs
   const [currentTab, setCurrentTab] = useState(canAccess('finance.ledger.main') ? 'UTAMA' : 'VIRTUAL') // 'UTAMA' | 'VIRTUAL'
@@ -119,6 +121,33 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       } else {
         alert('Gagal menghapus: ' + res.error)
       }
+    }
+  }
+
+  const isMarketplaceSettlement = (trx) =>
+    String(trx.reference || '').toUpperCase() === 'PENJUALAN' &&
+    /^Pencairan\s+(Shopee|Tokopedia|TikTok|Marketplace)/i.test(String(trx.description || ''))
+
+  const handleToggleSettlement = async (trx) => {
+    if (expandedSettlementId === trx.id) {
+      setExpandedSettlementId(null)
+      return
+    }
+
+    setExpandedSettlementId(trx.id)
+    if (settlementDetails[trx.id]) return
+
+    setSettlementDetails(current => ({ ...current, [trx.id]: { loading: true, orders: [] } }))
+    try {
+      const result = await getMarketplaceSettlementDetails(trx.id)
+      setSettlementDetails(current => ({
+        ...current,
+        [trx.id]: result.success
+          ? { loading: false, orders: result.orders || [] }
+          : { loading: false, error: result.error }
+      }))
+    } catch {
+      setSettlementDetails(current => ({ ...current, [trx.id]: { loading: false, error: 'Rincian pencairan tidak dapat dimuat.' } }))
     }
   }
   const handleSubmit = async () => {
@@ -391,34 +420,85 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                  <tr>
                     <td colSpan="7" className="px-6 py-12 text-center text-foreground/40">Belum ada data transaksi.</td>
                  </tr>
-              ) : paginatedTransactions.map((trx) => (
-                <tr key={trx.id} onClick={() => handleEditTransaction(trx)} className="cursor-pointer transition-colors hover:bg-white/5">
-                  <td className="px-4 py-3 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
-                  <td className="px-4 py-3 font-medium text-foreground/90">
-                    {trx.sales_orders?.customers?.name || removeInvoiceNumber(trx.description) || (trx.sales_orders ? 'Unknown Pelanggan' : 'Sistem ERP')}
-                    {trx.sales_orders?.customers?.name && removeInvoiceNumber(trx.description) && (
-                      <div className="mt-0.5 text-xs font-normal text-foreground/50">{removeInvoiceNumber(trx.description)}</div>
+              ) : paginatedTransactions.map((trx) => {
+                const isSettlement = isMarketplaceSettlement(trx)
+                const isExpanded = expandedSettlementId === trx.id
+                const details = settlementDetails[trx.id]
+
+                return (
+                  <Fragment key={trx.id}>
+                    <tr
+                      onClick={() => isSettlement ? handleToggleSettlement(trx) : handleEditTransaction(trx)}
+                      aria-expanded={isSettlement ? isExpanded : undefined}
+                      title={isSettlement ? 'Klik untuk melihat rincian pencairan' : undefined}
+                      className="cursor-pointer transition-colors hover:bg-white/5"
+                    >
+                      <td className="px-4 py-3 text-foreground/80">{new Date(trx.date).toLocaleDateString('id-ID')}</td>
+                      <td className="px-4 py-3 font-medium text-foreground/90">
+                        <span className="inline-flex items-center gap-1.5">
+                          {trx.sales_orders?.customers?.name || removeInvoiceNumber(trx.description) || (trx.sales_orders ? 'Unknown Pelanggan' : 'Sistem ERP')}
+                          {isSettlement && (isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
+                        </span>
+                        {trx.sales_orders?.customers?.name && removeInvoiceNumber(trx.description) && (
+                          <div className="mt-0.5 text-xs font-normal text-foreground/50">{removeInvoiceNumber(trx.description)}</div>
+                        )}
+                        {trx.payment_method?.toUpperCase() === 'VIRTUAL' && ['BAYAR KE GLOBAL', 'BAYAR KE GUDANG'].includes((trx.reference || '').toUpperCase()) && (
+                          <div className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary">
+                            {trx.reference}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
+                      <td className="px-4 py-3 text-foreground/80">{trx.payment_method || '-'}</td>
+                      <td className="px-4 py-3 text-right font-medium text-green-400">
+                        {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right font-medium text-red-400">
+                        {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-right">
+                        {!isSettlement && <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>}
+                        <button onClick={event => { event.stopPropagation(); handleDeleteTransaction(trx.id) }} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
+                      </td>
+                    </tr>
+                    {isExpanded && (
+                      <tr className="bg-white/[0.03]">
+                        <td colSpan="7" className="px-4 py-4">
+                          <div className="rounded-lg border border-white/10 bg-black/10 p-4">
+                            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                              <p className="font-semibold text-foreground">Rincian pesanan yang dicairkan</p>
+                              <p className="text-xs text-foreground/60">Total pencairan: Rp {Number(trx.amount_in || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                            </div>
+                            {details?.loading ? (
+                              <div className="flex items-center gap-2 text-sm text-foreground/60"><Loader2 className="h-4 w-4 animate-spin" /> Memuat rincian...</div>
+                            ) : details?.error ? (
+                              <p className="text-sm text-red-400">{details.error}</p>
+                            ) : details?.orders?.length ? (
+                              <div className="divide-y divide-white/10">
+                                {details.orders.map((order, index) => (
+                                  <div key={`${trx.id}-settlement-${index}`} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                                    <div className="min-w-0">
+                                      <p className="font-medium text-foreground">{order.customerName}</p>
+                                      {order.products.length > 0 && (
+                                        <p className="mt-0.5 text-xs text-foreground/60">
+                                          {order.products.map(item => `${item.name} × ${item.quantity.toLocaleString('id-ID')} ${item.unit}`).join(', ')}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <p className="shrink-0 text-sm font-semibold text-green-400">Rp {Number(order.amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="text-sm text-foreground/60">Belum ada rincian pesanan yang terhubung dengan pencairan ini.</p>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
                     )}
-                    {trx.payment_method?.toUpperCase() === 'VIRTUAL' && ['BAYAR KE GLOBAL', 'BAYAR KE GUDANG'].includes((trx.reference || '').toUpperCase()) && (
-                      <div className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary">
-                        {trx.reference}
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
-                  <td className="px-4 py-3 text-foreground/80">{trx.payment_method || '-'}</td>
-                  <td className="px-4 py-3 text-right font-medium text-green-400">
-                    {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-right font-medium text-red-400">
-                    {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>
-                    <button onClick={event => { event.stopPropagation(); handleDeleteTransaction(trx.id) }} className="text-red-400 hover:text-red-300 font-medium text-xs">Hapus</button>
-                  </td>
-                </tr>
-              ))}
+                  </Fragment>
+                )
+              })}
             </tbody>
           </table>
         </div>
