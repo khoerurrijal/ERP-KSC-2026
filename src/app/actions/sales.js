@@ -725,6 +725,7 @@ export async function cancelSalesOrder(soId) {
     revalidatePath('/dashboard/sales')
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/report')
+    revalidatePath('/dashboard/transactions')
     return { success: true }
   } catch (error) {
     console.error('Cancel Sales Order error:', error)

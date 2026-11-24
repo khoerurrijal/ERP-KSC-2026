@@ -9,7 +9,7 @@ export default async function TransactionsPage({ searchParams = {} }) {
 
   let transactionsQuery = supabase
     .from('transactions')
-    .select('*, sales_orders(customers(name))')
+    .select('*, sales_orders(payment_status, customers(name))')
     .order('date', { ascending: false })
     .limit(search ? 50000 : 1000)
 

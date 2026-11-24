@@ -17,7 +17,7 @@ export default async function ReportPage({ searchParams }) {
   // Fetch all transactions with a high limit to bypass the 1000 default
   const { data: transactions } = await supabase
     .from('transactions')
-    .select('*')
+    .select('*, sales_orders(payment_status)')
     .limit(100000)
     .order('date', { ascending: false })
 
@@ -34,11 +34,11 @@ export default async function ReportPage({ searchParams }) {
     .neq('status', 'BATAL')
 
   const allTransactions = transactions || []
-  const countedTransactions = allTransactions.filter(t => !(
-    String(t.reference || '').trim().toUpperCase() === 'PENJUALAN' &&
-    /^\[DIBATALKAN\]/i.test(String(t.description || '').trim()) &&
-    !String(t.payment_method || '').trim()
-  ))
+  const countedTransactions = allTransactions.filter(t => {
+    const salesOrder = Array.isArray(t.sales_orders) ? t.sales_orders[0] : t.sales_orders
+    return String(salesOrder?.payment_status || '').trim().toUpperCase() !== 'BATAL' &&
+      !/^\[DIBATALKAN\]/i.test(String(t.description || '').trim())
+  })
   const validTransactions = countedTransactions.filter(t => t.date && t.date.startsWith(selectedMonth))
 
   // Determine the cutoff date to calculate history (up to the end of selected month)
