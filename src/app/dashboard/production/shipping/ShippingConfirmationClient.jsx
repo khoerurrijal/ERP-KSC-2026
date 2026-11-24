@@ -45,55 +45,49 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
       {error && <div className="glass-card p-4 border border-red-500/30 text-red-400 text-sm">Gagal mengambil data: {error}</div>}
 
       {!error && visibleOrders.length === 0 && (
-        <div className="glass-card p-12 text-center text-foreground/50">Belum ada invoice yang siap dikonfirmasi.</div>
+        <div className="glass-card p-6 text-center text-foreground/50">Belum ada pesanan yang siap dikonfirmasi.</div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-2 sm:space-y-3">
         {visibleOrders.map(order => (
-          <div key={order.soId} className="glass-card p-3 sm:p-4 space-y-3">
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-              <div>
-                <p className="text-xs text-foreground/50 uppercase font-bold tracking-wider">Nama / Brand</p>
-                <h2 className="text-lg font-bold text-primary">{order.customerName || 'Pelanggan'}</h2>
-                <p className="text-sm text-foreground/70">
+          <div key={order.soId} className="glass-card p-2.5 sm:p-3 space-y-2">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="min-w-0">
+                <h2 className="text-base font-bold leading-tight text-primary">{order.customerName || 'Pelanggan'}</h2>
+                <p className="text-xs text-foreground/70">
                   Tanggal pesan: {order.orderDate ? new Date(order.orderDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} · {order.paymentStatus}
                 </p>
               </div>
-              <div className="flex flex-col gap-1.5">
-                <p className="text-[10px] text-foreground/45 uppercase font-bold tracking-wider">Pilih tindakan pengiriman</p>
-                <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:shrink-0">
+                <span className="mr-0.5 text-[10px] font-bold uppercase tracking-wider text-foreground/45">Aksi</span>
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'DIKIRIM', label: 'DIKIRIM' })}
-                  className="px-3 py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer"
                 >
-                  <Truck className="w-4 h-4" />
+                  <Truck className="w-3.5 h-3.5" />
                   {loadingKey === `${order.soId}-DIKIRIM` ? 'Memproses...' : 'Dikirim'}
                 </button>
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'SUDAH DIAMBIL', label: 'SUDAH DIAMBIL' })}
-                  className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-1.5 text-xs font-bold cursor-pointer"
                 >
-                  <CheckCircle2 className="w-4 h-4" />
+                  <CheckCircle2 className="w-3.5 h-3.5" />
                   {loadingKey === `${order.soId}-SUDAH DIAMBIL` ? 'Memproses...' : 'Sudah Diambil'}
                 </button>
-                </div>
               </div>
             </div>
 
-            <div className="grid gap-2">
+            <div className="grid gap-1.5">
               {order.items.map(item => (
-                <div key={item.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-3 py-2">
+                <div key={item.id} className="flex items-center justify-between gap-2 rounded-lg bg-white/5 border border-white/10 px-2.5 py-1.5">
                   <div>
-                    <p className="font-semibold text-sm text-foreground">{item.productName}</p>
-                    <p className="text-xs text-foreground/50">{item.orderType} · {item.qty} {item.unit}</p>
+                    <p className="font-semibold text-sm leading-tight text-foreground">{item.productName}</p>
+                    <p className="text-[11px] text-foreground/50">{item.orderType} · {item.qty} {item.unit}</p>
                     {item.notes && <p className="text-[10px] text-foreground/50 italic whitespace-pre-line">{item.notes}</p>}
                   </div>
-                  <div className="flex min-w-[125px] flex-col items-start gap-1 sm:items-end">
-                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/45">Status saat ini</span>
-                    <span className="rounded-md border border-dashed border-white/15 bg-white/[0.03] px-2.5 py-1 text-xs font-semibold text-foreground/70">{item.status}</span>
-                  </div>
+                  <span className="shrink-0 rounded-md border border-dashed border-white/15 bg-white/[0.03] px-2 py-0.5 text-[10px] font-semibold text-foreground/70">Status: {item.status}</span>
                 </div>
               ))}
             </div>
