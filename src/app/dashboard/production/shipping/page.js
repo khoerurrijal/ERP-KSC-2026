@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/server'
+import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 import ShippingConfirmationClient from './ShippingConfirmationClient'
 
 export const dynamic = 'force-dynamic'
@@ -55,7 +56,8 @@ export default async function ShippingConfirmationPage({ embedded = false } = {}
     const code = String(item.product_code || '').toUpperCase()
     const orderType = String(item.order_type || '').toUpperCase()
     const status = String(item.status || 'BARU MASUK').toUpperCase()
-    if (LEGACY_SERVICE_CODES.has(code) || !DELIVERY_ORDER_TYPES.has(orderType) || status === 'BATAL') continue
+    const canBeDelivered = DELIVERY_ORDER_TYPES.has(orderType) || isSablonProductionItem(item)
+    if (LEGACY_SERVICE_CODES.has(code) || !canBeDelivered || status === 'BATAL') continue
 
     const order = normalizeRelation(item.sales_orders)
     if (!order?.id) continue

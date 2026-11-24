@@ -14,6 +14,7 @@ import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
+import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 import MockupUploadModal from '@/components/MockupUploadModal'
 import ImageViewerModal from '@/components/ImageViewerModal'
 import SalesOrderWizard from '@/components/SalesOrderWizard'
@@ -262,6 +263,7 @@ export default function SalesClient({
       const so = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
       const cust = Array.isArray(so?.customers) ? so?.customers[0] : so?.customers
       const prod = Array.isArray(item.products) ? item.products[0] : item.products
+      if (['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) && !isSablonProductionItem({ ...item, products: prod })) return false
 
       const customerName = cust?.name || ''
       const productName = prod?.name || item.product_name || item.item_name || ''

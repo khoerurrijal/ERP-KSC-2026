@@ -186,10 +186,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     const normalizedSearch = searchQuery.replace(/[(),\"]/g, ' ').trim().toLowerCase()
     const isSearching = Boolean(normalizedSearch)
     let result = (productionJobs || []).filter(j => 
-      (isSearching || (
-        j.order_type?.toUpperCase() === 'SABLON' &&
-        ['PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2', 'SIAP PROSES', 'BARU MASUK'].includes(j.item_status?.toUpperCase())
-      )) &&
+      j.is_production_job === true &&
+      ['PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2', 'SIAP PROSES', 'BARU MASUK'].includes(j.item_status?.toUpperCase()) &&
       (!isSearching ||
        matchesSearchText(j.sales_order_items?.sales_orders?.customers?.name, normalizedSearch) ||
        matchesSearchText(j.sales_order_items?.products?.product_name, normalizedSearch) ||

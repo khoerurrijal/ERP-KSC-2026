@@ -6,6 +6,7 @@ import { createAdminNotification } from '@/lib/adminNotifications'
 import {
   getProductionItemProgress,
   getRecalculatedProductionStatus,
+  isSablonProductionItem,
   isProductionPassQtyWithinTarget,
   isProductionProgressSnapshotCurrent,
 } from '@/utils/productionColorPasses.mjs'
@@ -75,33 +76,36 @@ function getNextItemProductionStatus(item, logs, { forceRecalculate = false } = 
   const so = item?.sales_orders || {}
   const canProceed = getOrderCanProceed(item)
   const orderType = String(item?.order_type || '').toUpperCase()
+  const isSablonJob = isSablonProductionItem(item)
   const storedStatus = item?.status || 'BARU MASUK'
   const oldStatus = String(storedStatus).toUpperCase()
   let nextStatus = oldStatus
 
   if (
-    ['SABLON', 'POLOS', 'PRINTING'].includes(orderType) &&
+    (isSablonJob || ['POLOS', 'PRINTING'].includes(orderType)) &&
     ['DIKIRIM', 'TERKIRIM', 'SUDAH DIAMBIL', 'SELESAI'].includes(oldStatus)
   ) {
     return shouldCompleteDelivery(oldStatus, so.payment_status) ? 'SELESAI' : storedStatus
   }
 
-  if (orderType === 'PRINTING' || ['DLL', 'LAINNYA', 'JASA'].includes(orderType)) {
+  if (orderType === 'PRINTING' || (['DLL', 'LAINNYA', 'JASA'].includes(orderType) && !isSablonJob)) {
     return storedStatus
   }
 
   if (orderType === 'POLOS') {
     if (!canProceed) nextStatus = 'BARU MASUK'
     else nextStatus = 'SIAP KIRIM'
-  } else {
+  } else if (isSablonJob) {
     nextStatus = getRecalculatedProductionStatus(item, logs, {
       canProceed,
       currentStatus: oldStatus,
       forceRecalculate
     })
+  } else {
+    return storedStatus
   }
 
-  if (['SABLON', 'POLOS', 'PRINTING'].includes(orderType) && shouldCompleteDelivery(nextStatus, so.payment_status)) {
+  if ((isSablonJob || ['POLOS', 'PRINTING'].includes(orderType)) && shouldCompleteDelivery(nextStatus, so.payment_status)) {
     nextStatus = 'SELESAI'
   }
   return String(nextStatus).toUpperCase() === oldStatus ? storedStatus : nextStatus
@@ -158,11 +162,14 @@ export async function saveProductionProgress(payload) {
   try {
     const { data: job, error: jobError } = await supabase
       .from('sales_items')
-      .select('id, notes, qty, unit_multiplier, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
+      .select('id, notes, qty, unit_multiplier, order_type, status, products(name), sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
       .eq('id', payload.job_id)
       .maybeSingle()
     if (jobError) throw jobError
     if (!job) throw new Error('Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.')
+    if (!isSablonProductionItem(job)) {
+      throw new Error('Item ini tidak termasuk pekerjaan produksi sablon.')
+    }
 
     const isTwoColor = /2\s*warna|warna\s*ke-?2/i.test(job.notes || '')
     const processedQty = Number(payload.qty_processed)
@@ -232,7 +239,7 @@ export async function handleAutoStatusUpdate(itemId, { forceRecalculate = false 
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR', 'OPERATOR MESIN'], 'Akun Anda tidak memiliki akses produksi.')
 
   // Ambil data item dan invoice
-  const { data: item, error: itemError } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
+  const { data: item, error: itemError } = await supabase.from('sales_items').select('*, products(name), sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name))').eq('id', itemId).single()
   if (itemError) throw itemError
   if (!item) return;
 
@@ -319,14 +326,16 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
     const requestedStatus = String(deliveryStatus).toUpperCase()
     const { data: items, error: itemsError } = await supabase
       .from('sales_items')
-      .select('id, status, order_type, product_code, sales_orders(invoice_number, payment_status), products(category)')
+      .select('id, status, order_type, product_code, sales_orders(invoice_number, payment_status), products(name, category)')
       .eq('so_id', soId)
 
     if (itemsError) throw itemsError
 
     const deliveryItems = (items || []).filter(item => {
       const code = String(item.product_code || '').toUpperCase()
-      return !LEGACY_SERVICE_CODES.has(code) && DELIVERY_ORDER_TYPES.has(String(item.order_type || '').toUpperCase()) && String(item.status || '').toUpperCase() !== 'BATAL'
+      const orderType = String(item.order_type || '').toUpperCase()
+      const canBeDelivered = DELIVERY_ORDER_TYPES.has(orderType) || isSablonProductionItem(item)
+      return !LEGACY_SERVICE_CODES.has(code) && canBeDelivered && String(item.status || '').toUpperCase() !== 'BATAL'
     })
 
     if (deliveryItems.length === 0) {
@@ -386,11 +395,14 @@ export async function correctProductionProgress(jobId, newTotalQty, employeeId, 
     }
     const { data: job, error: jobError } = await supabase
       .from('sales_items')
-      .select('id, qty, unit_multiplier, notes, order_type, status, sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
+      .select('id, qty, unit_multiplier, notes, order_type, status, products(name), sales_orders(invoice_number, payment_status, marketplace_receipt, customers(name)), production_logs(id, qty_processed, qty_defect, employee_id, notes, processed_date, created_at)')
       .eq('id', jobId)
       .maybeSingle()
     if (jobError) throw jobError
     if (!job) throw new Error('Pekerjaan sudah tidak tersedia. Muat ulang daftar produksi.')
+    if (!isSablonProductionItem(job)) {
+      throw new Error('Item ini tidak termasuk pekerjaan produksi sablon.')
+    }
 
     const logs = job.production_logs || []
     const currentTotal = logs.reduce((sum, log) => sum + Number(log.qty_processed || 0), 0)

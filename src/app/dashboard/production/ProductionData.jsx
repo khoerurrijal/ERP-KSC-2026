@@ -3,7 +3,7 @@ import { buildAllTermsSearchFilter } from '@/utils/search'
 import {
   getAutomaticProductionProgressQty,
   getProductionItemProgress,
-  getRecalculatedProductionStatus,
+  isSablonProductionItem,
   reconcileProductionColorPasses
 } from '@/utils/productionColorPasses.mjs'
 import ProductionTable from '@/components/ProductionTable'
@@ -16,14 +16,17 @@ export default async function ProductionData({ mode = 'production', embedded = f
   if (mode === 'status') {
     const { data: paidDeliveryItems, error: paidItemsError } = await supabase
       .from('sales_items')
-      .select('id, sales_orders!inner(payment_status)')
+      .select('id, order_type, products(name), sales_orders!inner(payment_status)')
       .in('sales_orders.payment_status', ['LUNAS', 'SETTLED_EXTERNAL'])
       .in('status', ['DIKIRIM', 'TERKIRIM', 'SUDAH DIAMBIL'])
-      .in('order_type', ['SABLON', 'POLOS', 'PRINTING'])
+      .in('order_type', ['SABLON', 'POLOS', 'PRINTING', 'DLL', 'JASA'])
       .limit(10000)
 
     if (!paidItemsError && paidDeliveryItems?.length) {
-      for (const item of paidDeliveryItems) {
+      const itemsToFinalize = paidDeliveryItems.filter(item =>
+        !['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) || isSablonProductionItem(item)
+      )
+      for (const item of itemsToFinalize) {
         await handleAutoStatusUpdate(item.id)
       }
     }
@@ -73,23 +76,24 @@ export default async function ProductionData({ mode = 'production', embedded = f
     .select(productionItemSelection)
     .order('id', { ascending: false })
 
-  if (search && mode === 'production') {
-    const searchFilters = [
-      `product_code.ilike.%${search}%`,
-      `notes.ilike.%${search}%`,
-      `status.ilike.%${search}%`,
-      ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : []),
-      ...(matchedOrderIds.length ? [`so_id.in.(${matchedOrderIds.join(',')})`] : [])
-    ]
-    productionItemsQuery = productionItemsQuery.or(searchFilters.join(','))
-  } else if (mode === 'production') {
-    productionItemsQuery = productionItemsQuery.in('status', [
-      'SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'
-    ])
+  if (mode === 'production') {
+    productionItemsQuery = productionItemsQuery.in('status', search
+      ? ['BARU MASUK', 'SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2']
+      : ['SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'])
+
+    if (search) {
+      const searchFilters = [
+        `product_code.ilike.%${search}%`,
+        `notes.ilike.%${search}%`,
+        `status.ilike.%${search}%`,
+        ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : []),
+        ...(matchedOrderIds.length ? [`so_id.in.(${matchedOrderIds.join(',')})`] : [])
+      ]
+      productionItemsQuery = productionItemsQuery.or(searchFilters.join(','))
+    }
   } else {
-    productionItemsQuery = productionItemsQuery.in('status', [
-      'SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'
-    ])
+    productionItemsQuery = productionItemsQuery
+      .in('status', ['SIAP PROSES', 'PROSES', 'Proses', 'PROSES WARNA 1', 'PROSES WARNA 2'])
   }
   productionItemsQuery = productionItemsQuery.limit(search && mode === 'production' ? 50000 : 500)
 
@@ -105,7 +109,7 @@ export default async function ProductionData({ mode = 'production', embedded = f
   const newSablonItemsQuery = mode === 'production' && !search
     ? supabase.from('sales_items')
       .select(productionItemSelection)
-      .eq('order_type', 'SABLON')
+      .in('order_type', ['SABLON', 'DLL', 'JASA'])
       .eq('status', 'BARU MASUK')
       .order('id', { ascending: false })
       .limit(500)
@@ -222,24 +226,14 @@ export default async function ProductionData({ mode = 'production', embedded = f
     const qtyPerColorTarget = Number(item.qty || 0) * Number(item.unit_multiplier || 1)
     const productionLogs = item.production_logs || []
     const progress = getProductionItemProgress(item, productionLogs.map(log => ({ ...log, job_id: item.id })))
-    const salesOrder = item.sales_orders || {}
-    const customerName = salesOrder.customers?.name?.toLowerCase() || ''
-    const isPaid = ['LUNAS', 'DP'].includes(salesOrder.payment_status)
-    const isMarketplace = Boolean(salesOrder.marketplace_receipt?.trim()) ||
-      ['shopee', 'tokopedia', 'tiktok', 'lazada'].some(name => customerName.includes(name))
-    const calculatedStatus = item.order_type?.toUpperCase() === 'SABLON'
-      ? getRecalculatedProductionStatus(item, productionLogs.map(log => ({ ...log, job_id: item.id })), {
-        canProceed: isPaid || isMarketplace,
-        currentStatus: item.status,
-        forceRecalculate: true
-      })
-      : item.status || 'BARU MASUK'
+    const calculatedStatus = item.status || 'BARU MASUK'
     const rawActivityQty = productionLogs.reduce((total, log) => total + Number(log.qty_processed || 0), 0)
 
     return ({
     id: item.id,
     so_id: item.sales_orders?.id,
     order_type: item.order_type,
+    is_production_job: isSablonProductionItem(item),
     qty_target: qtyPerColorTarget * (isTwoColor ? 2 : 1),
     qty_per_color_target: qtyPerColorTarget,
     qty_color_1: progress.qtyColorOne,
@@ -280,9 +274,10 @@ export default async function ProductionData({ mode = 'production', embedded = f
     qty_processed: progress.qtyActivity,
     qty_raw_activity: rawActivityQty
   })
-  }).filter(job => (
-    mode !== 'production' || search || ['BARU MASUK', 'SIAP PROSES', 'PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(String(job.item_status).toUpperCase())
-  ))
+  }).filter(job => {
+    if (['DLL', 'JASA'].includes(String(job.order_type || '').toUpperCase()) && !job.is_production_job) return false
+    return mode !== 'production' || ['BARU MASUK', 'SIAP PROSES', 'PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(String(job.item_status).toUpperCase())
+  })
 
   return (
     <ProductionTable 

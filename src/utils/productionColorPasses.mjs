@@ -269,6 +269,16 @@ export function getRecalculatedProductionStatus(job, logs = [], {
   return canProceed ? 'SIAP PROSES' : 'BARU MASUK'
 }
 
+export function isSablonProductionItem(item) {
+  const orderType = String(item?.order_type || '').trim().toUpperCase()
+  if (orderType === 'SABLON') return true
+  if (!['DLL', 'JASA'].includes(orderType)) return false
+
+  const product = Array.isArray(item?.products) ? item.products[0] : item?.products
+  const productName = product?.name || item?.product_name || ''
+  return /sablon/i.test(String(productName))
+}
+
 export function inferProductionColorPasses(jobs = [], logs = []) {
   return reconcileProductionColorPasses(jobs, logs).colorPassByLogId
 }

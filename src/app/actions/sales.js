@@ -1,5 +1,6 @@
 'use server'
 
+import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
@@ -620,11 +621,15 @@ export async function updateSalesItemStatus(itemId, newStatus) {
     if (!itemId || typeof newStatus !== 'string' || !newStatus.trim()) throw new Error('Status item tidak valid.')
     const { data: item, error: fetchErr } = await supabase
       .from('sales_items')
-      .select('*, sales_orders(invoice_number, payment_status)')
+      .select('*, products(name), sales_orders(invoice_number, payment_status)')
       .eq('id', itemId)
       .single()
     
     if (fetchErr || !item) throw new Error("Item tidak ditemukan")
+
+    if (['DLL', 'JASA'].includes(String(item.order_type || '').toUpperCase()) && !isSablonProductionItem(item)) {
+      throw new Error('Item layanan tidak memiliki status produksi.')
+    }
 
     const oldStatus = (item.status || 'BARU MASUK').toUpperCase()
     const targetStatus = newStatus.toUpperCase()
