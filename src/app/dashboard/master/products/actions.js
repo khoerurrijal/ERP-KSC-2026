@@ -80,8 +80,12 @@ export async function updateStock(product_code, new_stock) {
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   
   // Ambil stok saat ini
-  const { data: prod } = await supabase.from('products').select('physical_stock').eq('product_code', product_code).single()
+  const { data: prod } = await supabase.from('products').select('physical_stock, category').eq('product_code', product_code).single()
   if (!prod) return { error: 'Produk tidak ditemukan.' }
+
+  if (['JASA', 'JASA LAYANAN'].includes(String(prod.category || '').trim().toUpperCase())) {
+    return { error: 'Produk jasa tidak memakai stok dan tidak dapat diopname.' }
+  }
 
   const current_stock = Number(prod.physical_stock || 0)
   const difference = Number(new_stock) - current_stock

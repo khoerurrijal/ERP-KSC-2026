@@ -2,6 +2,9 @@ import { createClient } from '@/utils/supabase/server'
 import InventoryClient from './InventoryClient'
 import { buildAllTermsSearchFilter } from '@/utils/search'
 
+const excludeNonStockServices = query =>
+  query.not('category', 'in', '("JASA","Jasa Layanan")')
+
 // Komponen server ini di-render di dalam Suspense boundary di page.js
 // sehingga UI halaman bisa langsung tampil, dan data dimuat secara streaming
 export default async function InventoryData({ searchParams = {}, activeTab = 'table' }) {
@@ -15,12 +18,13 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
   const sortKey = searchParams.sortKey || 'name'
   const sortDir = searchParams.sortDir || 'asc'
 
-  let query = supabase
+  let query = excludeNonStockServices(supabase
     .from('products')
     .select(`
       *,
       workshops (name)
     `, { count: 'exact' })
+  )
 
   if (!search) {
     query = query.eq('is_active', true)
@@ -50,9 +54,10 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
   const end = start + pageSize - 1
   query = query.range(start, end)
 
-  let pipelineQuery = supabase
+  let pipelineQuery = excludeNonStockServices(supabase
     .from('product_pipeline_view')
     .select('*')
+  )
   if (search && activeTab === 'pipeline') {
     pipelineQuery = pipelineQuery.or(buildAllTermsSearchFilter(['product_name', 'category'], search))
   }
@@ -70,11 +75,12 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
       .from('workshops')
       .select('id, name, code')
       .order('name'),
-    supabase
+    excludeNonStockServices(supabase
       .from('products')
       .select('category')
       .eq('is_active', true)
       .limit(300)
+    )
   ])
 
   const categories = Array.from(new Set((allCategories || []).map(c => c.category).filter(Boolean))).sort()
