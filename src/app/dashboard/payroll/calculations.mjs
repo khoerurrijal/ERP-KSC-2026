@@ -162,9 +162,13 @@ export function calculatePayrollItems({
       return isWeekday(currentDate) && attendanceByEmployeeDate.get(`${employee.id}:${day}`)?.status === 'Hadir'
     })
     const attendanceDays = workDates.length
-    const logs = logsByEmployee.get(employee.id) || []
-    const myQty = logs.reduce((sum, log) => sum + Number(log.qty_processed || 0), 0)
     const isOperatorMesin = roleName.toLowerCase() === 'operator mesin'
+    const isPresentOnDay = day => attendanceByEmployeeDate.get(`${employee.id}:${day}`)?.status === 'Hadir'
+    const logs = logsByEmployee.get(employee.id) || []
+    const payableLogs = isOperatorMesin
+      ? logs.filter(log => isPresentOnDay(String(log.processed_date || '').slice(0, 10)))
+      : logs
+    const myQty = payableLogs.reduce((sum, log) => sum + Number(log.qty_processed || 0), 0)
     const lowQtyThreshold = Number(schema.batas_qty_bonus_harian || 0)
     const lowQtyPay = Number(schema.bonus_harian_dibawah_target || 0)
     const targetQtyThreshold = Number(schema.batas_qty_target_harian || 0)
@@ -175,10 +179,13 @@ export function calculatePayrollItems({
     const dailyTwoColorQty = {}
     for (const [key, qty] of logsByEmployeeDate.entries()) {
       const [employeeId, day] = key.split(':')
-      if (employeeId === employee.id && day >= startDate && day <= endDate) dailyQty[day] = qty
+      if (
+        employeeId === employee.id && day >= startDate && day <= endDate &&
+        (!isOperatorMesin || isPresentOnDay(day))
+      ) dailyQty[day] = qty
     }
     if (isOperator(roleName)) {
-      for (const log of logs) {
+      for (const log of payableLogs) {
         const day = String(log.processed_date || '').slice(0, 10)
         if (!log.is_two_color || Number(log.color_pass) !== 2 || day < startDate || day > endDate) continue
         dailyTwoColorQty[day] = (dailyTwoColorQty[day] || 0) + Number(log.qty_processed || 0)
@@ -255,6 +262,7 @@ export function calculatePayrollItems({
     })
     const bawahanQtyTotal = isOperatorMesin
       ? subordinates.reduce((sum, subordinate) => sum + (logsByEmployee.get(subordinate.id) || [])
+        .filter(log => isPresentOnDay(String(log.processed_date || '').slice(0, 10)))
         .reduce((qty, log) => qty + Number(log.qty_processed || 0), 0), 0)
       : 0
     const bawahanRate = isOperatorMesin ? Number(schema.rate_produksi_bawahan || 0) : 0

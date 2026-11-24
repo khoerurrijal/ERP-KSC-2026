@@ -64,11 +64,11 @@ const employee = {
   }
 }
 
-function calculateWithLogs(logs) {
+function calculateWithLogs(logs, attendanceRows = []) {
   return calculatePayrollItems({
     employees: [employee],
     productionLogs: logs,
-    attendanceRows: [],
+    attendanceRows,
     loans: [],
     startDate: '2026-11-09',
     endDate: '2026-11-13'
@@ -80,11 +80,13 @@ test('payroll uses the same reconciled two-color quantities as production', () =
   const periodLogs = rawProductionLogs.filter(log => (
     log.employee_id && log.processed_date >= '2026-11-09' && log.processed_date <= '2026-11-13'
   ))
-  const rawItem = calculateWithLogs(periodLogs)
+  const attendanceRows = ['2026-11-09', '2026-11-10', '2026-11-11', '2026-11-12', '2026-11-13']
+    .map(attendance_date => ({ employee_id: employeeId, attendance_date, status: 'Hadir' }))
+  const rawItem = calculateWithLogs(periodLogs, attendanceRows)
   const twoColorJobIds = new Set([casaJobId, otherTwoColorJobId])
   const reconciledLogs = applyProductionReconciliationToPayrollLogs(periodLogs, reconciliation)
     .map(log => ({ ...log, is_two_color: twoColorJobIds.has(log.job_id) }))
-  const payrollItem = calculateWithLogs(reconciledLogs)
+  const payrollItem = calculateWithLogs(reconciledLogs, attendanceRows)
 
   assert.equal(rawItem.myQty, 21500)
   assert.equal(payrollItem.myQty, 17500)
@@ -111,7 +113,47 @@ test('one-color payroll quantities remain unchanged by reconciliation', () => {
   const reconciledLogs = applyProductionReconciliationToPayrollLogs([oneColorLog], reconciliation)
 
   assert.equal(reconciledLogs[0].qty_processed, 500)
-  assert.equal(calculateWithLogs(reconciledLogs).myQty, 500)
+  assert.equal(calculateWithLogs(reconciledLogs, [
+    { employee_id: employeeId, attendance_date: '2026-11-13', status: 'Hadir' }
+  ]).myQty, 500)
+})
+
+test('machine operator gets no personal or subordinate production pay on absent dates', () => {
+  const operatorMachine = {
+    ...employee,
+    gaji_harian: 10000,
+    salary_schemas: { ...employee.salary_schemas, rate_produksi_bawahan: 5 }
+  }
+  const operatorSablon = {
+    id: 'operator-sablon',
+    full_name: 'Operator Sablon',
+    supervisor_id: employeeId,
+    salary_schemas: { role_name: 'Operator' }
+  }
+  const result = calculatePayrollItems({
+    employees: [operatorMachine, operatorSablon],
+    productionLogs: [
+      { employee_id: employeeId, qty_processed: 4000, processed_date: '2026-11-09' },
+      { employee_id: employeeId, qty_processed: 6000, processed_date: '2026-11-10', is_two_color: true, color_pass: 2 },
+      { employee_id: operatorSablon.id, qty_processed: 1000, processed_date: '2026-11-09' },
+      { employee_id: operatorSablon.id, qty_processed: 5000, processed_date: '2026-11-10' }
+    ],
+    attendanceRows: [
+      { employee_id: employeeId, attendance_date: '2026-11-09', status: 'Hadir' },
+      { employee_id: employeeId, attendance_date: '2026-11-10', status: 'Tidak Hadir' }
+    ],
+    loans: [],
+    startDate: '2026-11-09',
+    endDate: '2026-11-10'
+  }).items[0]
+
+  assert.equal(result.attendance_days, 1)
+  assert.equal(result.myQty, 4000)
+  assert.equal(result.dailyQty['2026-11-10'] || 0, 0)
+  assert.equal(result.twoColorQty, 0)
+  assert.equal(result.borongan_amount, 80000)
+  assert.equal(result.bawahanQtyTotal, 1000)
+  assert.equal(result.bawahan_bonus, 5000)
 })
 
 test('payroll save accepts an unchanged production snapshot despite edited pay components', () => {
