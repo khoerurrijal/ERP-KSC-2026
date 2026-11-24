@@ -9,6 +9,7 @@ import {
   isProductionPassQtyWithinTarget,
   isProductionProgressSnapshotCurrent,
 } from '@/utils/productionColorPasses.mjs'
+import { isFullyPaidForDelivery, shouldCompleteDelivery } from '@/utils/deliveryStatus.mjs'
 
 function getJakartaDateKey(date = new Date()) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -76,8 +77,14 @@ function getNextItemProductionStatus(item, logs, { forceRecalculate = false } = 
   const orderType = String(item?.order_type || '').toUpperCase()
   const storedStatus = item?.status || 'BARU MASUK'
   const oldStatus = String(storedStatus).toUpperCase()
-  const deliveredStatuses = ['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
   let nextStatus = oldStatus
+
+  if (
+    ['SABLON', 'POLOS', 'PRINTING'].includes(orderType) &&
+    ['DIKIRIM', 'TERKIRIM', 'SUDAH DIAMBIL', 'SELESAI'].includes(oldStatus)
+  ) {
+    return shouldCompleteDelivery(oldStatus, so.payment_status) ? 'SELESAI' : storedStatus
+  }
 
   if (orderType === 'PRINTING' || ['DLL', 'LAINNYA', 'JASA'].includes(orderType)) {
     return storedStatus
@@ -85,7 +92,7 @@ function getNextItemProductionStatus(item, logs, { forceRecalculate = false } = 
 
   if (orderType === 'POLOS') {
     if (!canProceed) nextStatus = 'BARU MASUK'
-    else if (!deliveredStatuses.includes(oldStatus)) nextStatus = 'SIAP KIRIM'
+    else nextStatus = 'SIAP KIRIM'
   } else {
     nextStatus = getRecalculatedProductionStatus(item, logs, {
       canProceed,
@@ -94,7 +101,7 @@ function getNextItemProductionStatus(item, logs, { forceRecalculate = false } = 
     })
   }
 
-  if ((nextStatus === 'DIKIRIM' || nextStatus === 'SUDAH DIAMBIL') && so.payment_status === 'LUNAS') {
+  if (['SABLON', 'POLOS', 'PRINTING'].includes(orderType) && shouldCompleteDelivery(nextStatus, so.payment_status)) {
     nextStatus = 'SELESAI'
   }
   return String(nextStatus).toUpperCase() === oldStatus ? storedStatus : nextStatus
@@ -255,18 +262,16 @@ export async function updateSalesOrderStatus(itemId, status) {
     const { data: item } = await supabase.from('sales_items').select('*, sales_orders(invoice_number, payment_status)').eq('id', itemId).single()
     const oldStatus = String(item?.status || 'BARU MASUK').toUpperCase()
     let finalStatus = status;
-    const isLunas = item?.sales_orders?.payment_status === 'LUNAS';
+    const paymentStatus = item?.sales_orders?.payment_status
 
     const { data: settingsData } = await supabase.from('system_settings').select('value').eq('key', 'dropdown_config').single()
     const dropdownConfig = settingsData?.value || {}
     const statuses = dropdownConfig.production_status || ['DRAFT', 'BARU MASUK', 'SIAP PROSES', 'PROSES', 'SUDAH JADI', 'SIAP KIRIM', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI']
     
-    const ST_DIKIRIM = statuses[6] || 'DIKIRIM'
-    const ST_SUDAH_DIAMBIL = statuses[7] || 'SUDAH DIAMBIL'
     const ST_SELESAI = statuses[8] || 'SELESAI'
 
     // Finalisasi Fisik (Dikirim -> Selesai)
-    if ((finalStatus === ST_DIKIRIM || finalStatus === ST_SUDAH_DIAMBIL) && isLunas) {
+    if (shouldCompleteDelivery(finalStatus, paymentStatus)) {
       finalStatus = ST_SELESAI;
     }
 
@@ -334,12 +339,12 @@ export async function confirmInvoiceDelivery(soId, deliveryStatus) {
     }
 
     const order = normalizeRelation(deliveryItems[0].sales_orders)
-    const isLunas = order?.payment_status === 'LUNAS'
-    const nextStatus = isLunas ? 'SELESAI' : requestedStatus
+    const isFullyPaid = isFullyPaidForDelivery(order?.payment_status)
+    const nextStatus = shouldCompleteDelivery(requestedStatus, order?.payment_status) ? 'SELESAI' : requestedStatus
     const pendingIds = deliveryItems
       .filter(item => {
         const status = String(item.status || '').toUpperCase()
-        return isLunas ? status !== 'SELESAI' : ['SIAP KIRIM', 'SUDAH JADI'].includes(status)
+        return isFullyPaid ? status !== 'SELESAI' : ['SIAP KIRIM', 'SUDAH JADI'].includes(status)
       })
       .map(item => item.id)
 

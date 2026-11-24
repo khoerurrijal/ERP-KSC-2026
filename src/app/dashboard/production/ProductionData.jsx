@@ -17,8 +17,8 @@ export default async function ProductionData({ mode = 'production', embedded = f
     const { data: paidDeliveryItems, error: paidItemsError } = await supabase
       .from('sales_items')
       .select('id, sales_orders!inner(payment_status)')
-      .eq('sales_orders.payment_status', 'LUNAS')
-      .in('status', ['DIKIRIM', 'SUDAH DIAMBIL'])
+      .in('sales_orders.payment_status', ['LUNAS', 'SETTLED_EXTERNAL'])
+      .in('status', ['DIKIRIM', 'TERKIRIM', 'SUDAH DIAMBIL'])
       .in('order_type', ['SABLON', 'POLOS', 'PRINTING'])
       .limit(10000)
 
