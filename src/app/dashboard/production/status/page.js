@@ -12,7 +12,7 @@ function StatusSkeleton() {
 
 export default async function StatusPesananPage({ searchParams }) {
   const params = await Promise.resolve(searchParams || {})
-  const activeTab = ['shipping', 'orders', 'items'].includes(params.tab) ? params.tab : 'orders'
+  const activeTab = ['shipping', 'orders', 'items'].includes(params.tab) ? params.tab : 'shipping'
 
   let content
   if (activeTab === 'shipping') {

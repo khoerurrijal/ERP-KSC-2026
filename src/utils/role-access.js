@@ -163,7 +163,7 @@ export const ACCESS_ROUTES = [
   { matches: (path) => path.startsWith('/dashboard/order-requests/'), permissions: ['sales.requests.detail'] },
   { matches: (path) => path === '/marketplace' || path === '/dashboard/marketplace', permissions: ['marketplace.orders'] },
   { matches: (path) => path === '/production' || path === '/dashboard/production', permissions: ['production.queue'] },
-  { matches: (path) => path === '/status-pesanan' || path === '/dashboard/production/status', tabParam: 'tab', defaultTab: 'orders', tabs: { orders: 'production.status.orders', items: 'production.status.items', shipping: 'production.status.shipping' } },
+  { matches: (path) => path === '/status-pesanan' || path === '/dashboard/production/status', tabParam: 'tab', defaultTab: 'shipping', tabs: { orders: 'production.status.orders', items: 'production.status.items', shipping: 'production.status.shipping' } },
   { matches: (path) => path === '/shipping' || path === '/dashboard/production/shipping', permissions: ['production.status.shipping'] },
   { matches: (path) => path === '/inventory' || path === '/dashboard/inventory', tabParam: 'tab', defaultTab: 'table', tabs: { table: 'inventory.table', pipeline: 'inventory.pipeline', mutations: 'inventory.mutations' } },
   { matches: (path) => path === '/inventory/mutasi' || path === '/dashboard/inventory/mutasi', permissions: ['inventory.mutations'] },

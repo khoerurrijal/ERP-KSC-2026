@@ -59,11 +59,13 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
                   Tanggal pesan: {order.orderDate ? new Date(order.orderDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'} · {order.paymentStatus}
                 </p>
               </div>
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col gap-1.5">
+                <p className="text-[10px] text-foreground/45 uppercase font-bold tracking-wider">Pilih tindakan pengiriman</p>
+                <div className="flex flex-col sm:flex-row gap-2">
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'DIKIRIM', label: 'DIKIRIM' })}
-                  className="px-3 py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
+                  className="px-3 py-2 rounded-lg bg-indigo-500/15 border border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold cursor-pointer"
                 >
                   <Truck className="w-4 h-4" />
                   {loadingKey === `${order.soId}-DIKIRIM` ? 'Memproses...' : 'Dikirim'}
@@ -71,11 +73,12 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
                 <button
                   disabled={loadingKey !== ''}
                   onClick={() => setPendingConfirmation({ order, status: 'SUDAH DIAMBIL', label: 'SUDAH DIAMBIL' })}
-                  className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold"
+                  className="px-3 py-2 rounded-lg bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50 flex items-center justify-center gap-2 text-sm font-bold cursor-pointer"
                 >
                   <CheckCircle2 className="w-4 h-4" />
                   {loadingKey === `${order.soId}-SUDAH DIAMBIL` ? 'Memproses...' : 'Sudah Diambil'}
                 </button>
+                </div>
               </div>
             </div>
 
@@ -87,7 +90,10 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
                     <p className="text-xs text-foreground/50">{item.orderType} · {item.qty} {item.unit}</p>
                     {item.notes && <p className="text-[10px] text-foreground/50 italic whitespace-pre-line">{item.notes}</p>}
                   </div>
-                  <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-purple-500/15 text-purple-300 border border-purple-500/20">{item.status}</span>
+                  <div className="flex min-w-[125px] flex-col items-start gap-1 sm:items-end">
+                    <span className="text-[9px] font-bold uppercase tracking-wider text-foreground/45">Status saat ini</span>
+                    <span className="rounded-md border border-dashed border-white/15 bg-white/[0.03] px-2.5 py-1 text-xs font-semibold text-foreground/70">{item.status}</span>
+                  </div>
                 </div>
               ))}
             </div>
@@ -114,7 +120,6 @@ export default function ShippingConfirmationClient({ orders = [], error = '', em
             </div>
 
             <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-2 text-sm">
-              <p className="text-foreground/70">Invoice: <span className="font-bold text-foreground">{pendingConfirmation.order.invoiceNumber || '-'}</span></p>
               <p className="text-foreground/70">Tanggal pesan: <span className="font-bold text-foreground">{pendingConfirmation.order.orderDate ? new Date(pendingConfirmation.order.orderDate).toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : '-'}</span></p>
               <p className="text-foreground/70">Status pembayaran: <span className="font-bold text-foreground">{pendingConfirmation.order.paymentStatus}</span></p>
               <p className="text-foreground/70">Status baru: <span className="font-bold text-primary">{pendingConfirmation.label}</span></p>

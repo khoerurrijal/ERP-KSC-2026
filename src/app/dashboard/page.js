@@ -179,13 +179,13 @@ export default async function DashboardPage({ searchParams }) {
 
         {/* TENGAH: Antrean & Stok */}
         <div className="flex flex-col gap-4 lg:col-span-1">
-          {/* TRACKING PRODUKSI */}
+          {/* STATUS PESANAN */}
           <div className="glass-card flex flex-col h-fit">
             <div className="p-4 border-b border-white/10 bg-white/5 flex justify-between items-center">
               <h2 className="font-bold text-foreground flex items-center gap-2">
-                <Package className="w-5 h-5 text-purple-400" /> Antrean Produksi
+                <Package className="w-5 h-5 text-purple-400" /> Status Pesanan
               </h2>
-              <Link href="/production" className="text-xs text-primary hover:underline">Lihat Semua</Link>
+              <Link href="/status-pesanan?tab=shipping" className="text-xs text-primary hover:underline">Lihat Semua</Link>
             </div>
             <div className="p-4 flex-1 flex flex-col justify-center gap-3">
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
