@@ -460,6 +460,9 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
     if (items.some(i => !i.product_id || !i.order_type)) {
       return setError("Pastikan Jenis Pesanan dan Produk sudah dipilih.")
     }
+    if (!isExistingOrder && !isMarketplace && Number(dpAmount) > 0 && !String(paymentAccount || '').trim()) {
+      return setError("Pilih metode pembayaran sebelum menyimpan DP.")
+    }
 
     setLoading(true)
     setError(null)
@@ -758,7 +761,7 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     </div>
                     {dpAmount > 0 && !isMarketplace && (
                       <div className="space-y-1">
-                        <label className="text-xs font-medium text-foreground/70">Rekening DP</label>
+                        <label className="text-xs font-medium text-foreground/70">Metode Pembayaran DP</label>
                         <CustomSelect value={paymentAccount} onChange={e => setPaymentAccount(e.target.value)} options={[{ value: '', label: 'Pilih Rekening...' }, ...(dropdownConfig.payment_method || ['BCA', 'MANDIRI', 'CASH']).map(value => ({ value, label: value }))]} />
                       </div>
                     )}

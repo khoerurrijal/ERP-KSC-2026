@@ -34,11 +34,16 @@ export default async function ReportPage({ searchParams }) {
     .neq('status', 'BATAL')
 
   const allTransactions = transactions || []
-  const validTransactions = allTransactions.filter(t => t.date && t.date.startsWith(selectedMonth))
+  const countedTransactions = allTransactions.filter(t => !(
+    String(t.reference || '').trim().toUpperCase() === 'PENJUALAN' &&
+    /^\[DIBATALKAN\]/i.test(String(t.description || '').trim()) &&
+    !String(t.payment_method || '').trim()
+  ))
+  const validTransactions = countedTransactions.filter(t => t.date && t.date.startsWith(selectedMonth))
 
   // Determine the cutoff date to calculate history (up to the end of selected month)
   // Just compare dates lexicographically since they are YYYY-MM-DD
-  const historyTransactions = allTransactions.filter(t => t.date && t.date <= maxDate)
+  const historyTransactions = countedTransactions.filter(t => t.date && t.date <= maxDate)
 
   // Compute summary dynamically from ALL HISTORY up to selected month
   const summary = {
@@ -97,7 +102,7 @@ export default async function ReportPage({ searchParams }) {
 
   // Calculate physical method balances from ALL HISTORY
   const physicalBalances = { BCA: 0, Mandiri: 0, Cash: 0, Virtual: 0 }
-  allTransactions.forEach(t => {
+  countedTransactions.forEach(t => {
     const amountIn = Number(t.amount_in || 0)
     const amountOut = Number(t.amount_out || 0)
     const method = (t.payment_method || '').toUpperCase()

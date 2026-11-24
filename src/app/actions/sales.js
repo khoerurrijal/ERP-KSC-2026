@@ -30,6 +30,10 @@ export async function createSalesOrder(payload) {
     if (!Number.isFinite(normalizedDpAmount) || normalizedDpAmount < 0) {
       throw new Error('Nominal DP tidak valid.')
     }
+    const normalizedPaymentAccount = String(paymentAccount || '').trim()
+    if (normalizedDpAmount > 0 && !normalizedPaymentAccount) {
+      throw new Error('Metode pembayaran wajib dipilih saat mencatat DP.')
+    }
     for (const item of items) {
       const qty = Number(item.qty)
       const price = Number(item.price)
@@ -119,7 +123,7 @@ export async function createSalesOrder(payload) {
       notes: notes,
       total_amount: grandTotal,
       dp_amount: normalizedDpAmount,
-      payment_method: paymentAccount,
+      payment_method: normalizedPaymentAccount || null,
       payment_status: paymentStatus,
     }
     if (sourceRequestId) salesOrderData.source_request_id = sourceRequestId
@@ -192,7 +196,7 @@ export async function createSalesOrder(payload) {
         date: orderDate,
         reference: 'PENJUALAN',
         description: `Pembayaran ${paymentStatus} - ${customerName}`,
-        payment_method: paymentAccount,
+        payment_method: normalizedPaymentAccount,
         amount_in: normalizedDpAmount,
         amount_out: 0,
         workshop_code: 'KING',
@@ -286,7 +290,7 @@ export async function addSalesPayment(soId, paymentData) {
   const { amount: paymentAmount, method: paymentMethod, date: paymentDate } = paymentData;
   const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'])
   try {
-    if (!soId || !paymentMethod || !paymentDate) throw new Error('Data pembayaran belum lengkap.')
+    if (!soId || !String(paymentMethod || '').trim() || !paymentDate) throw new Error('Metode pembayaran dan tanggal wajib diisi.')
     const normalizedPaymentAmount = Number(paymentAmount)
     if (!Number.isFinite(normalizedPaymentAmount) || normalizedPaymentAmount <= 0) {
       throw new Error('Nominal pembayaran harus lebih dari 0.')
@@ -335,7 +339,7 @@ export async function addSalesPayment(soId, paymentData) {
       date: paymentDate,
       reference: 'PENJUALAN',
       description: paymentStatus,
-      payment_method: paymentMethod,
+      payment_method: String(paymentMethod).trim(),
       amount_in: normalizedPaymentAmount,
       amount_out: 0,
       workshop_code: 'KING',

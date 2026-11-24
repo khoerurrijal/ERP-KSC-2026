@@ -22,6 +22,12 @@ function removeInvoiceNumber(value) {
     .replace(/^[\s,.:;-]+|[\s,.:;-]+$/g, '')
 }
 
+function isExcludedCanceledSalePayment(transaction) {
+  return String(transaction.reference || '').trim().toUpperCase() === 'PENJUALAN' &&
+    /^\[DIBATALKAN\]/i.test(String(transaction.description || '').trim()) &&
+    !String(transaction.payment_method || '').trim()
+}
+
 export default function TransactionsClient({ transactions = [], dropdownConfig = {}, initialSearch = '' }) {
   const router = useRouter()
   const pathname = usePathname()
@@ -261,8 +267,9 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
     return filteredAndSorted.slice(start, start + pageSize)
   }, [filteredAndSorted, page, pageSize])
 
-  const totalIn = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_in || 0), 0)
-  const totalOut = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_out || 0), 0)
+  const countedTransactions = filteredAndSorted.filter(transaction => !isExcludedCanceledSalePayment(transaction))
+  const totalIn = countedTransactions.reduce((acc, curr) => acc + Number(curr.amount_in || 0), 0)
+  const totalOut = countedTransactions.reduce((acc, curr) => acc + Number(curr.amount_out || 0), 0)
   const saldo = totalIn - totalOut
 
   const renderSortIcon = (key) => {
@@ -424,6 +431,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                 const isSettlement = isMarketplaceSettlement(trx)
                 const isExpanded = expandedSettlementId === trx.id
                 const details = settlementDetails[trx.id]
+                const isExcludedCanceledPayment = isExcludedCanceledSalePayment(trx)
 
                 return (
                   <Fragment key={trx.id}>
@@ -442,6 +450,9 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                         {trx.sales_orders?.customers?.name && removeInvoiceNumber(trx.description) && (
                           <div className="mt-0.5 text-xs font-normal text-foreground/50">{removeInvoiceNumber(trx.description)}</div>
                         )}
+                        {isExcludedCanceledPayment && (
+                          <div className="mt-1 text-[10px] font-semibold text-foreground/50">Dibatalkan · metode kosong · tidak masuk rekap</div>
+                        )}
                         {trx.payment_method?.toUpperCase() === 'VIRTUAL' && ['BAYAR KE GLOBAL', 'BAYAR KE GUDANG'].includes((trx.reference || '').toUpperCase()) && (
                           <div className="mt-1 inline-flex rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-bold tracking-wide text-primary">
                             {trx.reference}
@@ -451,10 +462,10 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                       <td className="px-4 py-3 text-foreground/80">{trx.workshop_code || '-'}</td>
                       <td className="px-4 py-3 text-foreground/80">{trx.payment_method || '-'}</td>
                       <td className="px-4 py-3 text-right font-medium text-green-400">
-                        {trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
+                        {!isExcludedCanceledPayment && trx.amount_in > 0 ? `+ Rp ${Number(trx.amount_in).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                       </td>
                       <td className="px-4 py-3 text-right font-medium text-red-400">
-                        {trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
+                        {!isExcludedCanceledPayment && trx.amount_out > 0 ? `- Rp ${Number(trx.amount_out).toLocaleString('id-ID', { maximumFractionDigits: 0 })}` : '-'}
                       </td>
                       <td className="px-4 py-3 text-right">
                         {!isSettlement && <button onClick={event => { event.stopPropagation(); handleEditTransaction(trx) }} className="text-accent hover:text-accent/80 font-medium text-xs mr-3">Edit</button>}
