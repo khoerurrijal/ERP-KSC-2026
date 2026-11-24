@@ -71,7 +71,7 @@ export default async function DashboardPage({ searchParams }) {
     { data: sablonItems }
   ] = await Promise.all([
     supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name'),
-    supabase.from('sales_orders').select('id, date, payment_status, marketplace_settlement_status, total_amount, dp_amount, customers(name, type)').limit(100000),
+    supabase.from('sales_orders').select('id, date, payment_status, marketplace_settlement_status, marketplace_receipt, total_amount, dp_amount, customers(name, type)').limit(100000),
     supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000)
   ])
 
@@ -79,6 +79,17 @@ export default async function DashboardPage({ searchParams }) {
   const pricelistConfig = settings?.find(s => s.key === 'pricelist_config')?.value || {}
 
   const rawOrders = salesOrders || []
+  const getOpenBalance = order => (Number(order.total_amount) || 0) - (Number(order.dp_amount) || 0)
+  const isOutstandingOrder = order => {
+    const paymentStatus = String(order.payment_status || '').trim().toUpperCase()
+    const settlementStatus = String(order.marketplace_settlement_status || 'PENDING').trim().toUpperCase()
+    const hasMarketplaceReceipt = Boolean(String(order.marketplace_receipt || '').trim())
+    return ['BELUM LUNAS', 'DP'].includes(paymentStatus)
+      && !hasMarketplaceReceipt
+      && settlementStatus !== 'SETTLED_EXTERNAL'
+      && getOpenBalance(order) > 0
+  }
+  const unpaidOrders = rawOrders.filter(isOutstandingOrder)
   
   // LOGIC FILTER
   // Omset: HANYA transaksi yang terjadi di bulan terpilih.
@@ -87,8 +98,8 @@ export default async function DashboardPage({ searchParams }) {
   // SO Lunas: Selesai bulan ini
   const soLunas = thisMonthOrders.filter(o => o.payment_status === 'LUNAS').length
   
-  // SO Belum Lunas & Marketplace Tempo: Hutang berjalan (TIDAK DIFILTER BULAN), ABAIKAN BATAL
-  const soBelumLunas = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL').length
+  // Tagihan aktif mencakup DP/tempo, tetapi mengecualikan batal dan settlement di luar ERP.
+  const soBelumLunas = unpaidOrders.length
 
   const mpTempo = rawOrders.filter(order => {
     const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
@@ -116,9 +127,11 @@ export default async function DashboardPage({ searchParams }) {
 
   // Calculate Antrean Produksi (berdasarkan Item Sablon)
   const items = sablonItems || []
-  const antreanMasuk = items.filter(i => !i.status || i.status === 'BARU MASUK').length
-  const antreanProses = items.filter(i => i.status === 'PROSES').length
-  const antreanSiapAmbil = items.filter(i => ['SUDAH JADI', 'DIKIRIM', 'SUDAH DIAMBIL'].includes(i.status)).length
+  const getProductionStatus = item => String(item.status || 'BARU MASUK').trim().toUpperCase()
+  const antreanMasuk = items.filter(i => !i.status || getProductionStatus(i) === 'BARU MASUK').length
+  const antreanSiapProses = items.filter(i => getProductionStatus(i) === 'SIAP PROSES').length
+  const antreanProses = items.filter(i => ['PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(getProductionStatus(i))).length
+  const antreanSiapAmbil = items.filter(i => ['SIAP KIRIM', 'SUDAH JADI'].includes(getProductionStatus(i))).length
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
@@ -178,21 +191,28 @@ export default async function DashboardPage({ searchParams }) {
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
                   <Clock className="w-5 h-5 text-blue-400" />
-                  <span className="font-medium text-foreground/80 text-sm">Baru Masuk (DRAFT)</span>
+                  <span className="font-medium text-foreground/80 text-sm">Baru Masuk</span>
                 </div>
                 <span className="text-lg font-bold text-blue-400">{antreanMasuk}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
+                  <Clock className="w-5 h-5 text-indigo-400" />
+                  <span className="font-medium text-foreground/80 text-sm">Siap Proses</span>
+                </div>
+                <span className="text-lg font-bold text-indigo-400">{antreanSiapProses}</span>
+              </div>
+              <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
+                <div className="flex items-center gap-3">
                   <Activity className="w-5 h-5 text-yellow-400" />
-                  <span className="font-medium text-foreground/80 text-sm">Sedang Proses (BERJALAN)</span>
+                  <span className="font-medium text-foreground/80 text-sm">Sedang Proses</span>
                 </div>
                 <span className="text-lg font-bold text-yellow-400">{antreanProses}</span>
               </div>
               <div className="flex items-center justify-between p-3 rounded-lg bg-white/5 border border-white/10">
                 <div className="flex items-center gap-3">
                   <CheckCircle className="w-5 h-5 text-green-400" />
-                  <span className="font-medium text-foreground/80 text-sm">Siap Ambil (SELESAI)</span>
+                  <span className="font-medium text-foreground/80 text-sm">Siap Kirim / Ambil</span>
                 </div>
                 <span className="text-lg font-bold text-green-400">{antreanSiapAmbil}</span>
               </div>
@@ -212,7 +232,6 @@ export default async function DashboardPage({ searchParams }) {
           </div>
              <div className="p-4 min-h-0 flex-1 overflow-y-auto max-h-[450px] space-y-3">
              {(() => {
-               const unpaidOrders = rawOrders.filter(o => o.payment_status !== 'LUNAS' && o.payment_status !== 'BATAL')
                if (unpaidOrders.length === 0) {
                  return <div className="text-center text-foreground/40 py-8">Belum ada piutang/pesanan aktif.</div>
                }
@@ -221,8 +240,7 @@ export default async function DashboardPage({ searchParams }) {
                  const month = so.date ? so.date.substring(0, 7) : 'Unknown'
                  if (!acc[month]) acc[month] = { totalRp: 0, orders: [] }
                  
-                 const total = Number(so.total_amount) || 0
-                 const sisa = total - (Number(so.dp_amount) || 0)
+                 const sisa = getOpenBalance(so)
                  
                  acc[month].totalRp += sisa
                  acc[month].orders.push({ ...so, sisaTagihan: sisa })
@@ -248,6 +266,9 @@ export default async function DashboardPage({ searchParams }) {
                           <div key={so.id} className="flex justify-between items-center text-sm border-b border-white/5 pb-2 last:border-0 last:pb-0 hover:bg-white/5 p-1 rounded transition-colors">
                              <div>
                                <p className="font-bold text-foreground/90">{so.customers?.name || 'Unknown'}</p>
+                               <p className="mt-0.5 text-xs text-foreground/50">
+                                 SO {so.date ? new Date(`${so.date}T12:00:00`).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : 'tanpa tanggal'} · {String(so.payment_status || 'BELUM LUNAS').trim().toUpperCase()}
+                               </p>
                              </div>
                              <p className="font-semibold text-yellow-400">Rp {so.sisaTagihan.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
                           </div>
@@ -260,10 +281,7 @@ export default async function DashboardPage({ searchParams }) {
           <div className="p-4 border-t border-white/10 bg-yellow-500/10 flex shrink-0 justify-between items-center">
             <span className="text-sm font-medium text-yellow-400">Total Keseluruhan:</span>
             <span className="text-lg font-bold text-yellow-500">
-              Rp {rawOrders.filter(o => o.payment_status !== 'LUNAS').reduce((acc, so) => {
-                const total = Number(so.total_amount) || 0
-                return acc + (total - (Number(so.dp_amount) || 0))
-              }, 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+              Rp {unpaidOrders.reduce((acc, so) => acc + getOpenBalance(so), 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
             </span>
           </div>
         </div>
