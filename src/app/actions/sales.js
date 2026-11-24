@@ -327,17 +327,37 @@ export async function createSalesOrder(payload) {
     }
 
     if (isKingInternal && grandTotal > 0) {
-      const productNames = items.map(item => internalProducts.get(String(item.product_id || '').trim())?.name).filter(Boolean)
-      const { error: internalPurchaseError } = await supabase.from('transactions').insert({
+      const salesBySource = new Map()
+      for (const item of items) {
+        const product = internalProducts.get(String(item.product_id || '').trim())
+        const sourceWorkshop = String(product?.workshop_code || '').trim().toUpperCase()
+        const sourceSale = salesBySource.get(sourceWorkshop) || { amount: 0, productNames: [] }
+        sourceSale.amount += Number(item.qty) * Number(item.price)
+        if (product?.name) sourceSale.productNames.push(product.name)
+        salesBySource.set(sourceWorkshop, sourceSale)
+      }
+
+      const internalPurchaseTransactions = Array.from(salesBySource, ([sourceWorkshop, sourceSale]) => ({
+        date: orderDate,
+        reference: 'PENJUALAN INTERNAL KING',
+        description: `Penjualan internal ke KING: ${sourceSale.productNames.join(', ')}`,
+        payment_method: 'Virtual',
+        amount_in: sourceSale.amount,
+        amount_out: 0,
+        workshop_code: sourceWorkshop,
+        so_id: so.id
+      })).filter(transaction => transaction.amount_in > 0)
+      internalPurchaseTransactions.push({
         date: orderDate,
         reference: 'PEMBELIAN INTERNAL KING',
-        description: `Pembelian internal KING: ${productNames.join(', ')}`,
+        description: `Pembelian internal KING dari ${Array.from(salesBySource.keys()).join(', ')}`,
         payment_method: 'Virtual',
         amount_in: 0,
         amount_out: grandTotal,
         workshop_code: 'KING',
         so_id: so.id
       })
+      const { error: internalPurchaseError } = await supabase.from('transactions').insert(internalPurchaseTransactions)
       if (internalPurchaseError) throw new Error('Gagal mencatat pengeluaran virtual KING: ' + internalPurchaseError.message)
     }
 
