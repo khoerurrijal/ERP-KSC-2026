@@ -14,6 +14,8 @@ import CurrencyInput from '@/components/CurrencyInput'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 import { useRoleAccess } from '@/components/RoleAccessContext'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 function removeInvoiceNumber(value) {
   return stripGeneratedInvoiceNumbers(value)
@@ -288,6 +290,7 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
     return { workshop, totalIn, totalOut, balance: totalIn - totalOut }
   }), [filteredAndSorted, summaryWorkshopCodes])
+  const { sortedRows: sortedWorkshopSummaries, sortConfig: workshopSortConfig, requestSort: requestWorkshopSort } = useSortableRows(workshopSummaries)
   const workshopTotals = workshopSummaries.reduce((totals, summary) => ({
     totalIn: totals.totalIn + summary.totalIn,
     totalOut: totals.totalOut + summary.totalOut,
@@ -405,14 +408,14 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
           <table className="w-full min-w-[560px] text-xs text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/60 uppercase">
               <tr>
-                <th className="px-4 py-2 font-medium">Workshop</th>
-                <th className="px-4 py-2 font-medium text-right">Masuk</th>
-                <th className="px-4 py-2 font-medium text-right">Keluar</th>
-                <th className="px-4 py-2 font-medium text-right">Saldo Bersih</th>
+                <SortableTableHeader sortKey="workshop" sortConfig={workshopSortConfig} onSort={requestWorkshopSort} className="px-4 py-2 font-medium">Workshop</SortableTableHeader>
+                <SortableTableHeader sortKey="totalIn" sortConfig={workshopSortConfig} onSort={requestWorkshopSort} className="px-4 py-2 font-medium text-right">Masuk</SortableTableHeader>
+                <SortableTableHeader sortKey="totalOut" sortConfig={workshopSortConfig} onSort={requestWorkshopSort} className="px-4 py-2 font-medium text-right">Keluar</SortableTableHeader>
+                <SortableTableHeader sortKey="balance" sortConfig={workshopSortConfig} onSort={requestWorkshopSort} className="px-4 py-2 font-medium text-right">Saldo Bersih</SortableTableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {workshopSummaries.map(({ workshop, totalIn, totalOut, balance }) => (
+              {sortedWorkshopSummaries.map(({ workshop, totalIn, totalOut, balance }) => (
                 <tr key={workshop}>
                   <th scope="row" className="px-4 py-2 font-bold text-foreground text-left">{workshop === 'TANPA WORKSHOP' ? 'Tanpa Workshop' : workshop}</th>
                   <td className="px-4 py-2 text-right font-semibold text-green-500 whitespace-nowrap">Rp {totalIn.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>

@@ -85,14 +85,14 @@ PENTING - KNOWLEDGE BASE KING SABLON CUP:
    - Fast Track (Jalur Cepat): 1-3 hari kerja (+Rp 100.000 per 1.000 pcs). Batas maksimal Fast Track adalah 1.000 pcs per pesanan. Sisanya ikut antrean reguler.
    - Catatan: "1 hari kerja" berarti butuh 1 hari proses. Jika pesan hari ini, kemungkinan selesai besok sore, BUKAN di hari H.
 5. Order & Pricelist Sablon:
-   - Jika ditanya daftar harga, pricelist, atau produk, berikan link ini: https://erpkscv1.vercel.app/order (Bisa hitung harga dan bikin invoice otomatis).
+   - Jika ditanya daftar harga, pricelist, atau produk, berikan link ini: https://kingsablon.cupstudio.id/order (Bisa hitung harga dan bikin invoice otomatis).
 6. Edukasi Produk Umum:
    - Untuk pertanyaan beda PP/PET, ukuran Oz, dsb, gunakan wawasan AI-mu secara cerdas.
 
 Jika pelanggan menanyakan status pesanan, COBA DULU gunakan nama profil WhatsApp mereka ("${pushname}") atau baca dari history chat sebelumnya untuk mencari datanya menggunakan tool "cek_pesanan".
 Jika data tidak ditemukan dengan nama profil tersebut, JANGAN meminta nomor invoice atau kode apapun. Tanyakan dengan ramah: "Boleh diinfokan nama brand-nya apa kak?" lalu gunakan alat "cek_pesanan" lagi dengan nama brand tersebut.
 Jawablah berdasarkan data yang didapatkan dari tool tersebut. Jika statusnya "PROSES", sampaikan bahwa sedang dicetak. Jika "SIAP KIRIM", sampaikan bahwa pesanan sudah selesai dan menunggu pelunasan/siap diambil.
-PENTING: Setiap kali kamu menemukan data pesanan pelanggan, kamu WAJIB memberikan link Tracking Publik berikut agar mereka bisa memantau sendiri: https://erpkscv1.vercel.app/track/[NOMOR_INVOICE] (ganti [NOMOR_INVOICE] dengan invoice yang sesuai).
+PENTING: Setiap kali kamu menemukan data pesanan pelanggan, kamu WAJIB memberikan link Tracking Publik berikut agar mereka bisa memantau sendiri: https://kingsablon.cupstudio.id/track/[NOMOR_INVOICE] (ganti [NOMOR_INVOICE] dengan invoice yang sesuai).
 Jika data masih tidak ditemukan setelah dicari dengan nama brand, katakan dengan sopan bahwa pesanan atas nama brand tersebut belum ditemukan.
 Jangan menjanjikan sesuatu yang tidak ada di database atau diluar Knowledge Base di atas.
 
@@ -139,7 +139,7 @@ const TEMPLATE_RULES = [
   },
   {
     pattern: /(harga|pricelist|katalog|produk|price list|mau order|pesan cup|order cup|bikin sablon|mau pesan|pesen)/i,
-    reply: "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://erpkscv1.vercel.app/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon.",
+    reply: "Baik kak, Untuk cek detail produk dan harga terbaru, Kakak bisa langsung klik link ini ya: https://kingsablon.cupstudio.id/order\n\nKakak bisa langsung hitung harga otomatis, membuat pesanan, dan mendapatkan Invoice untuk masuk ke antrian sablon.",
   },
   {
     pattern: /(berapa lama|lama proses|proses sablon|lama pengerjaan)/i,
@@ -511,7 +511,7 @@ export async function POST(req) {
           let reply;
           if (orders?.length) {
             const orderSummary = orders.map(order =>
-              `📌 *Invoice:* ${order.invoice_number}\n*Status:* ${order.status}\n*Item:* ${order.sales_items?.map(item => `${item.qty} pcs ${item.products?.name}`).join(', ')}\n*Tracking:* https://erpkscv1.vercel.app/track/${order.invoice_number}`
+              `📌 *Invoice:* ${order.invoice_number}\n*Status:* ${order.status}\n*Item:* ${order.sales_items?.map(item => `${item.qty} pcs ${item.products?.name}`).join(', ')}\n*Tracking:* https://kingsablon.cupstudio.id/track/${order.invoice_number}`
             ).join('\n\n');
             reply = `Ina sudah cek! Berikut detail pesanan atas nama kakak:\n\n${orderSummary}`;
           } else {
@@ -622,7 +622,7 @@ export async function POST(req) {
                   status: order.status,
                   date: order.date,
                   items: order.sales_items?.map(item => `${item.qty} pcs ${item.products?.name}`).join(', '),
-                  tracking_link: `https://erpkscv1.vercel.app/track/${order.invoice_number}`,
+                  tracking_link: `https://kingsablon.cupstudio.id/track/${order.invoice_number}`,
                 })),
               }
             : { status: 'not_found', message: 'Tidak ditemukan pesanan aktif dengan nama atau invoice tersebut.' };

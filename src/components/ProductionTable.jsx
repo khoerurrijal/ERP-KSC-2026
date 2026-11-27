@@ -198,8 +198,8 @@ export default function ProductionTable({ productionJobs, productionHistory = []
     const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
     result.sort((a, b) => {
       let comparison = 0
-      if (sortConfig.key === 'qty_target') {
-        comparison = Number(a.qty_target || 0) - Number(b.qty_target || 0)
+      if (sortConfig.key === 'qty_target' || sortConfig.key === 'qty_processed') {
+        comparison = Number(a[sortConfig.key] || 0) - Number(b[sortConfig.key] || 0)
       } else {
         let valueA
         let valueB
@@ -858,9 +858,9 @@ export default function ProductionTable({ productionJobs, productionHistory = []
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('customer')}>Nama / Brand {renderSortIcon('customer')}</th>
-                  <th className="px-4 py-3 font-medium">Mockup / Desain</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('mockup_url')}>Mockup / Desain {renderSortIcon('mockup_url')}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('product')}>Produk & Qty Target {renderSortIcon('product')}</th>
-                  <th className="px-4 py-3 font-medium">Progress (Selesai)</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('qty_processed')}>Progress (Selesai) {renderSortIcon('qty_processed')}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('target_date')}>Tgl Order & Target {renderSortIcon('target_date')}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleSort('item_status')}>Status Item {renderSortIcon('item_status')}</th>
                   <th className="px-4 py-3 font-medium text-right">Aksi</th>

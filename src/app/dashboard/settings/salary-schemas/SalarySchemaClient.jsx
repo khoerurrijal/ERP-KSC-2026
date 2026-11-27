@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { Plus, Edit2, Trash2, Save, X, Loader2 } from 'lucide-react'
 import { saveSalarySchema, deleteSalarySchema } from './actions'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 const parseRp = (val) => {
   if (!val) return 0;
@@ -16,6 +18,7 @@ const formatRp = (val) => {
 
 export default function SalarySchemaClient({ initialSchemas }) {
   const [schemas, setSchemas] = useState(initialSchemas)
+  const { sortedRows: sortedSchemas, sortConfig, requestSort } = useSortableRows(schemas)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   
@@ -95,14 +98,14 @@ export default function SalarySchemaClient({ initialSchemas }) {
         <table className="w-full text-sm text-left">
           <thead className="text-xs uppercase bg-white/5 text-foreground/60">
             <tr>
-              <th className="px-4 py-3 rounded-tl-xl">Jabatan</th>
-              <th className="px-4 py-3">Borongan (Sendiri/Bawahan)</th>
-              <th className="px-4 py-3">Bonus Harian & Lainnya</th>
+              <SortableTableHeader sortKey="role_name" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3 rounded-tl-xl">Jabatan</SortableTableHeader>
+              <SortableTableHeader sortKey="rate_borongan_sendiri" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3">Borongan (Sendiri/Bawahan)</SortableTableHeader>
+              <SortableTableHeader sortKey="bonus_target_harian" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3">Bonus Harian & Lainnya</SortableTableHeader>
               <th className="px-4 py-3 text-center rounded-tr-xl">Aksi</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
-            {schemas.map(schema => (
+            {sortedSchemas.map(schema => (
               <tr key={schema.id} className="hover:bg-white/5 transition-colors">
                 <td className="px-4 py-3 font-bold text-primary">{schema.role_name}</td>
                 <td className="px-4 py-3 text-xs text-foreground/80">

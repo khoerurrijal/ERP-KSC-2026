@@ -4,10 +4,24 @@ import { useState } from 'react'
 import Image from 'next/image'
 import { Coffee, Box } from 'lucide-react'
 import { calculateItemPrice as calculateItemPriceUtil } from '@/utils/pricing'
+import SortableTableHeader from '@/components/SortableTableHeader'
+
+const getPricelistItemPrice = (product, qty, pricelistConfig) => calculateItemPriceUtil({
+  product,
+  qty,
+  orderType: product.isTutup || product.category === 'ADDON' ? 'POLOS' : 'SABLON',
+  isTwoColor: false,
+  pricelistConfig
+})
 
 export default function PriceListClient({ products, matrix, pricelistConfig = {} }) {
   const [mainTab, setMainTab] = useState('KING CUP')
   const [activeCategory, setActiveCategory] = useState('ALL')
+  const [priceSortConfig, setPriceSortConfig] = useState({ key: '', direction: 'asc' })
+  const requestPriceSort = key => setPriceSortConfig(current => ({
+    key,
+    direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+  }))
 
   // Normalisasi Kategori yang mirip dengan di PDF
   const categoryOrder = [
@@ -164,7 +178,16 @@ export default function PriceListClient({ products, matrix, pricelistConfig = {}
       )}
 
       {displayCategories.map(cat => {
-        const catProducts = groupedProducts[cat]
+        const catProducts = [...groupedProducts[cat]].sort((a, b) => {
+          if (!priceSortConfig.key) return 0
+          const qtyByKey = { '500': 500, '1000': 1000, '5000': 5000 }
+          const left = priceSortConfig.key === 'name' ? a.name : getPricelistItemPrice(a, qtyByKey[priceSortConfig.key], pricelistConfig)
+          const right = priceSortConfig.key === 'name' ? b.name : getPricelistItemPrice(b, qtyByKey[priceSortConfig.key], pricelistConfig)
+          const comparison = priceSortConfig.key === 'name'
+            ? String(left).localeCompare(String(right), 'id', { numeric: true, sensitivity: 'base' })
+            : Number(left || 0) - Number(right || 0)
+          return priceSortConfig.direction === 'asc' ? comparison : -comparison
+        })
         // Resolve original matrix category name
         let matrixKey = cat
         if (cat === 'INJECTION') matrixKey = 'CUP INJECT'
@@ -205,10 +228,10 @@ export default function PriceListClient({ products, matrix, pricelistConfig = {}
                 <table className="w-full text-left border-collapse text-sm">
                   <thead>
                     <tr className="border-b-2 border-border/50">
-                      <th className="py-3 px-3 font-bold text-foreground bg-foreground/5 rounded-tl-xl text-xs uppercase tracking-wider">Produk / Ukuran</th>
-                      <th className="py-3 px-3 font-bold text-center text-primary bg-primary/5 text-xs uppercase tracking-wider">500 Pcs</th>
-                      <th className="py-3 px-3 font-bold text-center text-primary bg-primary/5 text-xs uppercase tracking-wider">1.000 Pcs</th>
-                      <th className="py-3 px-3 font-bold text-center text-primary bg-primary/5 rounded-tr-xl text-xs uppercase tracking-wider">5.000 Pcs</th>
+                      <SortableTableHeader sortKey="name" sortConfig={priceSortConfig} onSort={requestPriceSort} className="py-3 px-3 font-bold text-foreground bg-foreground/5 rounded-tl-xl text-xs uppercase tracking-wider">Produk / Ukuran</SortableTableHeader>
+                      <SortableTableHeader sortKey="500" sortConfig={priceSortConfig} onSort={requestPriceSort} className="py-3 px-3 font-bold text-center text-primary bg-primary/5 text-xs uppercase tracking-wider" buttonClassName="w-full justify-center">500 Pcs</SortableTableHeader>
+                      <SortableTableHeader sortKey="1000" sortConfig={priceSortConfig} onSort={requestPriceSort} className="py-3 px-3 font-bold text-center text-primary bg-primary/5 text-xs uppercase tracking-wider" buttonClassName="w-full justify-center">1.000 Pcs</SortableTableHeader>
+                      <SortableTableHeader sortKey="5000" sortConfig={priceSortConfig} onSort={requestPriceSort} className="py-3 px-3 font-bold text-center text-primary bg-primary/5 rounded-tr-xl text-xs uppercase tracking-wider" buttonClassName="w-full justify-center">5.000 Pcs</SortableTableHeader>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/30">

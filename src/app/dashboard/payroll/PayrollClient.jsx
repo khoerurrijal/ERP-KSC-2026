@@ -7,6 +7,8 @@ import CustomDatePicker from '@/components/CustomDatePicker'
 import CustomSelect from '@/components/CustomSelect'
 import { calculatePayroll, getWeeklyAttendance, getSavedPayroll, getSavedPayrolls, saveWeeklyAttendance, savePayroll } from './actions'
 import { calculatePayrollTotals, getPayrollLedgerAmount, getPayrollWeekStart } from './calculations.mjs'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 const currency = value => `Rp ${Number(value || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}`
 const todayKey = () => {
@@ -100,6 +102,15 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
   const [focusedLateInput, setFocusedLateInput] = useState(null)
   const attendanceDraftsRef = useRef(new Map())
   const savedPayrollsLoadedRef = useRef(Boolean(initialSavedPayrolls?.success))
+  const attendanceSortableRows = useMemo(() => attendanceRows.map(employee => ({
+    ...employee,
+    __weeklyLateTotal: (attendanceWeek?.dates || []).reduce((sum, date) => sum + (
+      employee.attendance[date] ? Number(employee.lateDeduction?.[date] || 0) : 0
+    ), 0)
+  })), [attendanceRows, attendanceWeek?.dates])
+  const { sortedRows: sortedAttendanceRows, sortConfig: attendanceSortConfig, requestSort: requestAttendanceSort } = useSortableRows(attendanceSortableRows)
+  const { sortedRows: sortedSavedPayrolls, sortConfig: savedPayrollSortConfig, requestSort: requestSavedPayrollSort } = useSortableRows(savedPayrolls)
+  const { sortedRows: sortedPayrollItems, sortConfig: payrollItemSortConfig, requestSort: requestPayrollItemSort } = useSortableRows(payrollData?.items || [])
 
   const [saveModalOpen, setSaveModalOpen] = useState(false)
   const [saveDesc, setSaveDesc] = useState('Gaji Karyawan')
@@ -376,18 +387,18 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
                 <table className="w-full min-w-[700px] text-sm text-left md:min-w-[820px]">
                   <thead className="bg-white/5 text-foreground/70">
                     <tr>
-                      <th className="sticky left-0 min-w-[110px] bg-background px-2 py-3 md:px-4">Karyawan</th>
+                      <SortableTableHeader sortKey="full_name" sortConfig={attendanceSortConfig} onSort={requestAttendanceSort} className="sticky left-0 min-w-[110px] bg-background px-2 py-3 md:px-4">Karyawan</SortableTableHeader>
                       {attendanceWeek.dates.map(date => (
-                        <th key={date} className="min-w-[82px] px-1 py-2 text-center md:px-2 md:py-3">
+                        <SortableTableHeader key={date} sortKey={`attendance.${date}`} sortConfig={attendanceSortConfig} onSort={requestAttendanceSort} className="min-w-[82px] px-1 py-2 text-center md:px-2 md:py-3" buttonClassName="w-full justify-center flex-col gap-0">
                           <span className="block text-[10px] font-semibold uppercase md:text-xs">{formatAttendanceWeekday(date)}</span>
                           <span className="block text-xs md:text-sm">{new Date(`${date}T00:00:00.000Z`).getUTCDate()}</span>
-                        </th>
+                        </SortableTableHeader>
                       ))}
-                      <th className="min-w-[112px] px-2 py-3 text-right text-xs uppercase">Total Terlambat</th>
+                      <SortableTableHeader sortKey="__weeklyLateTotal" sortConfig={attendanceSortConfig} onSort={requestAttendanceSort} className="min-w-[112px] px-2 py-3 text-right text-xs uppercase" buttonClassName="w-full justify-end">Total Terlambat</SortableTableHeader>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-white/5">
-                    {attendanceRows.map(employee => {
+                    {sortedAttendanceRows.map(employee => {
                       const weeklyLateTotal = attendanceWeek.dates.reduce((sum, date) => sum + (
                         employee.attendance[date] ? Number(employee.lateDeduction?.[date] || 0) : 0
                       ), 0)
@@ -468,9 +479,9 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
             <table className="w-full min-w-[560px] text-left text-sm">
               <thead className="bg-white/5 text-xs uppercase text-foreground/60">
                 <tr>
-                  <th className="px-4 py-3">Periode</th>
-                  <th className="px-3 py-3 text-center">Karyawan</th>
-                  <th className="px-3 py-3 text-right">Total Gaji</th>
+                  <SortableTableHeader sortKey="startDate" sortConfig={savedPayrollSortConfig} onSort={requestSavedPayrollSort} className="px-4 py-3">Periode</SortableTableHeader>
+                  <SortableTableHeader sortKey="employeeCount" sortConfig={savedPayrollSortConfig} onSort={requestSavedPayrollSort} className="px-3 py-3 text-center" buttonClassName="w-full justify-center">Karyawan</SortableTableHeader>
+                  <SortableTableHeader sortKey="totalAmount" sortConfig={savedPayrollSortConfig} onSort={requestSavedPayrollSort} className="px-3 py-3 text-right" buttonClassName="w-full justify-end">Total Gaji</SortableTableHeader>
                   <th className="px-4 py-3 text-right">Aksi</th>
                 </tr>
               </thead>
@@ -479,7 +490,7 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
                   <tr><td colSpan={4} className="px-4 py-8 text-center text-foreground/60"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" />Memuat rekap...</td></tr>
                 ) : savedPayrollsError ? (
                   <tr><td colSpan={4} role="alert" className="px-4 py-6 text-center text-red-400">{savedPayrollsError}</td></tr>
-                ) : savedPayrolls.length ? savedPayrolls.map(payroll => (
+                ) : savedPayrolls.length ? sortedSavedPayrolls.map(payroll => (
                   <tr key={payroll.id} className="hover:bg-white/[0.03]">
                     <td className="px-4 py-3 font-medium text-foreground">{formatAttendanceWeek(payroll.startDate, payroll.endDate)}</td>
                     <td className="px-3 py-3 text-center text-foreground/70">{payroll.employeeCount}</td>
@@ -567,16 +578,16 @@ export default function PayrollClient({ dropdownConfig = {}, initialAttendance =
                   <table className="w-full min-w-[760px] text-sm text-left">
                     <thead className="bg-white/5 text-xs uppercase text-foreground/60">
                       <tr>
-                        <th className="px-4 py-3">Karyawan</th>
-                        <th className="px-3 py-3 text-center">Hadir</th>
-                        <th className="px-3 py-3 text-right">Pendapatan</th>
-                        <th className="px-3 py-3 text-right">Potongan</th>
-                        <th className="px-3 py-3 text-right">Gaji Bersih</th>
+                        <SortableTableHeader sortKey="employee_name" sortConfig={payrollItemSortConfig} onSort={requestPayrollItemSort} className="px-4 py-3">Karyawan</SortableTableHeader>
+                        <SortableTableHeader sortKey="attendance_days" sortConfig={payrollItemSortConfig} onSort={requestPayrollItemSort} className="px-3 py-3 text-center" buttonClassName="w-full justify-center">Hadir</SortableTableHeader>
+                        <SortableTableHeader sortKey="gross_total" sortConfig={payrollItemSortConfig} onSort={requestPayrollItemSort} className="px-3 py-3 text-right" buttonClassName="w-full justify-end">Pendapatan</SortableTableHeader>
+                        <SortableTableHeader sortKey="total_deductions" sortConfig={payrollItemSortConfig} onSort={requestPayrollItemSort} className="px-3 py-3 text-right" buttonClassName="w-full justify-end">Potongan</SortableTableHeader>
+                        <SortableTableHeader sortKey="total" sortConfig={payrollItemSortConfig} onSort={requestPayrollItemSort} className="px-3 py-3 text-right" buttonClassName="w-full justify-end">Gaji Bersih</SortableTableHeader>
                         <th className="px-4 py-3 text-right">Rincian</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/10">
-                      {payrollData.items.map(item => {
+                      {sortedPayrollItems.map(item => {
                         const expanded = expandedPayrollId === item.employee_id
                         const dailyProductionEntries = expanded ? getDailyProductionEntries(item) : []
                         return (

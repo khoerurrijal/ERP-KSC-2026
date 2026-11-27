@@ -5,10 +5,27 @@ import Image from 'next/image'
 import { Printer, ArrowLeft, Download, Crown, MapPin, Phone, Mail } from 'lucide-react'
 import { useState, useMemo } from 'react'
 import { getInvoiceAdditionalCharges, getInvoiceBaseItems } from '@/utils/invoiceTotals'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 export default function InvoiceClient({ order, storeConfig }) {
   const router = useRouter()
   const [isQrisOpen, setIsQrisOpen] = useState(false)
+  const invoiceItems = getInvoiceBaseItems(order?.sales_items || [])
+  const additionalCharges = getInvoiceAdditionalCharges(order?.sales_items || [])
+  const invoiceTableRows = [
+    ...invoiceItems.map((item, index) => ({
+      rowType: 'item', key: item.id || `item-${index}`, item,
+      product: item.products?.name || item.product_code,
+      qty: Number(item.qty || 0), unit_multiplier: Number(item.unit_multiplier || 1),
+      unit_price: Number(item.unit_price || 0), total_price: Number(item.total_price || 0)
+    })),
+    ...additionalCharges.map(charge => ({
+      rowType: 'charge', key: charge.key, charge, product: charge.label,
+      qty: 0, unit_multiplier: 0, unit_price: charge.amount, total_price: charge.amount
+    }))
+  ]
+  const { sortedRows: sortedInvoiceItems, sortConfig, requestSort } = useSortableRows(invoiceTableRows)
 
   if (!order) {
     return (
@@ -22,11 +39,6 @@ export default function InvoiceClient({ order, storeConfig }) {
   const dateStr = new Date(order.date).toLocaleDateString('id-ID', { year: 'numeric', month: 'long', day: 'numeric' })
   const sisaBayar = Number(order.total_amount) - Number(order.dp_amount || 0)
   const canShowQris = Number(order.total_amount || 0) <= 500000
-  const invoiceItems = getInvoiceBaseItems(order.sales_items)
-  const additionalCharges = getInvoiceAdditionalCharges(order.sales_items)
-
-
-
   const handlePrint = () => {
     window.print()
   }
@@ -145,7 +157,7 @@ export default function InvoiceClient({ order, storeConfig }) {
           <div className="text-left md:text-right">
             <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Status Pembayaran:</p>
             <div className={`inline-block px-4 py-1.5 rounded-full font-bold text-sm border ${order.payment_status === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
-              {order.payment_status === 'LUNAS' ? 'LUNAS' : `BELUM LUNAS (${order.payment_status})`}
+              {order.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}
             </div>
           </div>
         </div>
@@ -182,30 +194,29 @@ export default function InvoiceClient({ order, storeConfig }) {
             <table className="w-full text-left border-collapse min-w-[500px]">
               <thead>
                 <tr className="border-b-2 border-gray-900">
-                  <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
-                  <th className="py-3 font-bold text-gray-900 text-sm text-center">Qty</th>
-                  <th className="py-3 font-bold text-gray-900 text-sm text-center">Satuan</th>
-                  <th className="py-3 font-bold text-gray-900 text-sm text-right">Harga (Rp)</th>
-                  <th className="py-3 font-bold text-gray-900 text-sm text-right">Subtotal (Rp)</th>
+                  <SortableTableHeader sortKey="product" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</SortableTableHeader>
+                  <SortableTableHeader sortKey="qty" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Qty</SortableTableHeader>
+                  <SortableTableHeader sortKey="unit_multiplier" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Satuan</SortableTableHeader>
+                  <SortableTableHeader sortKey="unit_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Harga (Rp)</SortableTableHeader>
+                  <SortableTableHeader sortKey="total_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Subtotal (Rp)</SortableTableHeader>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {invoiceItems.map((item, idx) => (
-                  <tr key={idx}>
-                    <td className="py-4">
-                      <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
-                      <p className="text-xs text-gray-500 mt-1">Order: {item.order_type}</p>
-                    </td>
-                    <td className="py-4 text-center font-medium text-gray-900">{Number(item.qty).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
-                    <td className="py-4 text-center text-gray-600">Pcs</td>
-                    <td className="py-4 text-right text-gray-600">{Number(item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
-                    <td className="py-4 text-right font-bold text-gray-900">{Number(item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                {sortedInvoiceItems.map(row => row.rowType === 'charge' ? (
+                  <tr key={row.key}>
+                    <td colSpan={4} className="py-3 text-right font-bold text-gray-900">{row.charge.label}</td>
+                    <td className="py-3 text-right font-bold text-gray-900">{row.charge.amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   </tr>
-                ))}
-                {additionalCharges.map((charge) => (
-                  <tr key={charge.key}>
-                    <td colSpan={4} className="py-3 text-right font-bold text-gray-900">{charge.label}</td>
-                    <td className="py-3 text-right font-bold text-gray-900">{charge.amount.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                ) : (
+                  <tr key={row.key}>
+                    <td className="py-4">
+                      <p className="font-bold text-gray-900">{row.item.products?.name || row.item.product_code}</p>
+                      <p className="text-xs text-gray-500 mt-1">Order: {row.item.order_type}</p>
+                    </td>
+                    <td className="py-4 text-center font-medium text-gray-900">{Number(row.item.qty).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                    <td className="py-4 text-center text-gray-600">Pcs</td>
+                    <td className="py-4 text-right text-gray-600">{Number(row.item.unit_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                    <td className="py-4 text-right font-bold text-gray-900">{Number(row.item.total_price).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
                   </tr>
                 ))}
               </tbody>

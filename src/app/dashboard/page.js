@@ -4,9 +4,11 @@ import Link from 'next/link'
 import PriceCalculator from '@/components/PriceCalculator'
 import StockSearchWidget from '@/components/StockSearchWidget'
 import DashboardDirectSale from '@/components/DashboardDirectSale'
+import DashboardNewOrders from '@/components/DashboardNewOrders'
 import MonthFilter from '@/components/MonthFilter'
 import { redirect } from 'next/navigation'
 import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
+import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,11 +49,13 @@ export default async function DashboardPage({ searchParams }) {
     { data: products },
     { data: salesOrders },
     { data: sablonItems },
+    { data: newStatusItems },
     { data: customers }
   ] = await Promise.all([
     supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name'),
     supabase.from('sales_orders').select('id, date, notes, payment_status, marketplace_settlement_status, marketplace_receipt, total_amount, dp_amount, customers(name, type)').limit(100000),
     supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000),
+    supabase.from('sales_items').select('id, so_id, status, order_type, product_code, notes, sales_orders(id, date, payment_status, customers(name, type)), products(name, category)').eq('order_type', 'SABLON').or('status.eq.BARU MASUK,status.is.null').limit(100000),
     supabase.from('customers').select('customer_code, name, type').order('name')
   ])
 
@@ -113,6 +117,27 @@ export default async function DashboardPage({ searchParams }) {
   const antreanSiapProses = items.filter(i => getProductionStatus(i) === 'SIAP PROSES').length
   const antreanProses = items.filter(i => ['PROSES', 'PROSES WARNA 1', 'PROSES WARNA 2'].includes(getProductionStatus(i))).length
   const antreanSiapAmbil = items.filter(i => ['SIAP KIRIM', 'SUDAH JADI'].includes(getProductionStatus(i))).length
+
+  const newOrdersById = new Map()
+  for (const item of newStatusItems || []) {
+    const order = Array.isArray(item.sales_orders) ? item.sales_orders[0] : item.sales_orders
+    if (!order || order.payment_status !== 'BELUM LUNAS' || isKingInternalOrder(order) || !isSablonProductionItem(item)) continue
+
+    const customer = Array.isArray(order.customers) ? order.customers[0] : order.customers
+    const existing = newOrdersById.get(order.id) || {
+      id: order.id,
+      customerName: customer?.name || 'Pelanggan',
+      date: order.date,
+      itemCount: 0,
+      products: []
+    }
+    existing.itemCount += 1
+    const productName = Array.isArray(item.products) ? item.products[0]?.name : item.products?.name
+    if (productName && !existing.products.includes(productName)) existing.products.push(productName)
+    newOrdersById.set(order.id, existing)
+  }
+  const newOrdersAwaitingApproval = [...newOrdersById.values()]
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')))
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500 pb-12">
@@ -201,6 +226,9 @@ export default async function DashboardPage({ searchParams }) {
                 </div>
                 <span className="text-lg font-bold text-green-400">{antreanSiapAmbil}</span>
               </div>
+              {['ADMIN', 'OWNER'].includes(String(userRole || '').trim().toUpperCase()) && (
+                <DashboardNewOrders orders={newOrdersAwaitingApproval} />
+              )}
             </div>
           </div>
 

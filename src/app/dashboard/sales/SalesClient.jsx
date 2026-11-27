@@ -348,10 +348,20 @@ export default function SalesClient({
       } else if (itemSortConfig.key === 'product_name') {
         aVal = prodA?.name || a.product_name || a.item_name || ''
         bVal = prodB?.name || b.product_name || b.item_name || ''
+      } else if (itemSortConfig.key === 'date') {
+        aVal = Date.parse(soA?.date || '') || 0
+        bVal = Date.parse(soB?.date || '') || 0
+      } else if (itemSortConfig.key === 'qty') {
+        aVal = Number(a.qty || a.quantity || 0)
+        bVal = Number(b.qty || b.quantity || 0)
+      } else if (itemSortConfig.key === 'status') {
+        aVal = String(a.status || 'BARU MASUK').replace(/_/g, ' ').toUpperCase()
+        bVal = String(b.status || 'BARU MASUK').replace(/_/g, ' ').toUpperCase()
       }
 
-      const comparison = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
-        .compare(String(aVal ?? ''), String(bVal ?? ''))
+      const comparison = ['date', 'qty'].includes(itemSortConfig.key)
+        ? Number(aVal) - Number(bVal)
+        : new Intl.Collator('id', { numeric: true, sensitivity: 'base' }).compare(String(aVal ?? ''), String(bVal ?? ''))
       return itemSortConfig.direction === 'asc' ? comparison : -comparison
     })
   }, [salesItems, debouncedSearch, filterMonth, itemFilterStatus, itemSortConfig])
@@ -598,11 +608,11 @@ export default function SalesClient({
             <table className="w-full text-sm text-left">
               <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Tanggal SO</th>
+                  <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('date')}>Tanggal SO {renderSortIcon('date', itemSortConfig)}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('customers_name')}>Pelanggan {renderSortIcon('customers_name', itemSortConfig)}</th>
                   <th className="px-4 py-3 font-medium cursor-pointer hover:text-white" onClick={() => handleItemSort('product_name')}>Produk {renderSortIcon('product_name', itemSortConfig)}</th>
-                  <th className="px-4 py-3 font-medium text-center">Qty</th>
-                  <th className="px-4 py-3 font-medium text-right">Status Operasional</th>
+                  <th className="px-4 py-3 font-medium text-center cursor-pointer hover:text-white" onClick={() => handleItemSort('qty')}>Qty {renderSortIcon('qty', itemSortConfig)}</th>
+                  <th className="px-4 py-3 font-medium text-right cursor-pointer hover:text-white" onClick={() => handleItemSort('status')}>Status Operasional {renderSortIcon('status', itemSortConfig)}</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-white/5">

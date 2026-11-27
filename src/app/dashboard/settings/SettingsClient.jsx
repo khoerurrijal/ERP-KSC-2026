@@ -7,6 +7,21 @@ import CurrencyInput from '@/components/CurrencyInput'
 import { DEFAULT_AI_MODEL } from '@/utils/aiAgent'
 import { useRoleAccess } from '@/components/RoleAccessContext'
 import { ACCESS_SECTIONS, normalizeRolePermissionMap } from '@/utils/role-access'
+import SortableTableHeader from '@/components/SortableTableHeader'
+
+const sortMatrixCategories = (matrix, sortConfig) => Object.keys(matrix || {}).sort((a, b) => {
+  const left = sortConfig.key === 'category' ? a : Number(matrix[a]?.[sortConfig.key] || 0)
+  const right = sortConfig.key === 'category' ? b : Number(matrix[b]?.[sortConfig.key] || 0)
+  const comparison = sortConfig.key === 'category'
+    ? String(left).localeCompare(String(right), 'id', { numeric: true, sensitivity: 'base' })
+    : left - right
+  return sortConfig.direction === 'asc' ? comparison : -comparison
+})
+
+const nextSortConfig = (current, key) => ({
+  key,
+  direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+})
 
 export default function SettingsClient({ initialSettings, onlyAccess = false, hideHeader = false, hideTabs = false, initialTab }) {
   const { canAccess } = useRoleAccess()
@@ -66,6 +81,8 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
     sablon_matrix: (dbPricelist.sablon_matrix && Object.keys(dbPricelist.sablon_matrix).length > 0) ? dbPricelist.sablon_matrix : defaultMatrix,
     printing_matrix: (dbPricelist.printing_matrix && Object.keys(dbPricelist.printing_matrix).length > 0) ? dbPricelist.printing_matrix : defaultPrintingMatrix
   })
+  const [sablonMatrixSort, setSablonMatrixSort] = useState({ key: 'category', direction: 'asc' })
+  const [printingMatrixSort, setPrintingMatrixSort] = useState({ key: 'category', direction: 'asc' })
 
   // State for Store Config
   const [store, setStore] = useState({
@@ -84,6 +101,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
 
   // State for Roles & Permissions
   const [rolePermissions, setRolePermissions] = useState(() => normalizeRolePermissionMap(initialSettings.role_permissions))
+  const [accessSortConfig, setAccessSortConfig] = useState({ key: 'permission', direction: 'asc' })
   const [userRoles, setUserRoles] = useState(initialSettings.user_roles || [])
   
   // State for Category Images
@@ -688,16 +706,16 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                   <table className="w-full text-sm text-left">
                     <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
-                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Kategori</th>
+                        <SortableTableHeader sortKey="category" sortConfig={sablonMatrixSort} onSort={key => setSablonMatrixSort(current => nextSortConfig(current, key))} className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Kategori</SortableTableHeader>
                         {['1', '10', '100', '500', '1000', '5000', '10000'].map(tier => (
-                          <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
+                          <SortableTableHeader key={tier} sortKey={tier} sortConfig={sablonMatrixSort} onSort={key => setSablonMatrixSort(current => nextSortConfig(current, key))} className="px-3 py-3 text-center whitespace-nowrap" buttonClassName="w-full justify-center">
                             &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
-                          </th>
+                          </SortableTableHeader>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {Object.keys(pricelist.sablon_matrix || {}).map((category) => (
+                      {sortMatrixCategories(pricelist.sablon_matrix, sablonMatrixSort).map((category) => (
                         <tr key={category} className="hover:bg-white/5 transition-colors">
                           <td className="px-4 py-4 font-bold text-yellow-400 whitespace-nowrap">{category}</td>
                           {['1', '10', '100', '500', '1000', '5000', '10000'].map(tier => (
@@ -740,16 +758,16 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                   <table className="w-full text-sm text-left">
                     <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-[10px] font-bold tracking-wider">
                       <tr>
-                        <th className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Varian Warna</th>
+                        <SortableTableHeader sortKey="category" sortConfig={printingMatrixSort} onSort={key => setPrintingMatrixSort(current => nextSortConfig(current, key))} className="px-4 py-3 rounded-tl-xl whitespace-nowrap min-w-[120px]">Varian Warna</SortableTableHeader>
                         {['3000', '5000', '10000', '30000'].map(tier => (
-                          <th key={tier} className="px-3 py-3 text-center whitespace-nowrap">
+                          <SortableTableHeader key={tier} sortKey={tier} sortConfig={printingMatrixSort} onSort={key => setPrintingMatrixSort(current => nextSortConfig(current, key))} className="px-3 py-3 text-center whitespace-nowrap" buttonClassName="w-full justify-center">
                             &ge; {Number(tier) >= 1000 ? (Number(tier)/1000) + 'K' : tier} PCS
-                          </th>
+                          </SortableTableHeader>
                         ))}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-white/5">
-                      {Object.keys(pricelist.printing_matrix || {}).map((category) => (
+                      {sortMatrixCategories(pricelist.printing_matrix, printingMatrixSort).map((category) => (
                         <tr key={category} className="hover:bg-white/5 transition-colors">
                           <td className="px-4 py-4 font-bold text-blue-400 whitespace-nowrap">{category}</td>
                           {['3000', '5000', '10000', '30000'].map(tier => (
@@ -1076,9 +1094,9 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
               <table className="w-full text-sm text-left">
                 <thead className="bg-white/5 border-b border-white/10 text-foreground/80 uppercase text-xs font-bold tracking-wider">
                   <tr>
-                    <th className="px-6 py-4 rounded-tl-xl">Halaman / Tab</th>
+                    <SortableTableHeader sortKey="permission" sortConfig={accessSortConfig} onSort={key => setAccessSortConfig(current => nextSortConfig(current, key))} className="px-6 py-4 rounded-tl-xl">Halaman / Tab</SortableTableHeader>
                     {ROLES.map(role => (
-                      <th key={role} className="px-6 py-4 text-center">{role}</th>
+                      <SortableTableHeader key={role} sortKey={`role:${role}`} sortConfig={accessSortConfig} onSort={key => setAccessSortConfig(current => nextSortConfig(current, key))} className="px-6 py-4 text-center" buttonClassName="w-full justify-center">{role}</SortableTableHeader>
                     ))}
                   </tr>
                 </thead>
@@ -1088,7 +1106,16 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                       <tr className="bg-white/[0.04]">
                         <th colSpan={ROLES.length + 1} className="px-6 py-3 text-xs font-bold uppercase tracking-wider text-primary">{section.label}</th>
                       </tr>
-                      {section.pages.flatMap((page) => page.permissions.map((permission) => (
+                      {[...section.pages.flatMap((page) => page.permissions.map((permission) => ({ page, permission })))].sort((a, b) => {
+                        let comparison
+                        if (accessSortConfig.key.startsWith('role:')) {
+                          const role = accessSortConfig.key.slice(5)
+                          comparison = Number((rolePermissions[role] || []).includes(a.permission.id)) - Number((rolePermissions[role] || []).includes(b.permission.id))
+                        } else {
+                          comparison = `${a.page.label} ${a.permission.label}`.localeCompare(`${b.page.label} ${b.permission.label}`, 'id', { numeric: true, sensitivity: 'base' })
+                        }
+                        return accessSortConfig.direction === 'asc' ? comparison : -comparison
+                      }).map(({ page, permission }) => (
                         <tr key={permission.id} className="hover:bg-white/5 transition-colors">
                           <td className="px-6 py-3 font-medium text-foreground/90">
                             <span className="block text-xs text-foreground/50">{page.label}</span>
@@ -1112,7 +1139,7 @@ export default function SettingsClient({ initialSettings, onlyAccess = false, hi
                             )
                           })}
                         </tr>
-                      )))}
+                      ))}
                     </Fragment>
                   ))}
                 </tbody>

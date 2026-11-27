@@ -256,16 +256,16 @@ export function getProductionItemProgress(job, logs = []) {
 
 export function getRecalculatedProductionStatus(job, logs = [], {
   canProceed = true,
-  currentStatus = 'BARU MASUK',
-  forceRecalculate = false
+  currentStatus = 'BARU MASUK'
 } = {}) {
-  const progress = getProductionItemProgress(job, logs)
   const status = String(currentStatus || 'BARU MASUK').toUpperCase()
   const deliveredStatuses = new Set(['DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'])
+  if (deliveredStatuses.has(status)) return status
 
-  if (progress.isComplete) return deliveredStatuses.has(status) ? status : 'SIAP KIRIM'
+  const progress = getProductionItemProgress(job, logs)
+
+  if (progress.isComplete) return 'SIAP KIRIM'
   if (progress.qtyActivity > 0) return 'PROSES'
-  if (!forceRecalculate && !logs.length && deliveredStatuses.has(status)) return status
   return canProceed ? 'SIAP PROSES' : 'BARU MASUK'
 }
 

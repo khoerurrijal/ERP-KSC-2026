@@ -9,6 +9,8 @@ import { previewBulkMarketplaceSettlement, processBulkMarketplaceSettlement } fr
 import CustomSelect from '@/components/CustomSelect'
 import CustomDatePicker from '@/components/CustomDatePicker'
 import CurrencyInput from '@/components/CurrencyInput'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 export default function MarketplaceClient({ marketplaceOrders = [], dropdownConfig = {} }) {
   const filteredOrders = marketplaceOrders
@@ -18,6 +20,11 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
 
   // State for inline pencairan inputs
   const [inputPencairan, setInputPencairan] = useState({})
+  const sortableOrders = filteredOrders.map(order => ({
+    ...order,
+    __settlementSortAmount: Number(String(inputPencairan[order.id] ?? order.marketplace_pencairan ?? 0).replace(/[^\d-]/g, '')) || 0
+  }))
+  const { sortedRows: sortedOrders, sortConfig, requestSort } = useSortableRows(sortableOrders)
   
   // State for inline receipt inputs
   const [inputReceipts, setInputReceipts] = useState({})
@@ -50,6 +57,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
   const [bulkPreview, setBulkPreview] = useState(null)
   const [isBulkLoading, setIsBulkLoading] = useState(false)
   const [bulkSettlementDate, setBulkSettlementDate] = useState(new Date().toISOString().split('T')[0])
+  const { sortedRows: sortedBulkPreviewRows, sortConfig: bulkPreviewSortConfig, requestSort: requestBulkPreviewSort } = useSortableRows(bulkPreview?.rows || [])
 
   const handleInputChange = (id, value) => {
     setInputPencairan(prev => ({
@@ -312,12 +320,12 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                     aria-label="Pilih semua order marketplace"
                   />
                 </th>
-                <th className="px-4 py-3">Tanggal Order</th>
-                <th className="px-4 py-3">No. Pesanan / Resi</th>
-                <th className="px-4 py-3">Platform</th>
-                <th className="px-4 py-3 text-right">Nilai Tagihan</th>
-                <th className="px-4 py-3 text-right">Pencairan (Rp)</th>
-                <th className="px-4 py-3 text-right">Status Pencairan</th>
+                <SortableTableHeader sortKey="date" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3">Tanggal Order</SortableTableHeader>
+                <SortableTableHeader sortKey="marketplace_receipt" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3">No. Pesanan / Resi</SortableTableHeader>
+                <SortableTableHeader sortKey="customers.name" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3">Platform</SortableTableHeader>
+                <SortableTableHeader sortKey="total_amount" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3 text-right">Nilai Tagihan</SortableTableHeader>
+                <SortableTableHeader sortKey="__settlementSortAmount" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3 text-right">Pencairan (Rp)</SortableTableHeader>
+                <SortableTableHeader sortKey="payment_status" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-3 text-right">Status Pencairan</SortableTableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
@@ -325,7 +333,7 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                 <tr>
                   <td colSpan="7" className="px-4 py-8 text-center text-foreground/40">Belum ada data pesanan marketplace.</td>
                 </tr>
-              ) : filteredOrders.map(item => (
+              ) : sortedOrders.map(item => (
                 <tr key={item.id} className={`hover:bg-white/5 ${inputPencairan[item.id] > 0 ? 'bg-primary/5' : ''}`}>
                   <td className="px-4 py-3">
                     <input
@@ -533,14 +541,14 @@ export default function MarketplaceClient({ marketplaceOrders = [], dropdownConf
                     <table className="w-full text-xs text-left">
                       <thead className="bg-white/5 text-foreground/60 uppercase">
                         <tr>
-                          <th className="px-3 py-2">No Pesanan</th>
-                          <th className="px-3 py-2">Nominal</th>
-                          <th className="px-3 py-2">Pelanggan</th>
-                          <th className="px-3 py-2">Status</th>
+                          <SortableTableHeader sortKey="receipt" sortConfig={bulkPreviewSortConfig} onSort={requestBulkPreviewSort} className="px-3 py-2">No Pesanan</SortableTableHeader>
+                          <SortableTableHeader sortKey="amount" sortConfig={bulkPreviewSortConfig} onSort={requestBulkPreviewSort} className="px-3 py-2 text-right" buttonClassName="w-full justify-end">Nominal</SortableTableHeader>
+                          <SortableTableHeader sortKey="customerName" sortConfig={bulkPreviewSortConfig} onSort={requestBulkPreviewSort} className="px-3 py-2">Pelanggan</SortableTableHeader>
+                          <SortableTableHeader sortKey="status" sortConfig={bulkPreviewSortConfig} onSort={requestBulkPreviewSort} className="px-3 py-2">Status</SortableTableHeader>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-white/5">
-                        {bulkPreview.rows.map((row, index) => (
+                        {sortedBulkPreviewRows.map((row, index) => (
                           <tr key={`${row.receipt}-${row.line}-${index}`}>
                             <td className="px-3 py-2 font-mono">{row.receipt || '-'}</td>
                             <td className="px-3 py-2 text-right">Rp {Number(row.amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>

@@ -311,6 +311,58 @@ export async function updateSalesOrderStatus(itemId, status) {
   }
 }
 
+export async function advanceUnpaidSalesOrderToProduction(soId) {
+  const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER'], 'Hanya Admin/Owner yang dapat melanjutkan pesanan belum lunas.')
+
+  try {
+    if (!soId) throw new Error('Pesanan tidak valid.')
+
+    const { data: items, error: itemsError } = await supabase
+      .from('sales_items')
+      .select('id, status, order_type, product_code, notes, sales_orders(id, payment_status, customers(name, type)), products(name, category)')
+      .eq('so_id', soId)
+
+    if (itemsError) throw itemsError
+    if (!items?.length) throw new Error('Item pesanan tidak ditemukan.')
+
+    const orderRelation = items[0].sales_orders
+    const order = Array.isArray(orderRelation) ? orderRelation[0] : orderRelation
+    if (!order || isKingInternalOrder(order)) throw new Error('Pesanan ini tidak dapat dilanjutkan dari dashboard.')
+    if (String(order.payment_status || '').trim().toUpperCase() !== 'BELUM LUNAS') {
+      throw new Error('Shortcut ini hanya untuk pesanan yang belum lunas.')
+    }
+
+    const eligibleIds = items
+      .filter(item => String(item.status || 'BARU MASUK').trim().toUpperCase() === 'BARU MASUK')
+      .filter(item => String(item.order_type || '').trim().toUpperCase() === 'SABLON' && isSablonProductionItem(item))
+      .map(item => item.id)
+
+    if (!eligibleIds.length) throw new Error('Tidak ada item sablon berstatus Baru Masuk di pesanan ini.')
+
+    const { data: updatedItems, error: updateError } = await supabase
+      .from('sales_items')
+      .update({ status: 'SIAP PROSES' })
+      .in('id', eligibleIds)
+      .or('status.eq.BARU MASUK,status.is.null')
+      .select('id')
+
+    if (updateError) throw updateError
+    if (!updatedItems?.length) throw new Error('Status item baru saja berubah. Muat ulang dashboard.')
+
+    revalidatePath('/dashboard')
+    revalidatePath('/dashboard/production')
+    revalidatePath('/dashboard/production/status')
+    revalidatePath('/dashboard/sales')
+    revalidatePath('/status-pesanan')
+    revalidatePath('/sales')
+    revalidatePath('/track')
+    return { success: true, updatedCount: updatedItems.length }
+  } catch (err) {
+    console.error('Error advancing unpaid sales order:', err)
+    return { success: false, error: err.message || 'Gagal melanjutkan pesanan.' }
+  }
+}
+
 const DELIVERY_ORDER_TYPES = new Set(['SABLON', 'POLOS', 'PRINTING'])
 const DELIVERY_READY_STATUSES = new Set(['SIAP KIRIM', 'SUDAH JADI', 'DIKIRIM', 'SUDAH DIAMBIL', 'SELESAI'])
 const LEGACY_SERVICE_CODES = new Set(['SRV-FAST-TRACK', 'FAST-TRACK', 'SRV-2-WARNA', 'BIAYA-WARNA'])

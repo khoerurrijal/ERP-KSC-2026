@@ -7,6 +7,8 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, ArrowDownToLine, ArrowUpFromLine, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
 
 export default function MutasiClient({ mutations = [], products = [], selectedMonth = '', initialSearch = '', error = null }) {
@@ -50,15 +52,16 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
       return matchSearch && matchProduct
     })
   }, [mutations, searchQuery, filterProduct])
+  const { sortedRows: sortedMutations, sortConfig, requestSort } = useSortableRows(filteredMutations)
 
   useEffect(() => {
     setCurrentPage(1)
   }, [searchQuery, filterProduct, selectedMonth, mutations])
 
-  const totalPages = Math.max(1, Math.ceil(filteredMutations.length / pageSize))
-  const paginatedMutations = filteredMutations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
-  const firstVisibleMutation = filteredMutations.length ? (currentPage - 1) * pageSize + 1 : 0
-  const lastVisibleMutation = Math.min(currentPage * pageSize, filteredMutations.length)
+  const totalPages = Math.max(1, Math.ceil(sortedMutations.length / pageSize))
+  const paginatedMutations = sortedMutations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const firstVisibleMutation = sortedMutations.length ? (currentPage - 1) * pageSize + 1 : 0
+  const lastVisibleMutation = Math.min(currentPage * pageSize, sortedMutations.length)
 
   // Hitung Total Masuk dan Keluar Bulan Ini (dari yang terfilter)
   const totalMasuk = filteredMutations.reduce((sum, m) => sum + Number(m.qty_in || 0), 0)
@@ -126,13 +129,13 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
           <table className="w-full min-w-[900px] text-sm text-left">
             <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-white/10 text-foreground/70 uppercase text-[11px]">
               <tr>
-                <th className="px-3 py-2.5 font-medium">Waktu</th>
-                <th className="px-3 py-2.5 font-medium">Pelanggan / Supplier</th>
-                <th className="px-3 py-2.5 font-medium">Produk</th>
-                <th className="px-3 py-2.5 font-medium text-right text-green-400">Masuk</th>
-                <th className="px-3 py-2.5 font-medium text-right text-yellow-400">Keluar</th>
-                <th className="px-3 py-2.5 font-medium text-right text-blue-400">Proses</th>
-                <th className="px-3 py-2.5 font-medium text-right text-red-400">Reject</th>
+                <SortableTableHeader sortKey="mutation_date" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium">Waktu</SortableTableHeader>
+                <SortableTableHeader sortKey="actor" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium">Pelanggan / Supplier</SortableTableHeader>
+                <SortableTableHeader sortKey="product_name" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium">Produk</SortableTableHeader>
+                <SortableTableHeader sortKey="qty_in" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium text-right text-green-400">Masuk</SortableTableHeader>
+                <SortableTableHeader sortKey="qty_out" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium text-right text-yellow-400">Keluar</SortableTableHeader>
+                <SortableTableHeader sortKey="qty_proses" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium text-right text-blue-400">Proses</SortableTableHeader>
+                <SortableTableHeader sortKey="qty_reject" sortConfig={sortConfig} onSort={requestSort} className="px-3 py-2.5 font-medium text-right text-red-400">Reject</SortableTableHeader>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">

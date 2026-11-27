@@ -4,6 +4,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, Plus, Box, Trash2, CheckCircle2, Loader2, X, Upload } from 'lucide-react'
 import { addProduct, deleteProduct, updateProduct, upsertProductsBulk } from './actions'
@@ -158,6 +160,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
     matchesSearchText(p.category, searchQuery) ||
     matchesSearchText(p.workshops?.name, searchQuery)
   )
+  const { sortedRows: sortedProducts, sortConfig, requestSort } = useSortableRows(filteredProducts)
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -192,12 +195,12 @@ export default function ProductsClient({ products: initialProducts = [], error =
           <table className="w-full text-sm text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
-                <th className="px-6 py-4 font-medium">Kode</th>
-                <th className="px-6 py-4 font-medium">Nama Produk</th>
-                <th className="px-6 py-4 font-medium">Kategori</th>
-                <th className="px-6 py-4 font-medium">Workshop</th>
-                <th className="px-6 py-4 font-medium">HPP Murni (Modal)</th>
-                <th className="px-6 py-4 font-medium text-center">Status</th>
+                <SortableTableHeader sortKey="product_code" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Kode</SortableTableHeader>
+                <SortableTableHeader sortKey="name" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Nama Produk</SortableTableHeader>
+                <SortableTableHeader sortKey="category" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Kategori</SortableTableHeader>
+                <SortableTableHeader sortKey="workshops.name" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Workshop</SortableTableHeader>
+                <SortableTableHeader sortKey="price_polos" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">HPP Murni (Modal)</SortableTableHeader>
+                <SortableTableHeader sortKey="is_active" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium text-center">Status</SortableTableHeader>
                 <th className="px-6 py-4 font-medium text-right">Aksi</th>
               </tr>
             </thead>
@@ -212,7 +215,7 @@ export default function ProductsClient({ products: initialProducts = [], error =
                     Belum ada data barang jadi. Silakan tambah data baru.
                   </td>
                 </tr>
-              ) : filteredProducts?.map((item) => (
+              ) : sortedProducts?.map((item) => (
                 <tr key={item.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-medium text-accent">{item.product_code}</td>
                   <td className="px-6 py-4 text-foreground/90">{item.name}</td>

@@ -3,6 +3,8 @@
 import React, { useState } from 'react'
 import Image from 'next/image'
 import { Package, Truck, CheckCircle2, Clock, Check, ChevronDown, AlertCircle, Settings, PackageOpen, CreditCard, XCircle, Download, MapPin, Phone, Mail, Navigation } from 'lucide-react'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 
 const STATUS_STEPS = [
   { key: 'BARU MASUK', label: 'Baru Masuk', icon: PackageOpen },
@@ -19,6 +21,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
   
   const paymentStatus = order.payment_status || 'BELUM LUNAS'
   const items = order.sales_items || []
+  const { sortedRows: sortedTrackItems, sortConfig, requestSort } = useSortableRows(items)
   
   const amountPaid = order.dp_amount || 0
   const totalAmount = order.total_amount || 0
@@ -475,7 +478,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       <div className="text-left md:text-right">
                         <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Status Pembayaran:</p>
                         <div className={`inline-block px-4 py-1.5 rounded-full font-bold text-sm border ${order.payment_status === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
-                          {order.payment_status === 'LUNAS' ? 'LUNAS' : `BELUM LUNAS (${order.payment_status})`}
+                          {order.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}
                         </div>
                       </div>
                     </div>
@@ -501,15 +504,15 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                         <table className="w-full text-left border-collapse min-w-[500px]">
                           <thead>
                             <tr className="border-b-2 border-gray-900">
-                              <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
-                              <th className="py-3 font-bold text-gray-900 text-sm text-center">Qty</th>
-                              <th className="py-3 font-bold text-gray-900 text-sm text-center">Satuan</th>
-                              <th className="py-3 font-bold text-gray-900 text-sm text-right">Harga (Rp)</th>
-                              <th className="py-3 font-bold text-gray-900 text-sm text-right">Subtotal (Rp)</th>
+                              <SortableTableHeader sortKey="products.name" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</SortableTableHeader>
+                              <SortableTableHeader sortKey="qty" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Qty</SortableTableHeader>
+                              <SortableTableHeader sortKey="unit_multiplier" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Satuan</SortableTableHeader>
+                              <SortableTableHeader sortKey="unit_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Harga (Rp)</SortableTableHeader>
+                              <SortableTableHeader sortKey="total_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Subtotal (Rp)</SortableTableHeader>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {items.map((item, idx) => (
+                            {sortedTrackItems.map((item, idx) => (
                               <tr key={idx}>
                                 <td className="py-4">
                                   <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>
@@ -648,7 +651,7 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                     <div className="text-right">
                       <p className="text-xs text-gray-500 uppercase font-bold tracking-widest mb-2">Status Pembayaran:</p>
                       <div className={`inline-block px-4 py-1.5 rounded-full font-bold text-sm border ${order.payment_status === 'LUNAS' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-100 text-yellow-700 border-yellow-200'}`}>
-                        {order.payment_status === 'LUNAS' ? 'LUNAS' : `BELUM LUNAS (${order.payment_status})`}
+                        {order.payment_status === 'LUNAS' ? 'LUNAS' : 'BELUM LUNAS'}
                       </div>
                     </div>
                   </div>
@@ -658,15 +661,15 @@ export default function TrackClient({ order, logs, settings, storeConfig, employ
                       <table className="w-full text-left border-collapse min-w-[500px]">
                         <thead>
                           <tr className="border-b-2 border-gray-900">
-                            <th className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</th>
-                            <th className="py-3 font-bold text-gray-900 text-sm text-center">Qty</th>
-                            <th className="py-3 font-bold text-gray-900 text-sm text-center">Satuan</th>
-                            <th className="py-3 font-bold text-gray-900 text-sm text-right">Harga (Rp)</th>
-                            <th className="py-3 font-bold text-gray-900 text-sm text-right">Subtotal (Rp)</th>
+                            <SortableTableHeader sortKey="products.name" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm">Deskripsi Pesanan</SortableTableHeader>
+                            <SortableTableHeader sortKey="qty" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Qty</SortableTableHeader>
+                            <SortableTableHeader sortKey="unit_multiplier" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-center" buttonClassName="w-full justify-center">Satuan</SortableTableHeader>
+                            <SortableTableHeader sortKey="unit_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Harga (Rp)</SortableTableHeader>
+                            <SortableTableHeader sortKey="total_price" sortConfig={sortConfig} onSort={requestSort} className="py-3 font-bold text-gray-900 text-sm text-right" buttonClassName="w-full justify-end">Subtotal (Rp)</SortableTableHeader>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {items.map((item, idx) => (
+                          {sortedTrackItems.map((item, idx) => (
                             <tr key={idx}>
                               <td className="py-4">
                                 <p className="font-bold text-gray-900">{item.products?.name || item.product_code}</p>

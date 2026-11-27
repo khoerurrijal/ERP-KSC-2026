@@ -2,6 +2,8 @@
 
 import { useState } from 'react'
 import { Plus, Edit2, Trash2, Save, X, Loader2, CheckCircle2, XCircle } from 'lucide-react'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 import { saveEmployee, deleteEmployee } from './actions'
 import CustomSelect from '@/components/CustomSelect'
 import CurrencyInput from '@/components/CurrencyInput'
@@ -116,7 +118,8 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
     }
   }
 
-  const paginatedEmployees = employees.slice((page - 1) * pageSize, page * pageSize)
+  const { sortedRows: sortedEmployees, sortConfig, requestSort } = useSortableRows(employees)
+  const paginatedEmployees = sortedEmployees.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <div className="space-y-4">
@@ -130,10 +133,10 @@ export default function EmployeesClient({ initialEmployees, schemas }) {
         <table className="w-full text-sm text-left">
           <thead className="text-xs uppercase bg-white/5 text-foreground/60">
             <tr>
-              <th className="px-4 py-4 rounded-tl-xl">Nama Lengkap</th>
-              <th className="px-4 py-4">Username Login</th>
-              <th className="px-4 py-4">Posisi / Jabatan</th>
-              <th className="px-4 py-4">Status</th>
+              <SortableTableHeader sortKey="full_name" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-4 rounded-tl-xl">Nama Lengkap</SortableTableHeader>
+              <SortableTableHeader sortKey="username" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-4">Username Login</SortableTableHeader>
+              <SortableTableHeader sortKey="salary_schemas.role_name" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-4">Posisi / Jabatan</SortableTableHeader>
+              <SortableTableHeader sortKey="is_active" sortConfig={sortConfig} onSort={requestSort} className="px-4 py-4">Status</SortableTableHeader>
               <th className="px-4 py-4 text-center rounded-tr-xl">Aksi</th>
             </tr>
           </thead>

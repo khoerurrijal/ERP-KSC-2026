@@ -4,6 +4,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect, useCallback } from 'react'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Search, Plus, Truck, CheckCircle2, Edit2, Trash2, X, Loader2 } from 'lucide-react'
 import { saveSupplier, deleteSupplier } from './actions'
@@ -102,6 +104,7 @@ export default function SuppliersClient({ initialSuppliers = [], error, initialS
     matchesSearchText(supplier.phone, searchQuery, { numericSubstring: true }) ||
     matchesSearchText(supplier.address, searchQuery)
   )
+  const { sortedRows: sortedSuppliers, sortConfig, requestSort } = useSortableRows(filteredSuppliers)
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -129,9 +132,9 @@ export default function SuppliersClient({ initialSuppliers = [], error, initialS
           <table className="w-full text-sm text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
-                <th className="px-6 py-4 font-medium">Nama Supplier</th>
-                <th className="px-6 py-4 font-medium">No. Telepon</th>
-                <th className="px-6 py-4 font-medium">Alamat</th>
+                <SortableTableHeader sortKey="supplier_name" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Nama Supplier</SortableTableHeader>
+                <SortableTableHeader sortKey="phone" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">No. Telepon</SortableTableHeader>
+                <SortableTableHeader sortKey="address" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Alamat</SortableTableHeader>
                 <th className="px-6 py-4 font-medium text-right">Aksi</th>
               </tr>
             </thead>
@@ -146,7 +149,7 @@ export default function SuppliersClient({ initialSuppliers = [], error, initialS
                     Belum ada data supplier terdaftar.
                   </td>
                 </tr>
-              ) : filteredSuppliers.map((item) => (
+              ) : sortedSuppliers.map((item) => (
                 <tr key={item.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 text-foreground/90 font-bold">{item.supplier_name}</td>
                   <td className="px-6 py-4 text-foreground/60">{item.phone || '-'}</td>

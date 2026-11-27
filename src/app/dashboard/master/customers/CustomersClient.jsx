@@ -4,6 +4,8 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 
 import { useState, useEffect, useCallback } from 'react'
+import useSortableRows from '@/hooks/useSortableRows'
+import SortableTableHeader from '@/components/SortableTableHeader'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { Search, Plus, Users, CheckCircle2, Trash2, Loader2, ChevronLeft, ChevronRight } from 'lucide-react'
 import { addCustomer, deleteCustomer, updateCustomer } from './actions'
@@ -119,6 +121,7 @@ export default function CustomersClient({
   }
 
   const filteredCustomers = customers
+  const { sortedRows: sortedCustomers, sortConfig, requestSort } = useSortableRows(filteredCustomers)
 
   return (
     <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
@@ -146,11 +149,11 @@ export default function CustomersClient({
           <table className="w-full text-sm text-left">
             <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
               <tr>
-                <th className="px-6 py-4 font-medium">Kode</th>
-                <th className="px-6 py-4 font-medium">Nama / Brand</th>
-                <th className="px-6 py-4 font-medium">Tipe</th>
-                <th className="px-6 py-4 font-medium">Telepon</th>
-                <th className="px-6 py-4 font-medium">Kota</th>
+                <SortableTableHeader sortKey="customer_code" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Kode</SortableTableHeader>
+                <SortableTableHeader sortKey="name" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Nama / Brand</SortableTableHeader>
+                <SortableTableHeader sortKey="type" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Tipe</SortableTableHeader>
+                <SortableTableHeader sortKey="phone" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Telepon</SortableTableHeader>
+                <SortableTableHeader sortKey="city" sortConfig={sortConfig} onSort={requestSort} className="px-6 py-4 font-medium">Kota</SortableTableHeader>
                 <th className="px-6 py-4 font-medium text-right">Aksi</th>
               </tr>
             </thead>
@@ -165,7 +168,7 @@ export default function CustomersClient({
                     Belum ada data pelanggan terdaftar.
                   </td>
                 </tr>
-              ) : filteredCustomers.map((item) => (
+              ) : sortedCustomers.map((item) => (
                 <tr key={item.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 font-medium text-green-400">{item.customer_code}</td>
                   <td className="px-6 py-4 text-foreground/90 font-medium">{item.name}</td>
