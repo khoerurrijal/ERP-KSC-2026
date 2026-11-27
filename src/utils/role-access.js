@@ -86,11 +86,6 @@ export const ACCESS_SECTIONS = [
     ] }],
   },
   {
-    key: 'audit',
-    label: 'AI Audit',
-    pages: [{ label: 'AI Audit', permissions: [{ id: 'audit.findings', label: 'Temuan Audit' }] }],
-  },
-  {
     key: 'pengaturan',
     label: 'Pengaturan',
     pages: [{ label: 'Pengaturan Sistem', permissions: [
@@ -178,7 +173,6 @@ export const ACCESS_ROUTES = [
   { matches: (path) => path === '/master/suppliers' || path === '/dashboard/master/suppliers', permissions: ['master.suppliers'] },
   { matches: (path) => path === '/master/employees' || path === '/dashboard/master/employees', permissions: ['master.employees'] },
   { matches: (path) => path === '/report' || path === '/dashboard/report', tabs: { buku_besar: 'reports.ledger', analisa_laba: 'reports.profit' }, mode: 'local' },
-  { matches: (path) => path === '/audit' || path === '/dashboard/audit', permissions: ['audit.findings'] },
   { matches: (path) => path === '/settings/salary-schemas' || path === '/dashboard/settings/salary-schemas', permissions: ['settings.salary'] },
   { matches: (path) => path === '/dashboard/settings/access', permissions: ['settings.access'] },
   { matches: (path) => path === '/settings' || path === '/dashboard/settings', tabParam: 'tab', defaultTab: 'dropdowns', tabs: { dropdowns: 'settings.dropdowns', cashflow: 'settings.cashflow', pricelist: 'settings.pricelist', store: 'settings.store', category_images: 'settings.category_images', ai_agent: 'settings.ai_agent', access: 'settings.access', salary: 'settings.salary' } },

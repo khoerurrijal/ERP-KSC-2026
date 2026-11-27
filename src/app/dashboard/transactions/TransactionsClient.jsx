@@ -5,7 +5,7 @@
 
 import { Fragment, useState, useMemo, useEffect } from 'react'
 import { useRouter, usePathname, useSearchParams } from 'next/navigation'
-import { Search, Plus, BookOpen, ArrowDownRight, ArrowUpRight, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
+import { Search, Plus, Filter, ChevronUp, ChevronDown, Loader2, ChevronLeft, ChevronRight, X } from 'lucide-react'
 import { createManualTransaction, updateTransaction, deleteTransaction, getMarketplaceSettlementDetails } from './actions'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
@@ -27,6 +27,10 @@ function isCanceledSalesOrderTransaction(transaction) {
   const salesOrder = Array.isArray(transaction.sales_orders) ? transaction.sales_orders[0] : transaction.sales_orders
   return String(salesOrder?.payment_status || '').trim().toUpperCase() === 'BATAL' ||
     /^\[DIBATALKAN\]/i.test(String(transaction.description || '').trim())
+}
+
+function getWorkshopCode(transaction) {
+  return String(transaction.workshop_code || '').trim().toUpperCase() || 'TANPA WORKSHOP'
 }
 
 export default function TransactionsClient({ transactions = [], dropdownConfig = {}, initialSearch = '' }) {
@@ -213,15 +217,14 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
 
   const filteredAndSorted = useMemo(() => {
     const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
-    const isSearching = Boolean(normalizedSearch)
     let result = transactions.filter(trx => {
       if (isCanceledSalesOrderTransaction(trx)) return false
 
       // Tab Filtering
       const methodUpper = (trx.payment_method || '').toUpperCase()
-      if (!isSearching && currentTab === 'UTAMA') {
+      if (currentTab === 'UTAMA') {
         if (methodUpper === 'VIRTUAL') return false
-      } else if (!isSearching && currentTab === 'VIRTUAL') {
+      } else if (currentTab === 'VIRTUAL') {
         if (methodUpper !== 'VIRTUAL') return false
       }
 
@@ -231,12 +234,12 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
                           matchesSearchText(trx.sales_orders?.customers?.name, normalizedSearch)
       
       const transactionDate = trx.date ? new Date(trx.date) : null
-      const matchMonth = isSearching || !filterMonth || Boolean(transactionDate && !Number.isNaN(transactionDate.getTime()) && transactionDate.toISOString().slice(0, 7) === filterMonth)
+      const matchMonth = !filterMonth || Boolean(transactionDate && !Number.isNaN(transactionDate.getTime()) && transactionDate.toISOString().slice(0, 7) === filterMonth)
       const matchMethod = filterMethod ? methodUpper === filterMethod.toUpperCase() : true
-      const matchWorkshop = filterWorkshop ? (trx.workshop_code || '').toUpperCase() === filterWorkshop.toUpperCase() : true
+      const matchWorkshop = filterWorkshop ? getWorkshopCode(trx) === filterWorkshop.toUpperCase() : true
       const matchRef = filterRef ? (trx.reference || '').toUpperCase() === filterRef.toUpperCase() : true
 
-      return matchSearch && (isSearching || (matchMonth && matchMethod && matchWorkshop && matchRef))
+      return matchSearch && matchMonth && matchMethod && matchWorkshop && matchRef
     })
 
     const collator = new Intl.Collator('id', { numeric: true, sensitivity: 'base' })
@@ -270,9 +273,26 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
     return filteredAndSorted.slice(start, start + pageSize)
   }, [filteredAndSorted, page, pageSize])
 
-  const totalIn = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_in || 0), 0)
-  const totalOut = filteredAndSorted.reduce((acc, curr) => acc + Number(curr.amount_out || 0), 0)
-  const saldo = totalIn - totalOut
+  const summaryWorkshopCodes = useMemo(() => {
+    if (filterWorkshop) return [filterWorkshop.toUpperCase()]
+
+    const codes = new Set(['KING', 'GLOBAL', 'GUDANG', 'TABUNGAN'])
+    transactions.forEach(transaction => codes.add(getWorkshopCode(transaction)))
+    return [...codes].sort((a, b) => a.localeCompare(b, 'id'))
+  }, [transactions, filterWorkshop])
+
+  const workshopSummaries = useMemo(() => summaryWorkshopCodes.map(workshop => {
+    const workshopTransactions = filteredAndSorted.filter(transaction => getWorkshopCode(transaction) === workshop)
+    const totalIn = workshopTransactions.reduce((sum, transaction) => sum + Number(transaction.amount_in || 0), 0)
+    const totalOut = workshopTransactions.reduce((sum, transaction) => sum + Number(transaction.amount_out || 0), 0)
+
+    return { workshop, totalIn, totalOut, balance: totalIn - totalOut }
+  }), [filteredAndSorted, summaryWorkshopCodes])
+  const workshopTotals = workshopSummaries.reduce((totals, summary) => ({
+    totalIn: totals.totalIn + summary.totalIn,
+    totalOut: totals.totalOut + summary.totalOut,
+  }), { totalIn: 0, totalOut: 0 })
+  const workshopBalance = workshopTotals.totalIn - workshopTotals.totalOut || 0
 
   const renderSortIcon = (key) => {
     if (sortConfig.key !== key) return null
@@ -380,33 +400,36 @@ export default function TransactionsClient({ transactions = [], dropdownConfig =
       )}
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-green-500">
-          <div className="w-12 h-12 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
-            <ArrowDownRight className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm text-foreground/60">Total Pemasukan</p>
-            <p className="metric-value-compact text-foreground">Rp {totalIn.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-          </div>
-        </div>
-        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-red-500">
-          <div className="w-12 h-12 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-            <ArrowUpRight className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm text-foreground/60">Total Pengeluaran</p>
-            <p className="metric-value-compact text-foreground">Rp {totalOut.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-          </div>
-        </div>
-        <div className="glass-card p-3 flex items-center gap-3 border-l-4 border-primary">
-          <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
-            <BookOpen className="w-6 h-6" />
-          </div>
-          <div>
-            <p className="text-sm text-foreground/60">Saldo Bersih</p>
-            <p className="metric-value-compact text-primary">Rp {saldo.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-          </div>
+      <div className="glass-card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[560px] text-xs text-left">
+            <thead className="bg-white/5 border-b border-white/10 text-foreground/60 uppercase">
+              <tr>
+                <th className="px-4 py-2 font-medium">Workshop</th>
+                <th className="px-4 py-2 font-medium text-right">Masuk</th>
+                <th className="px-4 py-2 font-medium text-right">Keluar</th>
+                <th className="px-4 py-2 font-medium text-right">Saldo Bersih</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-white/5">
+              {workshopSummaries.map(({ workshop, totalIn, totalOut, balance }) => (
+                <tr key={workshop}>
+                  <th scope="row" className="px-4 py-2 font-bold text-foreground text-left">{workshop === 'TANPA WORKSHOP' ? 'Tanpa Workshop' : workshop}</th>
+                  <td className="px-4 py-2 text-right font-semibold text-green-500 whitespace-nowrap">Rp {totalIn.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-red-500 whitespace-nowrap">Rp {totalOut.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                  <td className="px-4 py-2 text-right font-semibold text-primary whitespace-nowrap">Rp {balance.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                </tr>
+              ))}
+            </tbody>
+            <tfoot className="border-t border-white/10 bg-white/5 font-bold">
+              <tr>
+                <th scope="row" className="px-4 py-2 text-foreground text-left">TOTAL</th>
+                <td className="px-4 py-2 text-right text-green-500 whitespace-nowrap">Rp {workshopTotals.totalIn.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                <td className="px-4 py-2 text-right text-red-500 whitespace-nowrap">Rp {workshopTotals.totalOut.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+                <td className="px-4 py-2 text-right text-primary whitespace-nowrap">Rp {workshopBalance.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       </div>
 

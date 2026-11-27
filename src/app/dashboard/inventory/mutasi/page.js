@@ -32,13 +32,11 @@ export default async function MutasiPage({ searchParams }) {
     .select('*')
     .order('created_at', { ascending: false })
     .limit(50000)
+    .gte('mutation_date', `${selectedMonth}-01`)
+    .lte('mutation_date', endDateStr)
 
   if (search) {
     mutationsQuery = mutationsQuery.or(buildAllTermsSearchFilter(['reference', 'actor', 'product_name'], search))
-  } else {
-    mutationsQuery = mutationsQuery
-      .gte('mutation_date', `${selectedMonth}-01`)
-      .lte('mutation_date', endDateStr)
   }
 
   const { data: rawMutations, error } = await mutationsQuery
@@ -50,6 +48,8 @@ export default async function MutasiPage({ searchParams }) {
     .from('stock_mutations')
     .select('*, products(name)')
     .not('mutation_type', 'in', '("IN","OUT_POLOS","OUT_SABLON")')
+    .gte('created_at', `${selectedMonth}-01T00:00:00`)
+    .lte('created_at', `${endDateStr}T23:59:59`)
 
   if (search) {
     const { data: matchedProducts } = await supabase
@@ -63,10 +63,6 @@ export default async function MutasiPage({ searchParams }) {
       ...(matchedProductCodes.length ? [`product_code.in.(${matchedProductCodes.join(',')})`] : [])
     ]
     stockMutationsQuery = stockMutationsQuery.or(searchFilters.join(','))
-  } else {
-    stockMutationsQuery = stockMutationsQuery
-      .gte('created_at', `${selectedMonth}-01T00:00:00`)
-      .lte('created_at', `${endDateStr}T23:59:59`)
   }
 
   stockMutationsQuery = stockMutationsQuery.order('created_at', { ascending: false }).limit(50000)

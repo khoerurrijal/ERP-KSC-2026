@@ -253,7 +253,6 @@ export default function Topbar({ userRole = '', userName = '', onToggleSidebar, 
     ['/master/suppliers', 'Supplier', 'Kelola data pemasok'],
     ['/master/employees', 'Karyawan', 'Kelola data karyawan'],
     ['/report', 'Laporan', 'Ringkasan keuangan dan performa usaha'],
-    ['/audit', 'AI Audit', 'Pemeriksaan data dan kesehatan alur aplikasi'],
     ['/settings', 'Pengaturan Sistem', 'Kelola konfigurasi, akses, dan skema gaji'],
     ['/system-config', 'Pengaturan Sistem', 'Kelola konfigurasi, akses, dan skema gaji'],
   ].find(([path]) => displayPathname === path || displayPathname.startsWith(`${path}/`)) || ['/', 'King Sablon ERP', '']

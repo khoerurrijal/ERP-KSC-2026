@@ -80,17 +80,43 @@ export default function SalesClient({
   const [zoomImage, setZoomImage] = useState(null)
   const [salesOrderDrawer, setSalesOrderDrawer] = useState(null)
 
-  const openSalesOrderDrawer = (order = null) => {
-    setSalesOrderDrawer(order ? {
-      ...order,
-      items: order.sales_items || []
-    } : { items: [] })
+  const openSalesOrderDrawer = async (order = null) => {
+    setSalesOrderDrawer(order ? { ...order, items: order.sales_items || [] } : { items: [] })
+    setPaymentHistory([])
+    if (!order?.id) {
+      setIsLoadingHistory(false)
+      return
+    }
+
+    setIsLoadingHistory(true)
+    try {
+      const paymentReference = isKingInternalOrder(order) ? 'PEMBELIAN INTERNAL KING' : 'PENJUALAN'
+      const { data, error } = await supabase.from('transactions')
+        .select('id, date, payment_method, amount_in, amount_out')
+        .eq('so_id', order.id)
+        .eq('reference', paymentReference)
+        .order('date', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      setPaymentHistory(data || [])
+    } catch (error) {
+      console.error('Gagal memuat riwayat pembayaran Sales Order:', error)
+      setPaymentHistory([])
+    } finally {
+      setIsLoadingHistory(false)
+    }
   }
 
-  const closeSalesOrderDrawer = () => setSalesOrderDrawer(null)
+  const closeSalesOrderDrawer = () => {
+    setSalesOrderDrawer(null)
+    setPaymentHistory([])
+    setIsLoadingHistory(false)
+  }
 
   const refreshSalesOrderList = () => {
     setSalesOrderDrawer(null)
+    setPaymentHistory([])
+    setIsLoadingHistory(false)
     router.refresh()
   }
   const updateQueryParams = useCallback((newParams) => {
@@ -719,6 +745,8 @@ export default function SalesClient({
           dropdownConfig={dropdownConfig}
           pricelistConfig={pricelistConfig}
           initialData={salesOrderDrawer.id ? salesOrderDrawer : undefined}
+          paymentHistory={paymentHistory}
+          isLoadingPaymentHistory={isLoadingHistory}
           onClose={closeSalesOrderDrawer}
           onSaved={refreshSalesOrderList}
           onCancel={handleCancelSalesOrder}

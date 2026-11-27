@@ -22,6 +22,7 @@ export async function createSalesOrder(payload) {
 
   try {
     const { customerId, orderDate, notes, items, dpAmount, paymentAccount, marketplaceReceipt, sourceRequestId, designService } = payload
+    const directPickup = payload.directPickup === true
 
     if (!customerId || !orderDate || !Array.isArray(items) || items.length === 0) {
       throw new Error('Customer, tanggal, dan minimal satu item wajib diisi.')
@@ -56,6 +57,54 @@ export async function createSalesOrder(payload) {
     if (isKingInternal && (designService || items.some(item => item.isFastTrack || item.isTwoColor))) {
       throw new Error('Pembelian internal KING hanya mencatat barang dan harga barang, tanpa jasa atau add-on produksi.')
     }
+    if (directPickup && items.some(item => String(item.order_type || '').trim().toUpperCase() !== 'POLOS' || item.isFastTrack || item.isTwoColor)) {
+      throw new Error('Beli Langsung hanya menerima barang polos tanpa add-on produksi.')
+    }
+
+    let directPolosCategories = null
+    if (directPickup) {
+      const { data: dropdownSettings, error: dropdownSettingsError } = await supabase
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'dropdown_config')
+        .maybeSingle()
+      if (dropdownSettingsError) throw new Error('Konfigurasi produk polos tidak dapat dibaca.')
+      const configuredCategories = dropdownSettings?.value?.category_mapping?.POLOS
+      if (Array.isArray(configuredCategories) && configuredCategories.length > 0) {
+        directPolosCategories = new Set(configuredCategories)
+      }
+
+      if (!isKingInternal) {
+        const requestedProducts = [...new Set(items.map(item => String(item.product_id || '').trim()))]
+        const { data: directProducts, error: directProductsError } = await supabase
+          .from('products')
+          .select('product_code, name, category, stock_qty, physical_stock, is_active')
+          .in('product_code', requestedProducts)
+        if (directProductsError) throw new Error('Barang untuk Beli Langsung tidak dapat diverifikasi.')
+        const directProductMap = new Map((directProducts || []).map(product => [product.product_code, product]))
+        const directDemandByProduct = new Map()
+        for (const item of items) {
+          const product = directProductMap.get(item.product_id)
+          const category = String(product?.category || '').trim().toUpperCase()
+          const demand = Number(item.qty) * Number(item.unit_multiplier || 1)
+          if (!product || product.is_active === false) throw new Error('Pilih barang polos yang masih aktif.')
+          if (['JASA', 'JASA LAYANAN'].includes(category) || isLegacySalesAddonCode(product.product_code)) {
+            throw new Error(`${product.name} bukan barang stok polos.`)
+          }
+          if (directPolosCategories && !directPolosCategories.has(product.category)) {
+            throw new Error(`${product.name} tidak termasuk kategori barang polos.`)
+          }
+          if (!Number.isSafeInteger(demand) || demand <= 0) throw new Error('Jumlah barang harus menghasilkan jumlah stok bulat yang valid.')
+          directDemandByProduct.set(product.product_code, (directDemandByProduct.get(product.product_code) || 0) + demand)
+        }
+        for (const [productCode, demand] of directDemandByProduct) {
+          const product = directProductMap.get(productCode)
+          if (Number(product.stock_qty || 0) < demand || Number(product.physical_stock || 0) < demand) {
+            throw new Error(`Stok tersedia atau fisik ${product.name} tidak cukup untuk pembelian ini.`)
+          }
+        }
+      }
+    }
 
     const internalProducts = new Map()
     if (isKingInternal) {
@@ -81,6 +130,9 @@ export async function createSalesOrder(payload) {
         }
         if (product.is_active === false || ['JASA', 'JASA LAYANAN'].includes(String(product.category || '').trim().toUpperCase())) {
           throw new Error(`${product.name} bukan barang stok aktif.`)
+        }
+        if (directPickup && directPolosCategories && !directPolosCategories.has(product.category)) {
+          throw new Error(`${product.name} tidak termasuk kategori barang polos.`)
         }
         if (Number(product.stock_qty || 0) < demand || Number(product.physical_stock || 0) < demand) {
           throw new Error(`Stok tersedia atau fisik ${product.name} tidak cukup untuk pembelian ini.`)
@@ -221,7 +273,11 @@ export async function createSalesOrder(payload) {
         so_id: so.id,
         order_type: isKingInternal ? 'POLOS' : item.order_type,
         product_code: item.product_id,
-        status: isKingInternal ? 'SELESAI' : 'BARU MASUK',
+        status: isKingInternal
+          ? 'SELESAI'
+          : directPickup
+            ? (paymentStatus === 'LUNAS' ? 'SELESAI' : 'SUDAH DIAMBIL')
+            : 'BARU MASUK',
         mockup_url: item.mockup_url,
         qty: Number(item.qty),
         unit: item.unit || 'PCS',
@@ -362,7 +418,7 @@ export async function createSalesOrder(payload) {
     }
 
     const { data: soItemsForStatus } = await supabase.from('sales_items').select('id').eq('so_id', so.id);
-    if (!isKingInternal && soItemsForStatus) {
+    if (!isKingInternal && soItemsForStatus && !directPickup) {
       for (const item of soItemsForStatus) {
         await handleAutoStatusUpdate(item.id);
       }

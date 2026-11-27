@@ -4,7 +4,7 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 import { useState, useMemo, useEffect } from 'react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { Search, ArrowDownToLine, ArrowUpFromLine, Filter } from 'lucide-react'
+import { Search, ArrowDownToLine, ArrowUpFromLine, Filter, ChevronLeft, ChevronRight } from 'lucide-react'
 import MonthFilter from '@/components/MonthFilter'
 import CustomSelect from '@/components/CustomSelect'
 import { matchesSearchText, stripGeneratedInvoiceNumbers } from '@/utils/search'
@@ -16,6 +16,8 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
   const searchParamsString = searchParams.toString()
   const [searchQuery, setSearchQuery] = useState(initialSearch)
   const [filterProduct, setFilterProduct] = useState('')
+  const [currentPage, setCurrentPage] = useState(1)
+  const pageSize = 25
 
   useEffect(() => {
     setSearchQuery(searchParams.get('mutationSearch') || '')
@@ -38,17 +40,25 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
 
   const filteredMutations = useMemo(() => {
     const normalizedSearch = searchQuery.replace(/[(),"]/g, ' ').trim().toLowerCase()
-    const isSearching = Boolean(normalizedSearch)
     return mutations.filter(m => {
       const matchSearch = matchesSearchText(stripGeneratedInvoiceNumbers(m.reference), normalizedSearch) ||
                           matchesSearchText(m.actor, normalizedSearch) ||
                           matchesSearchText(m.product_name, normalizedSearch)
       
-      const matchProduct = !isSearching && filterProduct ? m.product_code === filterProduct : true
+      const matchProduct = filterProduct ? m.product_code === filterProduct : true
 
       return matchSearch && matchProduct
     })
   }, [mutations, searchQuery, filterProduct])
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchQuery, filterProduct, selectedMonth, mutations])
+
+  const totalPages = Math.max(1, Math.ceil(filteredMutations.length / pageSize))
+  const paginatedMutations = filteredMutations.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+  const firstVisibleMutation = filteredMutations.length ? (currentPage - 1) * pageSize + 1 : 0
+  const lastVisibleMutation = Math.min(currentPage * pageSize, filteredMutations.length)
 
   // Hitung Total Masuk dan Keluar Bulan Ini (dari yang terfilter)
   const totalMasuk = filteredMutations.reduce((sum, m) => sum + Number(m.qty_in || 0), 0)
@@ -101,6 +111,8 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
             value={filterProduct} 
             onChange={e => setFilterProduct(e.target.value)} 
             icon={Filter}
+            searchable
+            placeholder="Filter produk..."
             options={[
               { value: "", label: "Semua Produk" },
               ...products.map(p => ({ value: p.product_code, label: p.name }))
@@ -111,50 +123,52 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
 
       <div className="glass-card overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
-            <thead className="bg-white/5 border-b border-white/10 text-foreground/70 uppercase text-xs">
+          <table className="w-full min-w-[900px] text-sm text-left">
+            <thead className="sticky top-0 z-10 bg-background/95 backdrop-blur border-b border-white/10 text-foreground/70 uppercase text-[11px]">
               <tr>
-                <th className="px-6 py-4 font-medium">Waktu Transaksi</th>
-                <th className="px-6 py-4 font-medium">Pelanggan / Supplier</th>
-                <th className="px-6 py-4 font-medium">Produk</th>
-                <th className="px-6 py-4 font-medium text-right text-green-400">Masuk (IN)</th>
-                <th className="px-6 py-4 font-medium text-right text-yellow-400">Keluar (OUT)</th>
-                <th className="px-6 py-4 font-medium text-right text-blue-400">Proses</th>
-                <th className="px-6 py-4 font-medium text-right text-red-400">Reject</th>
+                <th className="px-3 py-2.5 font-medium">Waktu</th>
+                <th className="px-3 py-2.5 font-medium">Pelanggan / Supplier</th>
+                <th className="px-3 py-2.5 font-medium">Produk</th>
+                <th className="px-3 py-2.5 font-medium text-right text-green-400">Masuk</th>
+                <th className="px-3 py-2.5 font-medium text-right text-yellow-400">Keluar</th>
+                <th className="px-3 py-2.5 font-medium text-right text-blue-400">Proses</th>
+                <th className="px-3 py-2.5 font-medium text-right text-red-400">Reject</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/5">
-              {filteredMutations.length === 0 ? (
+              {paginatedMutations.length === 0 ? (
                 <tr>
-                  <td colSpan="5" className="px-6 py-12 text-center text-foreground/40">
+                  <td colSpan="7" className="px-3 py-8 text-center text-foreground/40">
                     Tidak ada riwayat mutasi pada filter/bulan yang dipilih.
                   </td>
                 </tr>
-              ) : filteredMutations.map((item, idx) => (
-                <tr key={idx} className="hover:bg-white/5 transition-colors">
-                  <td className="px-6 py-4">
+              ) : paginatedMutations.map((item, idx) => (
+                <tr key={item.id || `${item.created_at}-${item.product_code}-${idx}`} className="hover:bg-white/5 transition-colors">
+                  <td className="px-3 py-2 whitespace-nowrap">
                     <div className="text-foreground/90 font-medium">{new Date(item.mutation_date).toLocaleDateString('id-ID')}</div>
-                    <div className="text-xs text-foreground/50">{new Date(item.created_at).toLocaleTimeString('id-ID')}</div>
+                    <div className="text-[11px] text-foreground/50">{new Date(item.created_at).toLocaleTimeString('id-ID')}</div>
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="text-foreground/90 font-bold">{item.actor || 'Sistem ERP'}</div>
+                  <td className="px-3 py-2 max-w-[220px]">
+                    <div className="text-foreground/90 font-semibold truncate">{item.actor || 'Sistem ERP'}</div>
                   </td>
-                  <td className="px-6 py-4 text-foreground/90">{item.product_name}</td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-2 max-w-[260px] text-foreground/90">
+                    <div className="truncate">{item.product_name}</div>
+                  </td>
+                  <td className="px-3 py-2 text-right">
                     {item.qty_in > 0 ? (
                       <span className="font-bold text-green-400 bg-green-500/10 px-2.5 py-1 rounded-full text-xs">
                         +{item.qty_in}
                       </span>
                     ) : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-2 text-right">
                     {item.qty_out > 0 ? (
                       <span className="font-bold text-yellow-400 bg-yellow-500/10 px-2.5 py-1 rounded-full text-xs">
                         -{item.qty_out}
                       </span>
                     ) : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-2 text-right">
                     {item.qty_proses > 0 ? (
                       <div className="flex flex-col items-end gap-1">
                         <span className="font-bold text-blue-400 bg-blue-500/10 px-2.5 py-1 rounded-full text-xs">
@@ -166,14 +180,14 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
                       </div>
                     ) : '-'}
                   </td>
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-3 py-2 text-right">
                     {item.qty_reject > 0 ? (
                       <div className="flex flex-col items-end gap-1">
                         <span className="font-bold text-red-400 bg-red-500/10 px-2.5 py-1 rounded-full text-xs">
                           {item.qty_reject}
                         </span>
                         {item.notes && (
-                          <span className="text-[10px] text-foreground/50 italic max-w-[100px] break-words text-right">{item.notes}</span>
+                          <span className="text-[10px] text-foreground/50 italic max-w-[140px] break-words text-right">{item.notes}</span>
                         )}
                       </div>
                     ) : '-'}
@@ -182,6 +196,28 @@ export default function MutasiClient({ mutations = [], products = [], selectedMo
               ))}
             </tbody>
           </table>
+        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-white/10 bg-white/5 px-3 py-3 text-xs text-foreground/65">
+          <span>Menampilkan {firstVisibleMutation}–{lastVisibleMutation} dari {filteredMutations.length} mutasi</span>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              disabled={currentPage <= 1}
+              onClick={() => setCurrentPage(page => Math.max(1, page - 1))}
+              className="btn-secondary h-8 px-3 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" /> Sebelumnya
+            </button>
+            <span className="px-2 font-medium text-foreground">Halaman {currentPage} dari {totalPages}</span>
+            <button
+              type="button"
+              disabled={currentPage >= totalPages}
+              onClick={() => setCurrentPage(page => Math.min(totalPages, page + 1))}
+              className="btn-secondary h-8 px-3 text-xs flex items-center gap-1 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Berikutnya <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
         </div>
       </div>
     </div>

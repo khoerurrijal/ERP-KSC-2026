@@ -104,7 +104,7 @@ import { createSalesOrder, updateSalesOrder } from '@/app/actions/sales'
 import { addCustomer } from '@/app/dashboard/master/customers/actions'
 import { calculateItemPrice as calculateItemPriceUtil, getMinQty } from '@/utils/pricing'
 
-export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {}, onClose, onSaved, onCancel, compact = true }) {
+export default function SalesOrderWizard({ customers, products, workshops, initialData, requestId, dropdownConfig = {}, pricelistConfig = {}, paymentHistory = [], isLoadingPaymentHistory = false, onClose, onSaved, onCancel, compact = true }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const itemIdPrefix = useId()
@@ -767,24 +767,36 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
 
               <section className="rounded-xl border border-white/10 bg-white/5 p-2.5 md:p-3">
                 <div className="mb-2 flex items-center justify-between gap-3">
-                  <div>
-                    <p className="text-[10px] font-bold uppercase tracking-wider text-primary">3. Pembayaran</p>
-                    <h2 className="text-base font-bold text-foreground">Sistem Pembayaran</h2>
-                  </div>
-                  <div className="rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1.5 text-right">
-                    <p className="text-[10px] font-medium text-primary/80">Total</p>
+                  <h2 className="text-base font-bold text-foreground">Pembayaran</h2>
+                  {!isExistingOrder && <div className="rounded-lg border border-primary/20 bg-primary/10 px-2.5 py-1.5 text-right">
+                    <p className="text-[10px] font-medium text-primary/80">Total pesanan</p>
                     <p className="text-base font-bold text-primary">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</p>
-                  </div>
+                  </div>}
                 </div>
 
-                {isKingInternal ? (
+                {isExistingOrder ? (
+                  <>
+                    <div className="grid grid-cols-3 gap-2">
+                      <div className="min-w-0 rounded-lg border border-primary/20 bg-primary/5 p-2">
+                        <span className="block text-[10px] leading-tight text-foreground/55">Total pesanan</span>
+                        <strong className="mt-1 block break-words text-xs font-bold text-primary sm:text-sm">Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-green-500/15 bg-green-500/5 p-2">
+                        <span className="block text-[10px] leading-tight text-foreground/55">Sudah dibayar</span>
+                        <strong className="mt-1 block break-words text-xs font-bold text-green-400 sm:text-sm">Rp {Number(dpAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                      </div>
+                      <div className="min-w-0 rounded-lg border border-yellow-500/15 bg-yellow-500/5 p-2">
+                        <span className="block text-[10px] leading-tight text-foreground/55">Belum dibayar</span>
+                        <strong className={`mt-1 block break-words text-xs font-bold sm:text-sm ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong>
+                      </div>
+                    </div>
+                    {isKingInternal && <div className="mt-2 rounded-lg border border-primary/20 bg-primary/5 px-2.5 py-2 text-[11px] leading-relaxed text-foreground/70">
+                      Pembelian internal KING lunas otomatis. Saldo virtual KING berkurang; rekening BCA, Mandiri, dan Cash tidak berubah.
+                    </div>}
+                  </>
+                ) : isKingInternal ? (
                   <div className="rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs text-foreground/70">
                     Pesanan langsung lunas secara internal. Saldo virtual KING berkurang Rp {grandTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}; rekening BCA, Mandiri, dan Cash tidak berubah.
-                  </div>
-                ) : isExistingOrder ? (
-                  <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">DP tercatat</span><strong className="mt-0.5 block text-green-400">Rp {Number(dpAmount).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
-                    <div className="rounded-lg bg-black/10 p-2"><span className="text-foreground/50">Sisa tagihan</span><strong className={`mt-0.5 block ${remaining > 0 ? 'text-yellow-400' : 'text-green-400'}`}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
                   </div>
                 ) : (
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -802,6 +814,45 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
                     <div className="rounded-lg border border-white/5 bg-black/10 p-2 text-xs sm:col-span-2">
                       <div className="flex items-center justify-between"><span className="text-foreground/60">Sisa Tagihan</span><strong className={remaining > 0 ? 'text-yellow-400' : 'text-green-400'}>Rp {Math.max(0, remaining).toLocaleString('id-ID', { maximumFractionDigits: 0 })}</strong></div>
                     </div>
+                  </div>
+                )}
+
+                {isExistingOrder && (
+                  <div className="mt-3 border-t border-white/10 pt-3">
+                    <div className="mb-2 flex items-center justify-between gap-3">
+                      <h3 className="text-xs font-bold text-foreground">
+                        {isKingInternal ? 'Riwayat Pembelian Internal' : 'Riwayat Pembayaran'}
+                      </h3>
+                      {!isLoadingPaymentHistory && <span className="text-[10px] text-foreground/45">{paymentHistory.length} catatan</span>}
+                    </div>
+                    {isLoadingPaymentHistory ? (
+                      <p className="py-2 text-[11px] text-foreground/50">Memuat riwayat pembayaran...</p>
+                    ) : paymentHistory.length === 0 ? (
+                      <p className="py-2 text-[11px] text-foreground/50">Belum ada riwayat pembayaran.</p>
+                    ) : (
+                      <div>
+                        <div className="grid grid-cols-[1fr_0.75fr_1fr] gap-2 px-1 pb-1 text-[9px] font-semibold uppercase tracking-wide text-foreground/40">
+                          <span>Tanggal</span>
+                          <span>Metode</span>
+                          <span className="text-right">Nominal</span>
+                        </div>
+                        <div className="max-h-32 divide-y divide-white/5 overflow-y-auto pr-1">
+                          {paymentHistory.map(payment => {
+                            const isOutflow = Number(payment.amount_out || 0) > 0
+                            const amount = isOutflow ? payment.amount_out : payment.amount_in
+                            return (
+                              <div key={payment.id} className="grid grid-cols-[1fr_0.75fr_1fr] items-center gap-2 py-2 text-[11px]">
+                                <span className="text-foreground/75">{new Date(payment.date).toLocaleDateString('id-ID')}</span>
+                                <span className="truncate text-foreground/60">{payment.payment_method || '-'}</span>
+                                <span className={`text-right font-bold ${isOutflow ? 'text-orange-400' : 'text-green-400'}`}>
+                                  {isOutflow ? '− ' : ''}Rp {Number(amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </section>
@@ -1213,6 +1264,38 @@ export default function SalesOrderWizard({ customers, products, workshops, initi
         {currentTab === 3 && (
           <div className="space-y-6 animate-in fade-in">
             <h2 className="text-xl font-bold text-primary mb-4">Transaksi & Pembayaran</h2>
+
+            {isExistingOrder && (
+              <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <div className="mb-3 flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-bold text-foreground">
+                    {isKingInternal ? 'Riwayat Pembelian Internal' : 'Riwayat Pembayaran'}
+                  </h3>
+                  {!isLoadingPaymentHistory && <span className="text-[11px] text-foreground/50">{paymentHistory.length} catatan</span>}
+                </div>
+                {isLoadingPaymentHistory ? (
+                  <p className="text-xs text-foreground/50">Memuat riwayat pembayaran...</p>
+                ) : paymentHistory.length === 0 ? (
+                  <p className="text-xs text-foreground/50">Belum ada riwayat pembayaran.</p>
+                ) : (
+                  <div className="divide-y divide-white/10">
+                    {paymentHistory.map(payment => {
+                      const isOutflow = Number(payment.amount_out || 0) > 0
+                      const amount = isOutflow ? payment.amount_out : payment.amount_in
+                      return (
+                        <div key={payment.id} className="grid grid-cols-[1fr_auto] items-center gap-3 py-2.5 text-xs sm:grid-cols-[1fr_1fr_auto]">
+                          <span className="text-foreground/80">{new Date(payment.date).toLocaleDateString('id-ID')}</span>
+                          <span className="text-foreground/60">{payment.payment_method || '-'}</span>
+                          <span className={`text-right font-bold ${isOutflow ? 'text-orange-400' : 'text-green-400'}`}>
+                            {isOutflow ? '−' : '+'} Rp {Number(amount || 0).toLocaleString('id-ID', { maximumFractionDigits: 0 })}
+                          </span>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </section>
+            )}
 
             <div className="p-6 rounded-xl bg-primary/10 border border-primary/20 flex flex-col md:flex-row items-center justify-between gap-4">
               <div>

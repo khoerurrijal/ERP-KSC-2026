@@ -37,9 +37,6 @@ export default async function DashboardLayout({ children }) {
 
   const configuredPermissions = rolePermissions[userRole] ?? defaultPermissions[userRole] ?? []
   const allowedPermissions = normalizeRolePermissions(configuredPermissions, userRole)
-  if (['Admin', 'Owner'].includes(userRole) && !allowedPermissions.includes('audit.findings')) {
-    allowedPermissions.push('audit.findings')
-  }
   const allowedMenus = menuKeysFromPermissions(allowedPermissions)
 
   return (

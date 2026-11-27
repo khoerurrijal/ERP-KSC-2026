@@ -1,36 +1,14 @@
 import { createClient } from '@/utils/supabase/server'
-import { Suspense } from 'react'
-import { Clock, CheckCircle, AlertTriangle, Activity, ShoppingBag, Package, Wallet, Building2, AlertOctagon, FileText, ShieldCheck } from 'lucide-react'
+import { Clock, CheckCircle, AlertTriangle, Activity, ShoppingBag, Package, Wallet, Building2, AlertOctagon, FileText } from 'lucide-react'
 import Link from 'next/link'
 import PriceCalculator from '@/components/PriceCalculator'
 import StockSearchWidget from '@/components/StockSearchWidget'
+import DashboardDirectSale from '@/components/DashboardDirectSale'
 import MonthFilter from '@/components/MonthFilter'
 import { redirect } from 'next/navigation'
-import { runAuditScan } from '@/app/dashboard/audit/audit'
 import { isKingInternalOrder } from '@/utils/kingInternalPurchase.mjs'
 
 export const dynamic = 'force-dynamic'
-
-async function DashboardAuditSummary({ auditReportPromise }) {
-  const auditReport = await auditReportPromise
-
-  return (
-    <div className="glass-card p-4 border border-primary/20 bg-primary/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <div className="flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-primary/15 flex items-center justify-center text-primary">
-          <ShieldCheck className="w-5 h-5" />
-        </div>
-        <div>
-          <p className="font-bold text-foreground">AI Audit Center</p>
-          <p className="text-xs text-foreground/60 mt-1">{auditReport.summary.total === 0 ? 'Belum ada temuan audit.' : `${auditReport.summary.total} temuan perlu diperiksa (${auditReport.summary.critical} kritis).`}</p>
-        </div>
-      </div>
-      <Link href="/audit" className="btn-primary h-9 px-4 text-sm flex items-center justify-center gap-2 whitespace-nowrap">
-        Periksa Sistem
-      </Link>
-    </div>
-  )
-}
 
 export default async function DashboardPage({ searchParams }) {
   const resolvedParams = await searchParams
@@ -65,15 +43,16 @@ export default async function DashboardPage({ searchParams }) {
   const user = { email: authUser.email, role: userRole }
 
   // Load independent dashboard data together to avoid serial Supabase round trips.
-  const auditReportPromise = runAuditScan(supabase)
   const [
     { data: products },
     { data: salesOrders },
-    { data: sablonItems }
+    { data: sablonItems },
+    { data: customers }
   ] = await Promise.all([
     supabase.from('products').select('*, product_units(id, unit_name, multiplier)').eq('is_active', true).limit(100000).order('name'),
     supabase.from('sales_orders').select('id, date, notes, payment_status, marketplace_settlement_status, marketplace_receipt, total_amount, dp_amount, customers(name, type)').limit(100000),
-    supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000)
+    supabase.from('sales_items').select('status, qty, sales_orders(date, payment_status)').eq('order_type', 'SABLON').limit(100000),
+    supabase.from('customers').select('customer_code, name, type').order('name')
   ])
 
   const dropdownConfig = settings?.find(s => s.key === 'dropdown_config')?.value || {}
@@ -140,7 +119,15 @@ export default async function DashboardPage({ searchParams }) {
       
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h2 className="text-lg font-bold text-foreground">Statistik Pesanan (Sales Order)</h2>
-        <div className="flex items-center justify-end gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          {['ADMIN', 'OWNER'].includes(String(userRole || '').trim().toUpperCase()) && (
+            <DashboardDirectSale
+              customers={customers || []}
+              products={products || []}
+              dropdownConfig={dropdownConfig}
+              pricelistConfig={pricelistConfig}
+            />
+          )}
           <MonthFilter />
           <form action="/auth/signout" method="post">
             <button type="submit" className="btn-secondary h-10 px-4 text-sm">Sign Out</button>
@@ -167,10 +154,6 @@ export default async function DashboardPage({ searchParams }) {
           <p className="metric-value mt-2 text-foreground">{totalSablonQty.toLocaleString('id-ID', { maximumFractionDigits: 0 })} <span className="text-xs font-normal text-foreground/50">Pcs</span></p>
         </div>
       </div>
-
-      <Suspense fallback={<div className="glass-card p-4 border border-primary/20 bg-primary/5 text-sm text-foreground/60" role="status">Memuat ringkasan audit...</div>}>
-        <DashboardAuditSummary auditReportPromise={auditReportPromise} />
-      </Suspense>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 items-start gap-4 mt-4">
         

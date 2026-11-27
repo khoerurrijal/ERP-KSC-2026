@@ -118,17 +118,14 @@ export default function InventoryClient({
   }, [products])
 
   const filteredPipelineData = useMemo(() => {
-    const activeProductCodes = new Set(products.map(p => p.product_code))
     const normalizedSearch = debouncedSearch.replace(/[(),"]/g, ' ').trim().toLowerCase()
     let result = pipelineData.filter(pipe => {
-      if (!activeProductCodes.has(pipe.product_code)) return false
-
       const matchSearch = matchesSearchText(pipe.product_name, normalizedSearch) ||
                           matchesSearchText(pipe.category, normalizedSearch)
       
       const matchCat = filterCategory ? pipe.category === filterCategory : true
       
-      return matchSearch && (normalizedSearch ? true : matchCat)
+      return matchSearch && matchCat
     })
 
     result.sort((a, b) => {
@@ -150,7 +147,7 @@ export default function InventoryClient({
     })
 
     return result
-  }, [pipelineData, products, debouncedSearch, filterCategory, sortConfig])
+  }, [pipelineData, debouncedSearch, filterCategory, sortConfig])
 
   useEffect(() => {
     setPipelinePage(1)

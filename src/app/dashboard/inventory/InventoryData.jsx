@@ -17,6 +17,11 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
   const workshop = searchParams.workshop || ''
   const sortKey = searchParams.sortKey || 'name'
   const sortDir = searchParams.sortDir || 'asc'
+  const isStockTable = activeTab === 'table'
+  const isPipelineTab = activeTab === 'pipeline'
+  const tableSearch = isStockTable ? search : ''
+  const tableCategory = isStockTable ? category : ''
+  const tableWorkshop = isStockTable ? workshop : ''
 
   let query = excludeNonStockServices(supabase
     .from('products')
@@ -26,24 +31,24 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     `, { count: 'exact' })
   )
 
-  if (!search) {
+  if (!tableSearch) {
     query = query.eq('is_active', true)
   }
 
-  if (search) {
+  if (tableSearch) {
     query = query.or(buildAllTermsSearchFilter(
       ['name', 'category', 'product_code'],
-      search,
+      tableSearch,
       { numericSubstringFields: ['product_code'] }
     ))
   }
 
-  if (!search && category) {
-    query = query.eq('category', category)
+  if (tableCategory) {
+    query = query.eq('category', tableCategory)
   }
 
-  if (!search && workshop) {
-    query = query.eq('workshop_code', workshop)
+  if (tableWorkshop) {
+    query = query.eq('workshop_code', tableWorkshop)
   }
 
   const validSortKey = ['name', 'product_code', 'category', 'physical_stock', 'safety_stock', 'stock_qty', 'workshop'].includes(sortKey) ? sortKey : 'name'
@@ -58,10 +63,13 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     .from('product_pipeline_view')
     .select('*')
   )
-  if (search && activeTab === 'pipeline') {
+  if (search && isPipelineTab) {
     pipelineQuery = pipelineQuery.or(buildAllTermsSearchFilter(['product_name', 'category'], search))
   }
-  pipelineQuery = pipelineQuery.limit(search && activeTab === 'pipeline' ? 1000 : 200)
+  if (category && isPipelineTab) {
+    pipelineQuery = pipelineQuery.eq('category', category)
+  }
+  pipelineQuery = pipelineQuery.limit(search && isPipelineTab ? 1000 : 200)
 
   const [
     productsRes,
@@ -69,8 +77,8 @@ export default async function InventoryData({ searchParams = {}, activeTab = 'ta
     { data: workshops },
     { data: allCategories }
   ] = await Promise.all([
-    query,
-    pipelineQuery,
+    isStockTable ? query : Promise.resolve({ data: [], count: 0 }),
+    isPipelineTab ? pipelineQuery : Promise.resolve({ data: [] }),
     supabase
       .from('workshops')
       .select('id, name, code')

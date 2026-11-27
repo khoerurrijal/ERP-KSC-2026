@@ -8,7 +8,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useTheme } from 'next-themes'
-import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, ShieldCheck, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { LayoutDashboard, Users, Package, ShoppingCart, TrendingUp, Settings, LogOut, Box, Factory, Wallet, ChevronDown, ChevronRight, FileText, ShoppingBag, PackageCheck, Inbox, Sun, Moon, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 
 function SidebarLogo({ lightweight, className }) {
   const [isDark, setIsDark] = useState(false)
@@ -84,7 +84,6 @@ const MENU_GROUPS = [
     icon: Settings,
     subItems: [
       { name: 'Laporan', path: '/report', icon: FileText, key: 'laporan', accessKeys: ['reports.ledger', 'reports.profit'] },
-      { name: 'AI Audit', path: '/audit', icon: ShieldCheck, key: 'audit', accessKeys: ['audit.findings'] },
       { name: 'Pengaturan Sistem', path: '/settings', icon: Settings, key: 'pengaturan', accessKeys: ['settings.dropdowns', 'settings.cashflow', 'settings.pricelist', 'settings.store', 'settings.category_images', 'settings.ai_agent', 'settings.access', 'settings.salary'] },
     ]
   }

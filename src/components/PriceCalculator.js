@@ -10,7 +10,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
   const [category, setCategory] = useState('')
   const [productId, setProductId] = useState('')
   const [unit, setUnit] = useState('PCS')
-  const [qty, setQty] = useState(1000)
+  const [qty, setQty] = useState(1)
   const [printingColors, setPrintingColors] = useState('3 Warna')
   const [addons, setAddons] = useState([]) // [{ id: Date.now(), productId: '', qty: 1 }]
 
@@ -72,8 +72,9 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
     }
   })
 
-  const finalPricePerPcs = basePricePerPcs * unitMultiplier;
-  const totalPrice = (finalPricePerPcs * qty) + addonsTotal
+  const baseUnitPrice = basePricePerPcs * unitMultiplier;
+  const totalPrice = (baseUnitPrice * qty) + addonsTotal
+  const finalUnitPrice = qty > 0 ? totalPrice / qty : 0
 
   const handleAddAddon = () => {
     setAddons([...addons, { id: Date.now(), productId: '', qty: 1 }])
@@ -109,6 +110,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                       setCategory('')
                       setProductId('')
                       setUnit('PCS')
+                      setQty(getMinQty({ orderType: type, category: '', printingColors, pricelistConfig }))
                     }}
                     className={`h-7 rounded-lg border px-2.5 text-[10px] font-semibold transition-colors ${isSelected ? 'border-primary/50 bg-primary/15 text-primary' : 'border-white/10 bg-white/5 text-foreground/70 hover:border-primary/40 hover:text-foreground'}`}
                   >
@@ -131,6 +133,7 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                 setProductId(nextProductId)
                 setCategory(nextProduct?.category || '')
                 setUnit('PCS')
+                setQty(getMinQty({ orderType, category: nextProduct?.category || '', printingColors, pricelistConfig }))
               }}
               options={[
                 ...filteredProducts.map(p => ({ value: p.id, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
@@ -179,7 +182,10 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                     name="printingColors" 
                     className="text-blue-500"
                     checked={printingColors === '3 Warna'} 
-                    onChange={() => setPrintingColors('3 Warna')} 
+                    onChange={() => {
+                      setPrintingColors('3 Warna')
+                      setQty(getMinQty({ orderType, category, printingColors: '3 Warna', pricelistConfig }))
+                    }}
                   />
                   <span className="text-blue-400 font-bold">3 Warna</span>
                 </label>
@@ -189,7 +195,10 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                     name="printingColors" 
                     className="text-purple-500"
                     checked={printingColors === '4 Warna'} 
-                    onChange={() => setPrintingColors('4 Warna')} 
+                    onChange={() => {
+                      setPrintingColors('4 Warna')
+                      setQty(getMinQty({ orderType, category, printingColors: '4 Warna', pricelistConfig }))
+                    }}
                   />
                   <span className="text-purple-400 font-bold">4 Warna</span>
                 </label>
@@ -200,7 +209,10 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
 
         {addons.length > 0 && (
           <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
-            <h3 className="text-xs font-bold text-foreground/80">Item Tambahan (Add-on)</h3>
+            <div>
+              <h3 className="text-xs font-bold text-foreground/80">Item Tambahan (Add-on)</h3>
+              <p className="mt-1 text-[11px] text-foreground/50">Cari dengan nama atau kategori, misalnya “tutup”.</p>
+            </div>
             {addons.map((addon, idx) => (
               <div key={addon.id} className="flex items-center gap-2">
                 <div className="flex-1">
@@ -208,9 +220,10 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
                     value={addon.productId} 
                     onChange={(e) => handleAddonChange(addon.id, 'productId', e.target.value)} 
                     searchable={true}
+                    placeholder="Cari item tambahan..."
                     options={[
                       { value: "", label: "- Pilih Add-on -" },
-                      ...products.map(p => ({ value: p.id, label: p.name }))
+                      ...products.map(p => ({ value: p.id, label: `${p.name}${p.category ? ` — ${p.category}` : ''}` }))
                     ]} 
                   />
                 </div>
@@ -238,9 +251,15 @@ export default function PriceCalculator({ products = [], dropdownConfig = {}, pr
         </div>
 
         <div className="mt-auto pt-4 border-t border-white/10 space-y-2">
+          {addonsTotal > 0 && (
+            <div className="flex justify-between text-xs text-foreground/60">
+              <span>Total biaya add-on</span>
+              <span>Rp {addonsTotal.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+            </div>
+          )}
           <div className="flex justify-between text-xs text-foreground/60">
-            <span>Harga Satuan (Rp)</span>
-            <span>Rp {finalPricePerPcs.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
+            <span>Harga Satuan (termasuk add-on)</span>
+            <span>Rp {finalUnitPrice.toLocaleString('id-ID', { maximumFractionDigits: 0 })}</span>
           </div>
         </div>
       </div>
