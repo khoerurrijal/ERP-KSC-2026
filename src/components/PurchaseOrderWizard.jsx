@@ -219,7 +219,7 @@ export default function PurchaseOrderWizard({ suppliers, products, workshops, in
           if (selectedProduct) {
             updated.category = selectedProduct.category || ''
             updated.product_id = selectedProduct.product_code
-            updated.unit_cost = selectedProduct.base_price || 0
+            updated.unit_cost = Number(selectedProduct.price_polos) > 0 ? selectedProduct.price_polos : 0
             updated.unit = 'PCS'
             updated.unit_multiplier = 1
           } else {

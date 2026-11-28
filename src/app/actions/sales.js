@@ -4,7 +4,7 @@ import { isSablonProductionItem } from '@/utils/productionColorPasses.mjs'
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
 import { handleAutoStatusUpdate } from '@/app/dashboard/production/actions'
-import { calculateDynamicHPP, calculateCostSnapshot } from '@/utils/pricing'
+import { getNormalizedProductHPP, calculateCostSnapshot } from '@/utils/pricing'
 import { createAdminNotification } from '@/lib/adminNotifications'
 import { formatVirtualProductDescription } from '@/utils/virtualTransactionDescription'
 import { isKingInternalCustomerType, isKingInternalOrder, KING_INTERNAL_PURCHASE_MARKER } from '@/utils/kingInternalPurchase.mjs'
@@ -121,7 +121,7 @@ export async function createSalesOrder(payload) {
       for (const [code, demand] of quantitiesByProduct) {
         const { data: product, error: productError } = await supabase
           .from('products')
-          .select('product_code, name, category, workshop_code, base_price, stock_qty, physical_stock, is_active')
+          .select('product_code, name, category, workshop_code, base_price, price_polos, stock_qty, physical_stock, is_active')
           .eq('product_code', code)
           .single()
         if (productError || !product) throw new Error(`Produk ${code} tidak ditemukan.`)
@@ -180,16 +180,16 @@ export async function createSalesOrder(payload) {
     for (const item of items) {
       const { data: product } = isKingInternal
         ? { data: internalProducts.get(String(item.product_id || '').trim()) }
-        : await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single();
+        : await supabase.from('products').select('workshop_code, base_price, price_polos, category, name').eq('product_code', item.product_id).single();
 
-      const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
+      const normalizedHPP = getNormalizedProductHPP(product);
       
       const snapshot = calculateCostSnapshot({
         product,
         orderType: isKingInternal ? 'POLOS' : item.order_type,
         qty: item.qty,
         unitMultiplier: item.unit_multiplier,
-        dynamicHPP,
+        normalizedHPP,
         profitGudangNom,
         profitGlobalPct
       });
@@ -245,15 +245,15 @@ export async function createSalesOrder(payload) {
     for (const item of items) {
       const { data: product } = isKingInternal
         ? { data: internalProducts.get(String(item.product_id || '').trim()) }
-        : await supabase.from('products').select('workshop_code, base_price, category').eq('product_code', item.product_id).single();
-      const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0);
+        : await supabase.from('products').select('workshop_code, base_price, price_polos, category').eq('product_code', item.product_id).single();
+      const normalizedHPP = getNormalizedProductHPP(product);
 
       const snapshot = calculateCostSnapshot({
         product,
         orderType: isKingInternal ? 'POLOS' : item.order_type,
         qty: item.qty,
         unitMultiplier: item.unit_multiplier,
-        dynamicHPP,
+        normalizedHPP,
         profitGudangNom,
         profitGlobalPct
       });
@@ -284,7 +284,7 @@ export async function createSalesOrder(payload) {
         unit_multiplier: item.unit_multiplier || 1,
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
-        hpp_price: dynamicHPP,
+        hpp_price: normalizedHPP,
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,
@@ -649,16 +649,16 @@ export async function updateSalesOrder(soId, payload) {
       const productCode = String(item.product_id || '').toUpperCase()
       if (isLegacySalesAddonCode(productCode)) continue
 
-      const { data: product } = await supabase.from('products').select('workshop_code, base_price, category, name').eq('product_code', item.product_id).single()
+      const { data: product } = await supabase.from('products').select('workshop_code, base_price, price_polos, category, name').eq('product_code', item.product_id).single()
       
-      const dynamicHPP = await calculateDynamicHPP(supabase, item.product_id, product?.base_price || 0)
+      const normalizedHPP = getNormalizedProductHPP(product)
       
       const snapshot = calculateCostSnapshot({
         product,
         orderType: item.order_type,
         qty: item.qty,
         unitMultiplier: item.unit_multiplier,
-        dynamicHPP,
+        normalizedHPP,
         profitGudangNom,
         profitGlobalPct
       });
@@ -704,7 +704,7 @@ export async function updateSalesOrder(soId, payload) {
         unit_multiplier: item.unit_multiplier || 1,
         unit_price: Number(item.price),
         total_price: Number(item.qty) * Number(item.price),
-        hpp_price: dynamicHPP,
+        hpp_price: normalizedHPP,
         beli_gudang: snapshot.beliGudang,
         beli_global: snapshot.beliGlobal,
         royalty_fee: snapshot.royaltyFee,

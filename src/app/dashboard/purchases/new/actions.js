@@ -2,6 +2,7 @@
 
 import { createAuthorizedAdminClient } from '@/lib/adminAuth'
 import { revalidatePath } from 'next/cache'
+import { getNormalizedProductHPP } from '@/utils/pricing'
 
 const isValidDateOnly = value => {
   if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
@@ -38,8 +39,48 @@ export async function createPurchaseOrder(payload) {
     payload = { ...payload, items: normalizedItems, grandTotal: normalizedGrandTotal }
 
     // Dynamically import to avoid circular dependencies if any
-    const { recalculateProductPrices } = await import('@/app/actions/pricing')
+    const { updateProductHPPFromReceipt } = await import('@/app/actions/pricing')
     const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
+
+    const receiptByProduct = new Map()
+    for (const item of normalizedItems) {
+      const receivedQty = item.qty * item.unit_multiplier
+      const receipt = receiptByProduct.get(item.product_id) || { receivedQty: 0, receivedValue: 0 }
+      receipt.receivedQty += receivedQty
+      receipt.receivedValue += receivedQty * item.unit_cost
+      receiptByProduct.set(item.product_id, receipt)
+    }
+
+    const productCodes = [...receiptByProduct.keys()]
+    const { data: products, error: productsError } = await supabase
+      .from('products')
+      .select('product_code, name, category, physical_stock, stock_qty, base_price, price_polos')
+      .in('product_code', productCodes)
+
+    if (productsError) return { success: false, error: 'Gagal membaca modal dan stok produk sebelum PO.' }
+
+    const productsByCode = new Map((products || []).map(product => [product.product_code, product]))
+    const productCostSnapshots = new Map()
+    for (const productCode of productCodes) {
+      const product = productsByCode.get(productCode)
+      if (!product) return { success: false, error: `Produk ${productCode} tidak ditemukan.` }
+
+      const category = String(product.category || '').toLowerCase()
+      const isNonStock = category.includes('jasa') || category.includes('printing')
+      if (isNonStock) continue
+
+      const stockValue = product.physical_stock ?? product.stock_qty ?? 0
+      const currentStockQty = Number(stockValue)
+      if (!Number.isFinite(currentStockQty)) {
+        return { success: false, error: `Stok fisik ${product.name} tidak valid, PO belum disimpan.` }
+      }
+
+      productCostSnapshots.set(productCode, {
+        currentStockQty: Math.max(0, currentStockQty),
+        currentHPP: getNormalizedProductHPP(product),
+        previousPricePolos: product.price_polos
+      })
+    }
 
     // 1. Generate PO Number
     const poNumber = `PO-${Date.now().toString().slice(-6)}`
@@ -142,14 +183,42 @@ export async function createPurchaseOrder(payload) {
       }
     }
 
-    // 6. Recalculate Dynamic Pricing for all affected products
-    const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
-    for (const prodCode of uniqueProducts) {
-      await recalculateProductPrices(prodCode)
+    // 6. Update modal master from this newly received PO. Manual normalization in
+    // the product master becomes the starting cost for the next receipt.
+    const updatedProductCosts = []
+    for (const [productCode, receipt] of receiptByProduct) {
+      const snapshot = productCostSnapshots.get(productCode)
+      if (!snapshot) continue
+
+      const hppUpdate = await updateProductHPPFromReceipt(productCode, {
+        ...snapshot,
+        ...receipt
+      })
+
+      if (!hppUpdate.success) {
+        const restoreErrors = []
+        for (const updatedCost of updatedProductCosts) {
+          const { error: restoreError } = await supabase
+            .from('products')
+            .update({ price_polos: updatedCost.previousPricePolos })
+            .eq('product_code', updatedCost.productCode)
+          if (restoreError) restoreErrors.push(restoreError.message)
+        }
+        await supabase.from('transactions').delete().eq('po_id', po.id)
+        const { error: rollbackError } = await supabase.from('purchase_orders').delete().eq('id', po.id)
+        if (rollbackError || restoreErrors.length > 0) {
+          const rollbackDetails = [rollbackError?.message, ...restoreErrors].filter(Boolean).join('; ')
+          return { success: false, error: `PO tersimpan, tetapi pemulihan otomatis gagal: ${hppUpdate.error || rollbackDetails}` }
+        }
+        return { success: false, error: `PO dibatalkan karena HPP master gagal diperbarui: ${hppUpdate.error || 'kesalahan tidak diketahui'}` }
+      }
+
+      updatedProductCosts.push({ productCode, previousPricePolos: snapshot.previousPricePolos })
     }
 
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/purchases')
+    revalidatePath('/dashboard/master/products')
     revalidatePath('/dashboard')
     revalidatePath('/pricelist')
 
@@ -162,10 +231,11 @@ export async function createPurchaseOrder(payload) {
 
 export async function updatePurchaseOrder(id, payload) {
   try {
+    // Historical PO edits change stock through the existing trigger. They do not
+    // overwrite the normalized current HPP from an incomplete PO history.
     if (payload?.paymentStatus === 'LUNAS' && !isValidDateOnly(payload.paymentDate)) {
       return { success: false, error: 'Tanggal pelunasan purchase order tidak valid.' }
     }
-    const { recalculateProductPrices } = await import('@/app/actions/pricing')
     const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     const { data: poInfo } = await supabase
@@ -176,13 +246,6 @@ export async function updatePurchaseOrder(id, payload) {
     const poNumber = poInfo?.po_number || 'PO'
 
     // 1. Stock reverting is automatically handled by DB Trigger on purchase_items BEFORE DELETE
-    const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
-    
-    if (oldItems && oldItems.length > 0) {
-       // Just fetch old items for pricing recalculation later
-    }
-
-    // 2. We will handle deletion carefully later
 
     // 3. Update Purchase Order
     let finalSupplierCode = payload.supplierId;
@@ -305,12 +368,6 @@ export async function updatePurchaseOrder(id, payload) {
         .eq('po_id', id)
     }
 
-    // 6. Recalculate Dynamic Pricing for all affected products
-    const uniqueProducts = [...new Set(payload.items.map(i => i.product_id))]
-    for (const prodCode of uniqueProducts) {
-      await recalculateProductPrices(prodCode)
-    }
-
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/purchases')
     revalidatePath('/dashboard')
@@ -325,7 +382,8 @@ export async function updatePurchaseOrder(id, payload) {
 
 export async function deletePurchaseOrder(id) {
   try {
-    const { recalculateProductPrices } = await import('@/app/actions/pricing')
+    // Keep the current normalized HPP; deleting a historical receipt does not
+    // reconstruct costs already issued to prior orders.
     const { supabase } = await createAuthorizedAdminClient(['ADMIN', 'OWNER', 'OPERATOR'], 'Akun Anda tidak memiliki akses pembelian.')
 
     // 1. Ambil PO sebelum dihapus untuk rollback cash dan pricing
@@ -335,8 +393,6 @@ export async function deletePurchaseOrder(id) {
       .eq('id', id)
       .single()
     if (poFetchErr || !po) throw new Error('PO tidak ditemukan.')
-
-    const { data: oldItems } = await supabase.from('purchase_items').select('*').eq('po_id', id)
 
     // 2. Rollback cash OUT jika PO pernah LUNAS
     // Gunakan exact po_id FK — bukan LIKE description
@@ -350,14 +406,6 @@ export async function deletePurchaseOrder(id) {
     // 3. Hapus PO (items CASCADE via FK)
     const { error } = await supabase.from('purchase_orders').delete().eq('id', id)
     if (error) throw new Error(error.message)
-
-    // 4. Recalculate Dynamic Pricing for affected products
-    if (oldItems && oldItems.length > 0) {
-      const uniqueProducts = [...new Set(oldItems.map(i => i.product_code))]
-      for (const prodCode of uniqueProducts) {
-        await recalculateProductPrices(prodCode)
-      }
-    }
 
     revalidatePath('/dashboard/inventory')
     revalidatePath('/dashboard/purchases')

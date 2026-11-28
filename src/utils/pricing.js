@@ -13,7 +13,7 @@ export function calculateItemPrice({
 }) {
   if (!product) return 0;
   
-  const baseHpp = Number(product.price_polos || product.base_price || 0);
+  const baseHpp = getNormalizedProductHPP(product);
   const qtyInt = parseInt(qty, 10) || 1;
   const isSablon = (orderType || '').toUpperCase() === 'SABLON';
   const isPrinting = (orderType || '').toUpperCase() === 'PRINTING';
@@ -125,25 +125,25 @@ export function getMinQty({ orderType, category, printingColors, pricelistConfig
   return 1;
 }
 
-export async function calculateDynamicHPP(supabase, productCode, fallbackPrice) {
-  try {
-    const { data: purchases, error } = await supabase
-      .from('purchase_items')
-      .select('unit_price')
-      .eq('product_code', productCode)
-      .order('id', { ascending: false });
-      
-    if (error || !purchases || purchases.length === 0) return fallbackPrice;
-    
-    if (purchases.length >= 3) {
-      const sum = purchases.reduce((acc, curr) => acc + Number(curr.unit_price || 0), 0);
-      return sum / purchases.length;
-    } else {
-      return Math.max(...purchases.map(p => Number(p.unit_price || 0)));
-    }
-  } catch(e) {
-    return fallbackPrice;
-  }
+export function getNormalizedProductHPP(product) {
+  const normalizedHPP = Number(product?.price_polos);
+  return Number.isFinite(normalizedHPP) && normalizedHPP > 0 ? normalizedHPP : 0;
+}
+
+export function calculateWeightedAverageHPP({ currentStockQty, currentHPP, receivedQty, receivedValue }) {
+  const stockQty = Number(currentStockQty);
+  const hpp = Number(currentHPP);
+  const incomingQty = Number(receivedQty);
+  const incomingValue = Number(receivedValue);
+
+  if (![stockQty, hpp, incomingQty, incomingValue].every(Number.isFinite)) return null;
+  if (stockQty < 0 || hpp < 0 || incomingQty <= 0 || incomingValue < 0) return null;
+
+  const totalQty = stockQty + incomingQty;
+  if (totalQty <= 0) return null;
+
+  const weightedHPP = ((stockQty * hpp) + incomingValue) / totalQty;
+  return Math.round(weightedHPP * 100) / 100;
 }
 
 export function calculateCostSnapshot({
@@ -151,14 +151,14 @@ export function calculateCostSnapshot({
   orderType,        // String: 'POLOS', 'SABLON', 'PRINTING'
   qty,              // Number
   unitMultiplier,   // Number (default 1)
-  dynamicHPP,       // Number
+  normalizedHPP,    // Number from the product's normalized master cost
   profitGudangNom,  // Number
   profitGlobalPct   // Number
 }) {
   const qtyNum = Number(qty || 0);
   const mult = Number(unitMultiplier || 1);
   const actualQty = qtyNum * mult;
-  const itemHppTotal = dynamicHPP * actualQty;
+  const itemHppTotal = normalizedHPP * actualQty;
 
   const category = (product?.category || '').toLowerCase();
   const isPlastik = category.includes('plastik');
